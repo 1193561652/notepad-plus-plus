@@ -1,0 +1,9 @@
+main.title=new 6 - Notepad++
+main.size=1100x760
+find.title=Find
+find.size=573x375
+preferences.title=Preferences
+preferences.size=830x372
+ui.font=Segoe UI,9
+find.tabs=5
+preferences.pages=19

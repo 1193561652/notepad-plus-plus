@@ -1,50 +1,80 @@
-What is Notepad++ ?
-===================
+# Notepad++ for Qt
 
-[![GitHub release](https://img.shields.io/github/release/notepad-plus-plus/notepad-plus-plus.svg)](../../releases/latest)
-&nbsp;&nbsp;&nbsp;&nbsp;[![Appveyor build status](https://ci.appveyor.com/api/projects/status/github/notepad-plus-plus/notepad-plus-plus?branch=master&svg=true)](https://ci.appveyor.com/project/donho/notepad-plus-plus)
-&nbsp;&nbsp;&nbsp;&nbsp;[![Join the disscussions at https://community.notepad-plus-plus.org/](https://notepad-plus-plus.org/assets/images/NppCommunityBadge.svg)](https://community.notepad-plus-plus.org/)
+Notepad++ for Qt is a cross-platform port of Notepad++ v8.4.6. The project
+targets behavioral, configuration, and workflow compatibility while replacing
+Win32-specific implementation with Qt and standard C++.
 
-Notepad++ is a free (free as in both "free speech" and "free beer") source code
-editor and Notepad replacement that supports several programming languages and
-natural languages. Running in the MS Windows environment, its use is governed by
-[GPL License](LICENSE).
+## Stack
 
-See the [Notepad++ official site](https://notepad-plus-plus.org/) for more information.
+- C++14
+- Qt 5 / Qt Widgets
+- CMake
+- Bundled QScintilla 2.13.3 / Scintilla
+- Notepad++ Boost.Regex search backend
 
-Notepad++ Release Key
----------------------
-_Since the release of version 7.6.5 Notepad++ is signed using GPG with the following key:_
+## Build
 
-- **Signer:** Notepad++
-- **E-mail:** don.h@free.fr
-- **Key ID:** 0x8D84F46E
-- **Key fingerprint:** 14BC E436 2749 B2B5 1F8C 7122 6C42 9F1D 8D84 F46E
-- **Key type:** RSA 4096/4096
-- **Created:** 2019-03-11
-- **Expires:** 2024-03-11
+Install Qt 5 with a matching C++ toolchain, then configure from the repository
+root:
 
-https://github.com/notepad-plus-plus/notepad-plus-plus/blob/master/nppGpgPub.asc
+```bash
+cmake -S . -B build -DBUILD_TESTING=ON
+cmake --build build -j 4
+```
 
+The application is produced as `build/notepadpp-qt` or
+`build/notepadpp-qt.exe`.
 
-Supported OS
-------------
+Run the complete automated suite with:
 
-All the Windows systems still supported by Microsoft are supported by Notepad++. However, not all Notepad++ users can or want to use the newest system. Here is the [Supported systems information](SUPPORTED_SYSTEM.md) you may need in case you are one of them.
+```bash
+ctest --test-dir build --output-on-failure
+```
 
+See [BUILD_AND_TEST.md](BUILD_AND_TEST.md) for platform notes and targeted
+validation commands.
 
+## Platform Support
 
+- Windows with Qt 5.12.12 and MinGW is the currently verified build.
+- Linux with Qt 5 and GCC/Clang is supported by the build system and is the next
+  validation target.
+- macOS with Qt 5 and Apple Clang has a build path but has not yet been verified.
 
-Build Notepad++
----------------
+Each platform builds the bundled, project-specific static QScintilla library
+with the Notepad++ Boost.Regex backend. Linux and macOS therefore require
+`qmake` and GNU Make in addition to the CMake build tool. Packaging and plugin
+ABI compatibility are outside the current platform-build scope.
 
-Please follow [build guide](BUILD.md) to build Notepad++ from source.
+## Repository Layout
 
+- `src/`: application and Qt port implementation
+- `resources/`: compatible XML defaults, localization, icons, and parsers
+- `tests/`: behavior, configuration, and UI runtime tests
+- `third_party/qscintilla/`: bundled QScintilla and Scintilla source
+- `third_party/boostregex/`: Boost.Regex integration
+- `third_party/lexilla/`: LexUser source used by the static editor core
+- `codex/`: project knowledge base and implementation records
 
-Contribution
-------------
+## Original Source
 
-Contributions are welcome. Be mindful of our [Contribution Rules](CONTRIBUTING.md) to increase the likelihood of your contribution getting accepted.
+This branch retains the original Notepad++ repository history. Reference
+v8.4.6 behavior without a second source checkout:
 
-[Notepad++ Contributors](https://github.com/notepad-plus-plus/notepad-plus-plus/graphs/contributors)
+```bash
+git show v8.4.6:PowerEditor/src/Notepad_plus.cpp
+```
 
+## Compatibility Principles
+
+- Preserve user-visible behavior before source-level similarity.
+- Preserve Notepad++ XML formats and unknown user data.
+- Keep platform-specific code behind explicit adaptation boundaries.
+- Keep changes local and verify every completed feature.
+- Plugin ABI work remains deferred; host interfaces stay isolated.
+
+## License
+
+The port builds on Notepad++, QScintilla, Scintilla, Boost, Lexilla, Qt, and
+other bundled components. Refer to the license files and source headers in the
+repository and its Git history for component-specific terms.

@@ -1,0 +1,14 @@
+finder.results=2
+copyMarkedText=pass
+savedSearchMacro=pass
+sort.integer=pass
+sort.decimalComma=pass
+sort.rectangle=pass
+columnEditor=pass
+udlDesigner=pass
+udlRoundTrip=pass
+printPdf=pass
+external.modified=pass
+external.renamed=pass
+external.permission=pass
+external.deleted=pass

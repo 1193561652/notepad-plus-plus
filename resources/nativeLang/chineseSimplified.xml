@@ -1,0 +1,606 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Notepad++ Qt - 简体中文语言文件
+  对应原版 nativeLang/chineseSimplified.xml
+  Qt 版改动：用 objectName 替代 Win32 整数命令 ID
+-->
+<NotepadPlus>
+    <Native-Langue name="简体中文" filename="chineseSimplified.xml">
+
+        <Menu>
+            <Main>
+                <!-- 顶级菜单标题（对应原版 Entries，menuId = QMenu::objectName）-->
+                <Entries>
+                    <Item menuId="fileMenu"     name="文件(&amp;F)"/>
+                    <Item menuId="editMenu"     name="编辑(&amp;E)"/>
+                    <Item menuId="searchMenu"   name="搜索(&amp;S)"/>
+                    <Item menuId="viewMenu"     name="视图(&amp;V)"/>
+                    <Item menuId="encodingMenu" name="编码(&amp;N)"/>
+                    <Item menuId="languageMenu" name="语言(&amp;L)"/>
+                    <Item menuId="formatMenu"   name="格式(&amp;O)"/>
+                    <Item menuId="toolsMenu"    name="工具(&amp;O)"/>
+                    <Item menuId="macroMenu"    name="宏(&amp;M)"/>
+                    <Item menuId="runMenu"      name="运行(&amp;R)"/>
+                    <Item menuId="pluginsMenu"  name="插件(&amp;P)"/>
+                    <Item menuId="windowMenu"   name="窗口(&amp;W)"/>
+                    <Item menuId="settingsMenu" name="设置(&amp;T)"/>
+                    <Item menuId="helpMenu"     name="帮助(&amp;H)"/>
+                </Entries>
+
+                <!-- 子菜单标题（objectName = QMenu::objectName）-->
+                <Entries>
+                    <Item menuId="recentFilesMenu"  name="最近打开的文件(&amp;R)"/>
+                    <Item menuId="openContainingFolderMenu" name="打开所在文件夹(&amp;F)"/>
+                    <Item menuId="closeMultipleMenu" name="关闭多个文档"/>
+                    <Item menuId="insertMenu"        name="插入(&amp;I)"/>
+                    <Item menuId="lineOpsMenu"      name="行操作(&amp;L)"/>
+                    <Item menuId="sortLinesMenu"    name="行排序"/>
+                    <Item menuId="commentMenu"      name="注释/取消注释(&amp;M)"/>
+                    <Item menuId="caseMenu"         name="大小写转换(&amp;V)"/>
+                    <Item menuId="blankOperationsMenu" name="空白字符操作"/>
+                    <Item menuId="autoCompletionMenu" name="自动完成"/>
+                    <Item menuId="eolEditMenu"      name="行尾转换(&amp;E)"/>
+                    <Item menuId="bookmarkMenu"     name="书签(&amp;B)"/>
+                    <Item menuId="markMenu"         name="标记(&amp;M)"/>
+                    <Item menuId="showSymMenu"      name="显示符号(&amp;S)"/>
+                    <Item menuId="zoomMenu"         name="缩放(&amp;Z)"/>
+                    <Item menuId="moveCloneMenu"    name="移动/克隆当前文档"/>
+                    <Item menuId="foldAllMenu"      name="折叠"/>
+                    <Item menuId="userDefinedLanguageMenu" name="自定义语言"/>
+                    <Item menuId="importMenu"       name="导入"/>
+                    <Item menuId="md5Menu"          name="MD5"/>
+                    <Item menuId="sha256Menu"       name="SHA-256"/>
+                    <Item menuId="eolMenu"          name="行尾转换(&amp;E)"/>
+                    <Item menuId="convertMenu"      name="转换为"/>
+                    <Item menuId="charsetsMenu"     name="字符集"/>
+                    <Item menuId="arabicMenu"       name="阿拉伯语"/>
+                    <Item menuId="balticMenu"       name="波罗的海语系"/>
+                    <Item menuId="celticMenu"       name="凯尔特语"/>
+                    <Item menuId="centralEurMenu"   name="中欧语系"/>
+                    <Item menuId="chineseMenu"      name="中文"/>
+                    <Item menuId="cyrillicMenu"     name="西里尔语系"/>
+                    <Item menuId="greekMenu"        name="希腊语"/>
+                    <Item menuId="hebrewMenu"       name="希伯来语"/>
+                    <Item menuId="japaneseMenu"     name="日语"/>
+                    <Item menuId="koreanMenu"       name="韩语"/>
+                    <Item menuId="nordicMenu"       name="北欧语系"/>
+                    <Item menuId="romanianMenu"     name="罗马尼亚语"/>
+                    <Item menuId="thaiMenu"         name="泰语"/>
+                    <Item menuId="turkishMenu"      name="土耳其语"/>
+                    <Item menuId="vietnameseMenu"   name="越南语"/>
+                    <Item menuId="westernEurMenu"   name="西欧语系"/>
+                </Entries>
+
+                <!-- 菜单命令（objectName = QAction::objectName）-->
+                <Commands>
+                    <!-- 文件菜单 -->
+                    <Item objectName="newAction"        name="新建(&amp;N)"/>
+                    <Item objectName="openAction"       name="打开(&amp;O)..."/>
+                    <Item objectName="reloadAction"     name="从磁盘重新加载(&amp;L)"/>
+                    <Item objectName="saveAction"       name="保存(&amp;S)"/>
+                    <Item objectName="saveAsAction"     name="另存为(&amp;A)..."/>
+                    <Item objectName="saveCopyAsAction" name="另存副本为..."/>
+                    <Item objectName="saveAllAction"    name="保存所有(&amp;V)"/>
+                    <Item objectName="renameFileAction" name="重命名..."/>
+                    <Item objectName="closeAction"      name="关闭(&amp;C)"/>
+                    <Item objectName="closeAllAction"   name="关闭所有(&amp;E)"/>
+                    <Item objectName="closeAllButCurrentAction" name="关闭活动文档之外的所有文档"/>
+                    <Item objectName="closeAllToLeftAction" name="关闭左侧所有文档"/>
+                    <Item objectName="closeAllToRightAction" name="关闭右侧所有文档"/>
+                    <Item objectName="closeAllUnchangedAction" name="关闭所有未修改文档"/>
+                    <Item objectName="openContainingExplorerAction" name="资源管理器"/>
+                    <Item objectName="openContainingCmdAction" name="命令提示符"/>
+                    <Item objectName="containingFolderAsWorkspaceAction" name="文件夹作为工作区"/>
+                    <Item objectName="openDefaultViewerAction" name="使用默认查看器打开"/>
+                    <Item objectName="openFolderAsWorkspaceAction" name="打开文件夹作为工作区..."/>
+                    <Item objectName="moveToRecycleBinAction" name="移至回收站"/>
+                    <Item objectName="loadSessionAction" name="加载会话..."/>
+                    <Item objectName="saveSessionAction" name="保存会话..."/>
+                    <Item objectName="printAction" name="打印(&amp;P)..."/>
+                    <Item objectName="printNowAction" name="立即打印"/>
+                    <Item objectName="clearRecentFilesAction" name="清除最近文件"/>
+                    <Item objectName="restoreLastClosedFileAction" name="恢复最近关闭的文件"/>
+                    <Item objectName="exitAction"       name="退出(&amp;X)"/>
+
+                    <!-- 编辑菜单 -->
+                    <Item objectName="undoAction"           name="撤销(&amp;U)"/>
+                    <Item objectName="redoAction"           name="重做(&amp;R)"/>
+                    <Item objectName="cutAction"            name="剪切(&amp;T)"/>
+                    <Item objectName="copyAction"           name="复制(&amp;C)"/>
+                    <Item objectName="pasteAction"          name="粘贴(&amp;P)"/>
+                    <Item objectName="deleteSelectionAction" name="删除(&amp;D)"/>
+                    <Item objectName="selectAllAction"      name="全选(&amp;A)"/>
+                    <Item objectName="beginEndSelectAction" name="开始/结束选择"/>
+                    <Item objectName="insertDateTimeShortAction" name="日期时间（短格式）"/>
+                    <Item objectName="insertDateTimeLongAction" name="日期时间（长格式）"/>
+                    <Item objectName="insertDateTimeCustomAction" name="日期时间（自定义）"/>
+                    <Item objectName="duplicateLineAction"  name="复制当前行(&amp;U)"/>
+                    <Item objectName="deleteLineAction"     name="删除当前行(&amp;D)"/>
+                    <Item objectName="moveLineUpAction"     name="上移当前行(&amp;U)"/>
+                    <Item objectName="moveLineDownAction"   name="下移当前行(&amp;W)"/>
+                    <Item objectName="toggleCommentAction"  name="切换行注释(&amp;L)"/>
+                    <Item objectName="blockCommentAction" name="块注释"/>
+                    <Item objectName="streamCommentAction" name="流注释"/>
+                    <Item objectName="blockUncommentAction" name="取消块注释"/>
+                    <Item objectName="toUpperCaseAction"    name="大写(&amp;U)"/>
+                    <Item objectName="toLowerCaseAction"    name="小写(&amp;L)"/>
+                    <Item objectName="properCaseAction" name="词首字母大写"/>
+                    <Item objectName="sentenceCaseAction" name="句首字母大写"/>
+                    <Item objectName="invertCaseAction" name="反转大小写"/>
+                    <Item objectName="removeEmptyLinesAction" name="删除空行"/>
+                    <Item objectName="removeBlankLinesAction" name="删除含空白字符的空行"/>
+                    <Item objectName="sortLexicographicAscendingAction" name="按字典顺序升序"/>
+                    <Item objectName="sortLexicographicDescendingAction" name="按字典顺序降序"/>
+                    <Item objectName="sortAscendingIgnoreCaseAction" name="忽略大小写升序"/>
+                    <Item objectName="sortDescendingIgnoreCaseAction" name="忽略大小写降序"/>
+                    <Item objectName="reverseLineOrderAction" name="反转行顺序"/>
+                    <Item objectName="trimTrailingSpaceAction" name="删除行尾空格"/>
+                    <Item objectName="trimLeadingSpaceAction" name="删除行首空格"/>
+                    <Item objectName="trimBothAction" name="删除行首和行尾空格"/>
+                    <Item objectName="tabToSpaceAction" name="制表符转为空格"/>
+                    <Item objectName="spaceToTabLeadingAction" name="行首空格转为制表符"/>
+                    <Item objectName="spaceToTabAllAction" name="所有空格转为制表符"/>
+                    <Item objectName="columnModeTipAction" name="列模式..."/>
+                    <Item objectName="columnEditorAction" name="列编辑器..."/>
+                    <Item objectName="functionCompletionAction" name="函数自动完成"/>
+                    <Item objectName="wordCompletionAction" name="单词自动完成"/>
+                    <Item objectName="functionParametersHintAction" name="函数参数提示"/>
+                    <Item objectName="eolWindowsAction"     name="Windows (CRLF)(&amp;W)"/>
+                    <Item objectName="eolUnixAction"        name="Unix (LF)(&amp;U)"/>
+                    <Item objectName="eolMacAction"         name="Mac (CR)(&amp;M)"/>
+
+                    <!-- 搜索菜单 -->
+                    <Item objectName="findAction"               name="查找(&amp;F)..."/>
+                    <Item objectName="findNextAction" name="查找下一个(&amp;N)"/>
+                    <Item objectName="findPreviousAction" name="查找上一个(&amp;P)"/>
+                    <Item objectName="replaceAction"            name="替换(&amp;R)..."/>
+                    <Item objectName="findInFilesAction" name="在文件中查找..."/>
+                    <Item objectName="findAllOpenedDocsAction" name="在所有已打开文档中查找全部"/>
+                    <Item objectName="searchOnInternetAction" name="在互联网上搜索"/>
+                    <Item objectName="goToLineAction"           name="转到(&amp;G)..."/>
+                    <Item objectName="goToMatchingBraceAction" name="转到匹配括号"/>
+                    <Item objectName="toggleBookmarkAction"     name="切换书签(&amp;B)"/>
+                    <Item objectName="nextBookmarkAction"       name="下一个书签(&amp;N)"/>
+                    <Item objectName="prevBookmarkAction"       name="上一个书签(&amp;P)"/>
+                    <Item objectName="clearBookmarksAction"     name="清除所有书签(&amp;A)"/>
+                    <Item objectName="markDialogAction" name="标记..."/>
+                    <Item objectName="jumpUpMarkedAction" name="向上跳转"/>
+                    <Item objectName="jumpDownMarkedAction" name="向下跳转"/>
+                    <Item objectName="clearAllMarksAction" name="清除所有标记"/>
+
+                    <!-- 视图菜单 -->
+                    <Item objectName="showWhitespaceAction" name="显示空格和制表符(&amp;T)"/>
+                    <Item objectName="showIndentAction"     name="显示缩进线(&amp;I)"/>
+                    <Item objectName="alwaysOnTopAction" name="总在最前"/>
+                    <Item objectName="fullScreenAction" name="切换全屏模式"/>
+                    <Item objectName="postItAction" name="便笺模式"/>
+                    <Item objectName="toolbarAction" name="工具栏"/>
+                    <Item objectName="statusBarAction" name="状态栏"/>
+                    <Item objectName="showEolAction" name="显示行尾符"/>
+                    <Item objectName="showAllCharactersAction" name="显示所有字符"/>
+                    <Item objectName="zoomInAction"         name="放大(&amp;I)"/>
+                    <Item objectName="zoomOutAction"        name="缩小(&amp;O)"/>
+                    <Item objectName="zoomRestoreAction"    name="恢复默认缩放(&amp;Z)"/>
+                    <Item objectName="moveToOtherAction"    name="移动到另一视图(&amp;M)"/>
+                    <Item objectName="cloneToOtherAction"   name="克隆到另一视图(&amp;C)"/>
+                    <Item objectName="wordWrapAction"       name="自动换行(&amp;W)"/>
+                    <Item objectName="splitViewAction"      name="分割视图(&amp;S)"/>
+                    <Item objectName="rotateSplitAction"    name="旋转分割视图(&amp;R)"/>
+                    <Item objectName="fileBrowserAction"    name="文件夹作为工作区(&amp;W)"/>
+                    <Item objectName="docMapAction"         name="文档地图(&amp;D)"/>
+                    <Item objectName="funcListAction"       name="函数列表(&amp;F)"/>
+                    <Item objectName="documentListAction" name="文档列表"/>
+                    <Item objectName="projectPanelsAction" name="项目面板"/>
+                    <Item objectName="clipboardHistoryAction" name="剪贴板历史"/>
+                    <Item objectName="characterPanelAction" name="字符面板"/>
+                    <Item objectName="foldCurrentLevelAction" name="折叠当前层级"/>
+                    <Item objectName="unfoldCurrentLevelAction" name="展开当前层级"/>
+                    <Item objectName="collapseAllAction" name="全部折叠"/>
+                    <Item objectName="uncollapseAllAction" name="全部展开"/>
+
+                    <!-- 语言、设置与工具菜单 -->
+                    <Item objectName="plainTextLanguageAction" name="无（普通文本）"/>
+                    <Item objectName="styleConfiguratorAction" name="语言格式设置..."/>
+                    <Item objectName="shortcutMapperAction" name="快捷键管理..."/>
+                    <Item objectName="importPluginsAction" name="导入插件..."/>
+                    <Item objectName="importStyleThemesAction" name="导入主题..."/>
+                    <Item objectName="editContextMenuAction" name="编辑右键菜单"/>
+                    <Item objectName="md5GenerateAction" name="生成..."/>
+                    <Item objectName="md5FromFilesAction" name="从文件生成..."/>
+                    <Item objectName="md5ToClipboardAction" name="生成到剪贴板"/>
+                    <Item objectName="sha256GenerateAction" name="生成..."/>
+                    <Item objectName="sha256FromFilesAction" name="从文件生成..."/>
+                    <Item objectName="sha256ToClipboardAction" name="生成到剪贴板"/>
+
+                    <!-- 编码菜单 -->
+                    <Item objectName="encAnsiAction"        name="以 ANSI 编码"/>
+                    <Item objectName="encUtf8Action"        name="以 UTF-8 编码"/>
+                    <Item objectName="encUtf8BomAction"     name="以 UTF-8 编码（含 BOM）"/>
+                    <Item objectName="encUtf16BEAction"     name="以 UTF-16 BE BOM 编码"/>
+                    <Item objectName="encUtf16LEAction"     name="以 UTF-16 LE BOM 编码"/>
+                    <Item objectName="convAnsiAction"       name="ANSI"/>
+                    <Item objectName="convUtf8Action"       name="UTF-8"/>
+                    <Item objectName="convUtf8BomAction"    name="UTF-8（含 BOM）"/>
+                    <Item objectName="convUtf16BEAction"    name="UTF-16 BE BOM"/>
+                    <Item objectName="convUtf16LEAction"    name="UTF-16 LE BOM"/>
+                    <Item objectName="encGb18030Action"     name="GB18030（简体）"/>
+                    <Item objectName="encBig5Action"        name="Big5（繁体）"/>
+
+                    <!-- 宏菜单 -->
+                    <Item objectName="startRecordAction"    name="开始录制(&amp;C)"/>
+                    <Item objectName="stopRecordAction"     name="停止录制(&amp;T)"/>
+                    <Item objectName="playMacroAction"      name="回放(&amp;P)"/>
+                    <Item objectName="saveMacroAction"      name="保存宏(&amp;S)..."/>
+                    <Item objectName="loadMacroAction"      name="加载宏(&amp;L)..."/>
+
+                    <!-- 运行、插件、窗口与帮助菜单 -->
+                    <Item objectName="runDialogAction" name="运行..."/>
+                    <Item objectName="noPluginsLoadedAction" name="未加载插件"/>
+                    <Item objectName="windowsDialogAction" name="窗口..."/>
+                    <Item objectName="sortByNameAscAction" name="按名称升序排序"/>
+                    <Item objectName="sortByNameDescAction" name="按名称降序排序"/>
+                    <Item objectName="copyNamesAction" name="复制名称到剪贴板"/>
+                    <Item objectName="copyPathsAction" name="复制完整路径到剪贴板"/>
+                    <Item objectName="homeAction" name="Notepad++ 主页"/>
+                    <Item objectName="onlineDocsAction" name="在线文档"/>
+                    <Item objectName="cmdArgsAction" name="命令行参数"/>
+                    <Item objectName="debugInfoAction" name="调试信息..."/>
+
+                    <!-- 设置菜单 -->
+                    <Item objectName="preferencesAction"    name="偏好设置(&amp;P)..."/>
+
+                    <!-- 帮助菜单 -->
+                    <Item objectName="aboutAction"          name="关于(&amp;A)"/>
+
+                    <!-- 停靠面板标题 -->
+                    <Item objectName="FileBrowserDock"          name="文件夹作为工作区"/>
+                    <Item objectName="DocumentMapDock"          name="文档地图"/>
+                    <Item objectName="FunctionListDock"         name="函数列表"/>
+                    <Item objectName="FindResultDock"           name="查找结果"/>
+                    <Item objectName="DocumentListDock"         name="文档列表"/>
+                    <Item objectName="ProjectPanelsDock"        name="项目面板"/>
+                    <Item objectName="ClipboardHistoryDock"     name="剪贴板历史"/>
+                    <Item objectName="CharacterPanelDock"       name="字符面板"/>
+                    <Item objectName="StandardToolBar"          name="标准工具栏"/>
+                </Commands>
+            </Main>
+        </Menu>
+
+        <!-- 通用字符串（对应原版 <Strings>，用于消息框等）-->
+        <Strings>
+            <Item id="normalText"          name="普通文本"/>
+            <Item id="fileSaved"           name="文件已保存"/>
+            <Item id="fileReloaded"        name="文件已重新加载"/>
+            <Item id="macroRecordStart"    name="宏录制已开始..."/>
+            <Item id="macroRecordStop"     name="宏录制已停止。"/>
+        </Strings>
+
+        <!-- 偏好设置对话框 -->
+        <Dialog name="Preferences" title="偏好设置">
+            <!-- 左侧页面列表（pageList_N = QListWidget objectName="pageList" 的第 N 项）-->
+            <Item objectName="pageList_0"  name="通用"/>
+            <Item objectName="pageList_1"  name="编辑"/>
+            <Item objectName="pageList_2"  name="深色模式"/>
+            <Item objectName="pageList_3"  name="边距/边框/边缘"/>
+            <Item objectName="pageList_4"  name="新建文档"/>
+            <Item objectName="pageList_5"  name="默认目录"/>
+            <Item objectName="pageList_6"  name="最近文件历史"/>
+            <Item objectName="pageList_7"  name="文件关联"/>
+            <Item objectName="pageList_8"  name="语言"/>
+            <Item objectName="pageList_9"  name="高亮"/>
+            <Item objectName="pageList_10" name="打印"/>
+            <Item objectName="pageList_11" name="搜索"/>
+            <Item objectName="pageList_12" name="备份"/>
+            <Item objectName="pageList_13" name="自动完成"/>
+            <Item objectName="pageList_14" name="多实例与日期"/>
+            <Item objectName="pageList_15" name="分隔符"/>
+            <Item objectName="pageList_16" name="云与链接"/>
+            <Item objectName="pageList_17" name="搜索引擎"/>
+            <Item objectName="pageList_18" name="其他"/>
+
+            <!-- 1. 通用页 -->
+            <Item objectName="grpToolBar"           name="工具栏"/>
+            <Item objectName="chkHideToolbar"       name="隐藏"/>
+            <Item objectName="grpTabBar"            name="标签栏"/>
+            <Item objectName="chkTabHide"           name="隐藏标签栏"/>
+            <Item objectName="chkTabDragDrop"       name="启用拖拽"/>
+            <Item objectName="chkTabTopBar"         name="在活动标签上绘制彩色条"/>
+            <Item objectName="chkTabInactiveTab"    name="以不同方式绘制非活动标签"/>
+            <Item objectName="chkTabCloseBtn"       name="在每个标签上显示关闭按钮"/>
+            <Item objectName="chkTabDblClickClose"  name="双击关闭文档"/>
+            <Item objectName="chkTabVertical"       name="垂直（旋转 90°）"/>
+            <Item objectName="chkTabMultiLine"      name="多行"/>
+            <Item objectName="chkTabQuitOnEmpty"    name="关闭最后一个标签时退出程序"/>
+            <Item objectName="grpBarGroup"          name="状态栏 / 菜单栏"/>
+            <Item objectName="chkShowStatusBar"     name="显示状态栏"/>
+            <Item objectName="chkShowMenuBar"       name="显示菜单栏"/>
+            <Item objectName="grpEditorFont"        name="编辑器字体"/>
+            <Item objectName="lblFontSize"          name="大小："/>
+
+            <!-- 2. 编辑页 -->
+            <Item objectName="grpCaretScrolling"        name="光标和滚动"/>
+            <Item objectName="chkAutoIndent"            name="自动缩进"/>
+            <Item objectName="chkScrollBeyondLastLine"  name="允许滚动超出最后一行"/>
+            <Item objectName="grpLineWrap"              name="自动换行"/>
+            <Item objectName="chkWordWrap"              name="启用自动换行"/>
+            <Item objectName="lblWrapIndentMode"        name="换行缩进模式："/>
+            <Item objectName="rbLwDefault"              name="默认（连续）"/>
+            <Item objectName="rbLwAlign"                name="对齐到开头括号"/>
+            <Item objectName="rbLwIndent"               name="缩进"/>
+            <Item objectName="grpDisplay"               name="显示"/>
+            <Item objectName="chkShowWhitespace"        name="显示空白字符"/>
+            <Item objectName="chkShowEol"               name="显示行尾字符"/>
+
+            <!-- 4. 边距/边框/边缘页 -->
+            <Item objectName="grpMargins"               name="边距"/>
+            <Item objectName="chkLineNumbers"           name="显示行号边距"/>
+            <Item objectName="chkBookmarkMargin"        name="显示书签边距"/>
+            <Item objectName="chkFoldMargin"            name="显示折叠边距"/>
+            <Item objectName="chkIndentGuideLine"       name="显示缩进指南线"/>
+            <Item objectName="chkCurrentLineHighlight"  name="高亮当前行"/>
+            <Item objectName="chkWrapSymbolShow"        name="在行尾显示换行符号"/>
+            <Item objectName="grpEdgeLine"              name="垂直边缘线"/>
+            <Item objectName="chkEdgeShow"              name="在列处显示垂直边缘："/>
+            <Item objectName="lblEdgeColumn"            name="列："/>
+
+            <!-- 5. 新建文档页 -->
+            <Item objectName="grpFormat"            name="格式（行尾）"/>
+            <Item objectName="rbFmtWindows"         name="Windows (CR LF)"/>
+            <Item objectName="rbFmtUnix"            name="Unix (LF)"/>
+            <Item objectName="rbFmtMac"             name="Macintosh (CR)"/>
+            <Item objectName="grpEncoding"          name="编码"/>
+            <Item objectName="lblDefaultEncoding"   name="默认编码："/>
+            <Item objectName="comboDefaultEncoding_0" name="ANSI"/>
+            <Item objectName="comboDefaultEncoding_1" name="UTF-8"/>
+            <Item objectName="comboDefaultEncoding_2" name="带 BOM 的 UTF-8"/>
+            <Item objectName="comboDefaultEncoding_3" name="UCS-2 大端序"/>
+            <Item objectName="comboDefaultEncoding_4" name="UCS-2 小端序"/>
+
+            <!-- 7. 最近文件历史页 -->
+            <Item objectName="grpRecentFiles"       name="最近文件历史"/>
+            <Item objectName="lblMaxRecentFiles"    name="最大条目数："/>
+            <Item objectName="chkRecentInSubMenu"   name="在子菜单中显示"/>
+
+            <!-- 9. 语言页 -->
+            <Item objectName="grpInterfaceLang"     name="界面语言"/>
+            <Item objectName="lblLanguage"          name="语言："/>
+            <Item objectName="comboInterfaceLanguage_0" name="英语"/>
+            <Item objectName="comboInterfaceLanguage_1" name="简体中文"/>
+
+            <!-- 13. 备份页 -->
+            <Item objectName="grpBackupSave"        name="保存时备份"/>
+            <Item objectName="rbBackupNone"         name="不备份"/>
+            <Item objectName="rbBackupSimple"       name="简单备份"/>
+            <Item objectName="rbBackupVerbose"      name="详细备份（附带时间戳）"/>
+            <Item objectName="chkBackupCustomDir"   name="使用自定义备份目录"/>
+            <Item objectName="btnBackupDirBrowse"   name="..."/>
+            <Item objectName="grpSnapshot"          name="会话快照和定期备份"/>
+            <Item objectName="chkSnapshotMode"      name="启用会话快照和定期备份，每"/>
+            <Item objectName="lblBackupInterval"    name="备份间隔："/>
+            <Item objectName="spinSnapshotTiming_suffix" name=" 秒"/>
+
+            <!-- 14. 自动完成页 -->
+            <Item objectName="grpAutoCompletion"    name="自动完成"/>
+            <Item objectName="chkAcEnable"          name="每次输入时启用自动完成"/>
+            <Item objectName="rbAcNone"             name="无"/>
+            <Item objectName="rbAcFunction"         name="函数自动完成"/>
+            <Item objectName="rbAcWord"             name="单词自动完成"/>
+            <Item objectName="rbAcBoth"             name="函数和单词自动完成"/>
+            <Item objectName="lblAcFromNbChar"      name="从"/>
+            <Item objectName="spinAcFromNbChar_suffix" name=" 个字符"/>
+            <Item objectName="chkAcIgnoreNumbers"   name="忽略数字"/>
+            <Item objectName="grpFuncParams"        name="函数参数提示"/>
+            <Item objectName="chkFuncParams"        name="输入时启用函数参数提示"/>
+            <Item objectName="grpAutoInsert"        name="自动插入"/>
+            <Item objectName="chkPairParentheses"   name="圆括号 ()"/>
+            <Item objectName="chkPairBrackets"      name="方括号 []"/>
+            <Item objectName="chkPairCurly"         name="花括号 {}"/>
+            <Item objectName="chkPairQuotes"        name="单引号 ''"/>
+            <Item objectName="chkPairDoubleQuotes"  name="双引号 &quot;&quot;"/>
+            <Item objectName="chkPairTags"          name="HTML/XML 闭合标签"/>
+
+            <!-- 19. 其他页 -->
+            <Item objectName="grpFileAutoDetect"        name="文件状态自动检测"/>
+            <Item objectName="lblFileAutoDetectStatus"  name="状态："/>
+            <Item objectName="comboFileAutoDetect_0"    name="禁用"/>
+            <Item objectName="comboFileAutoDetect_1"    name="启用"/>
+            <Item objectName="comboFileAutoDetect_2"    name="为所有已打开文件启用"/>
+            <Item objectName="chkCheckHistoryFiles"     name="静默更新（不提示重新加载）"/>
+            <Item objectName="grpSession"               name="会话"/>
+            <Item objectName="chkRestoreSession"        name="下次启动时恢复当前会话"/>
+
+            <!-- 3. 深色模式页 -->
+            <Item objectName="grpDarkMode"               name="深色模式"/>
+            <Item objectName="chkDarkModeEnable"         name="启用深色模式"/>
+
+            <!-- 6. 默认目录页 -->
+            <Item objectName="grpDefaultDirectory"       name="打开/保存目录"/>
+            <Item objectName="lblDefaultDirBehavior"     name="行为："/>
+            <Item objectName="comboDefaultDirMode_0"     name="跟随当前文档"/>
+            <Item objectName="comboDefaultDirMode_1"     name="记住上次使用的目录"/>
+            <Item objectName="comboDefaultDirMode_2"     name="使用自定义目录"/>
+            <Item objectName="lblDefaultDirectory"       name="目录："/>
+            <Item objectName="btnDefaultDirBrowse"       name="浏览..."/>
+
+            <!-- 8. 文件关联页 -->
+            <Item objectName="grpFileAssociations"       name="系统文件关联"/>
+            <Item objectName="lblSupportedExtensions"    name="支持的扩展名："/>
+            <Item objectName="lblRegisteredExtensions"   name="已注册的扩展名："/>
+            <Item objectName="fileAssociationCategories_0" name="记事本"/>
+            <Item objectName="fileAssociationCategories_1" name="MS INI/INF"/>
+            <Item objectName="fileAssociationCategories_2" name="C、C++、Objective-C"/>
+            <Item objectName="fileAssociationCategories_3" name="Java、C#、Pascal"/>
+            <Item objectName="fileAssociationCategories_4" name="Web 脚本"/>
+            <Item objectName="fileAssociationCategories_5" name="通用脚本"/>
+            <Item objectName="fileAssociationCategories_6" name="属性脚本"/>
+            <Item objectName="fileAssociationCategories_7" name="Fortran、TeX、SQL"/>
+            <Item objectName="fileAssociationCategories_8" name="其他"/>
+            <Item objectName="fileAssociationCategories_9" name="自定义"/>
+            <Item objectName="lblFileAssociationAdmin"
+                  name="需要管理员权限。请以管理员身份重新启动以更改文件关联。"/>
+            <Item objectName="lblFileAssociationPlatform"
+                  name="此平台上的文件关联由操作系统管理。"/>
+            <Item objectName="btnOpenDefaultApps"        name="打开系统默认应用设置"/>
+
+            <!-- 10. 高亮页 -->
+            <Item objectName="grpSmartHighlighting"      name="智能高亮"/>
+            <Item objectName="chkSmartHighlight"         name="启用"/>
+            <Item objectName="chkSmartMatchCase"         name="匹配大小写"/>
+            <Item objectName="chkSmartWholeWord"         name="全词匹配"/>
+            <Item objectName="chkSmartUseFindSettings"   name="使用查找对话框设置"/>
+            <Item objectName="chkSmartAnotherView"       name="在另一视图中高亮"/>
+            <Item objectName="grpTagMatching"            name="HTML/XML 标签匹配"/>
+            <Item objectName="chkTagMatch"               name="高亮匹配标签"/>
+            <Item objectName="chkTagAttributes"          name="高亮标签属性"/>
+
+            <!-- 11. 打印页 -->
+            <Item objectName="grpPrintOptions"           name="打印选项"/>
+            <Item objectName="chkPrintLineNumbers"       name="打印行号"/>
+            <Item objectName="lblPrintColorMode"         name="颜色模式："/>
+            <Item objectName="comboPrintColorMode_0"     name="所见即所得"/>
+            <Item objectName="comboPrintColorMode_1"     name="反转颜色"/>
+            <Item objectName="comboPrintColorMode_2"     name="白底黑字"/>
+            <Item objectName="comboPrintColorMode_3"     name="白底彩色"/>
+            <Item objectName="grpPrintHeaderFooter"      name="页眉和页脚"/>
+            <Item objectName="lblPrintHeader"            name="页眉："/>
+            <Item objectName="lblPrintFooter"            name="页脚："/>
+
+            <!-- 12. 搜索页 -->
+            <Item objectName="grpDefaultSearch"          name="默认搜索选项"/>
+            <Item objectName="chkSearchWholeWord"        name="全词匹配"/>
+            <Item objectName="chkSearchMatchCase"        name="匹配大小写"/>
+            <Item objectName="chkSearchWrap"             name="循环查找"/>
+            <Item objectName="chkSearchRecursive"        name="搜索子文件夹"/>
+            <Item objectName="chkSearchHidden"           name="搜索隐藏文件夹"/>
+
+            <!-- 15. 多实例与日期页 -->
+            <Item objectName="grpMultiInstance"          name="多实例"/>
+            <Item objectName="lblMultiInstanceMode"      name="模式："/>
+            <Item objectName="comboMultiInstance_0"      name="在现有实例中打开"/>
+            <Item objectName="comboMultiInstance_1"      name="每个会话使用新实例"/>
+            <Item objectName="comboMultiInstance_2"      name="始终打开新实例"/>
+            <Item objectName="grpDateTime"               name="日期和时间"/>
+            <Item objectName="lblDateTimeFormat"         name="自定义格式："/>
+            <Item objectName="chkDateReverse"            name="交换短格式和长格式命令顺序"/>
+
+            <!-- 16. 分隔符页 -->
+            <Item objectName="grpDelimiterSelection"     name="分隔符选择"/>
+            <Item objectName="lblLeftDelimiter"          name="左分隔符字符代码："/>
+            <Item objectName="lblRightDelimiter"         name="右分隔符字符代码："/>
+            <Item objectName="chkDelimiterWholeDocument" name="在整个文档中搜索分隔符"/>
+
+            <!-- 17. 云与链接页 -->
+            <Item objectName="grpClickableLinks"         name="可点击链接"/>
+            <Item objectName="lblLinkStyle"              name="链接样式："/>
+            <Item objectName="comboUrlMode_0"            name="禁用"/>
+            <Item objectName="comboUrlMode_1"            name="启用且不显示下划线"/>
+            <Item objectName="comboUrlMode_2"            name="启用并显示下划线"/>
+            <Item objectName="btnOpenConfigDirectory"    name="打开配置目录"/>
+
+            <!-- 18. 搜索引擎页 -->
+            <Item objectName="grpSearchEngine"           name="搜索引擎"/>
+            <Item objectName="lblSearchProvider"         name="提供商："/>
+            <Item objectName="lblSearchCustomUrl"        name="自定义 URL："/>
+            <Item objectName="comboSearchEngine_4"       name="自定义"/>
+
+            <!-- 对话框标准按钮 -->
+            <Item objectName="btnPrefsOk"                name="确定"/>
+            <Item objectName="btnPrefsApply"             name="应用"/>
+            <Item objectName="btnPrefsCancel"            name="取消"/>
+        </Dialog>
+
+        <!-- ══ 查找/替换对话框 ══════════════════════════════════════════════ -->
+        <Dialog name="FindReplace" title="查找 / 替换">
+            <!-- Tab 标签 -->
+            <Item objectName="tabBar_0" name="查找"/>
+            <Item objectName="tabBar_1" name="替换"/>
+            <Item objectName="tabBar_2" name="文件查找"/>
+            <Item objectName="tabBar_3" name="项目查找"/>
+            <Item objectName="tabBar_4" name="标记"/>
+
+            <!-- 输入行标签 -->
+            <Item objectName="lblFindWhat"    name="查找目标(F):"/>
+            <Item objectName="lblReplaceWith" name="替换为(P):"/>
+            <Item objectName="lblFilters"     name="过滤器:"/>
+            <Item objectName="lblDirectory"   name="目录:"/>
+
+            <!-- 通用复选框 -->
+            <Item objectName="chkInSel"       name="仅在选区中"/>
+            <Item objectName="browseDirBtn"   name="..."/>
+
+            <!-- Find tab 选项 -->
+            <Item objectName="chkBackwardDir" name="反向查找"/>
+            <Item objectName="chkWholeWord"   name="全词匹配(W)"/>
+            <Item objectName="chkMatchCase"   name="匹配大小写(C)"/>
+            <Item objectName="chkWrapAround"  name="循环查找(P)"/>
+
+            <!-- Replace tab 选项 -->
+            <Item objectName="chkMatchCase2"  name="匹配大小写(C)"/>
+            <Item objectName="chkWholeWord2"  name="全词匹配(W)"/>
+            <Item objectName="chkWrapAround2" name="循环查找(P)"/>
+            <Item objectName="chkInSel2"      name="仅在选区中"/>
+
+            <!-- Find in Files tab 选项 -->
+            <Item objectName="chkMatchCase3"  name="匹配大小写(C)"/>
+            <Item objectName="chkWholeWord3"  name="全词匹配(W)"/>
+            <Item objectName="chkFollowDoc"   name="跟随当前文档"/>
+            <Item objectName="chkRecursive"   name="包含子文件夹"/>
+            <Item objectName="chkInHiddenDir" name="包含隐藏文件夹"/>
+
+            <!-- Find in Projects tab 选项 -->
+            <Item objectName="chkProjectPanel1" name="项目面板 1"/>
+            <Item objectName="chkProjectPanel2" name="项目面板 2"/>
+            <Item objectName="chkProjectPanel3" name="项目面板 3"/>
+
+            <!-- Mark tab 选项 -->
+            <Item objectName="chkBookmarkLine" name="书签行"/>
+            <Item objectName="chkPurgeMarks"   name="每次搜索前清除标记"/>
+            <Item objectName="chkMatchCase4"   name="匹配大小写(C)"/>
+            <Item objectName="chkWholeWord4"   name="全词匹配(W)"/>
+            <Item objectName="chkInSel4"       name="仅在选区中"/>
+
+            <!-- Find tab 按钮 -->
+            <Item objectName="btnFindNext"    name="查找下一个"/>
+            <Item objectName="btnCount"       name="计数(D)"/>
+            <Item objectName="btnFindAllOpened" name="查找所有打开文件(O)"/>
+            <Item objectName="btnFindAllCur"  name="在当前文件中查找"/>
+            <Item objectName="btnClose"       name="取消"/>
+
+            <!-- Replace tab 按钮 -->
+            <Item objectName="btnFindNext2"   name="查找下一个"/>
+            <Item objectName="btnReplace"     name="替换(R)"/>
+            <Item objectName="btnReplaceAll"  name="全部替换(A)"/>
+            <Item objectName="btnReplAllOpened" name="替换所有打开文件"/>
+            <Item objectName="btnClose2"      name="取消"/>
+
+            <!-- Find in Files tab 按钮 -->
+            <Item objectName="btnFindAllFif"    name="查找全部"/>
+            <Item objectName="btnReplaceInFiles" name="替换文件中内容"/>
+            <Item objectName="btnClose3"        name="取消"/>
+
+            <!-- Find in Projects tab 按钮 -->
+            <Item objectName="btnFindAllFip"        name="查找全部"/>
+            <Item objectName="btnReplaceInProjects" name="替换项目中内容"/>
+            <Item objectName="btnClose4"            name="取消"/>
+
+            <!-- Mark tab 按钮 -->
+            <Item objectName="btnMarkAll"    name="全部标记"/>
+            <Item objectName="btnClearMarks" name="清除所有标记"/>
+            <Item objectName="btnCopyMarked" name="复制标记文本"/>
+            <Item objectName="btnClose5"     name="取消"/>
+
+            <!-- 底部：搜索模式 -->
+            <Item objectName="grpSearchMode"     name="搜索模式"/>
+            <Item objectName="rbModeNormal"      name="普通"/>
+            <Item objectName="rbModeExtended"    name="扩展"/>
+            <Item objectName="rbModeRegex"       name="正则表达式"/>
+            <Item objectName="chkDotMatchNewline" name=". 匹配换行符"/>
+
+            <!-- 底部：透明度 -->
+            <Item objectName="grpTransparency"    name="透明度(Y)"/>
+            <Item objectName="rbTransOnLostFocus" name="失去焦点后"/>
+            <Item objectName="rbTransAlways"      name="始终"/>
+        </Dialog>
+
+    </Native-Langue>
+</NotepadPlus>

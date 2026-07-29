@@ -1,0 +1,10 @@
+start
+print-start
+print-finished
+external-opened
+external-modified-start
+external-modified-finished
+external-renamed-start
+external-renamed-finished
+external-deleted-start
+external-deleted-finished

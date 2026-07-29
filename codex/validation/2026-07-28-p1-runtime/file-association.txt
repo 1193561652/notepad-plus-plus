@@ -1,0 +1,6 @@
+extension=.nppqb2b04578
+register=pass
+enumerate=pass
+open-command=pass
+restore=pass
+cleanup=scheduled
