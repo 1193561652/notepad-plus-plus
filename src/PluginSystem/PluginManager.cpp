@@ -1,9 +1,9 @@
 // PluginManager.cpp - 插件管理器实现
 
 #include "PluginManager.h"
+#include "PluginArtifactResolver.h"
 #include <QLibrary>
-#include <QDir>
-#include <QFileInfoList>
+#include <QFileInfo>
 #include <QDebug>
 
 PluginManager::PluginManager(QObject* parent)
@@ -19,26 +19,11 @@ PluginManager::~PluginManager()
 
 void PluginManager::loadPlugins(const QString& pluginDir, IPluginHost* host)
 {
-    QDir dir(pluginDir);
-    if (!dir.exists()) return;
-
-    // 查找平台对应的动态库扩展名
-#if defined(Q_OS_WIN)
-    QStringList filters = {"*.dll"};
-#elif defined(Q_OS_MAC)
-    QStringList filters = {"*.dylib"};
-#else
-    QStringList filters = {"*.so"};
-#endif
-
-    QFileInfoList entries = dir.entryInfoList(filters, QDir::Files);
-    const QFileInfoList pluginDirs = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QFileInfo& pluginDirInfo : pluginDirs) {
-        QDir pluginSubDir(pluginDirInfo.absoluteFilePath());
-        entries.append(pluginSubDir.entryInfoList(filters, QDir::Files));
-    }
-    for (const QFileInfo& fi : entries) {
-        const QString canonicalPath = fi.canonicalFilePath();
+    const QVector<PluginArtifact> artifacts =
+        PluginArtifactResolver::discover(pluginDir);
+    for (const PluginArtifact& artifact : artifacts) {
+        const QString canonicalPath =
+            QFileInfo(artifact.binaryPath).canonicalFilePath();
         if (!_loadedPaths.contains(canonicalPath))
             tryLoad(canonicalPath, host);
     }

@@ -13,6 +13,7 @@
 #include "ScintillaComponent/Buffer.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
 #include "PluginSystem/IPlugin.h"
+#include "PluginSystem/PluginUpdatePlan.h"
 #include "CommandLineOptions.h"
 #include "MISC/ClosedFileHistory.h"
 
@@ -24,6 +25,7 @@ class PreferenceDlg;
 class DocumentMapPanel;
 class FunctionListPanel;
 class PluginManager;
+class PluginAdminDialog;
 class QsciMacro;
 class QSplitter;
 class QDockWidget;
@@ -98,6 +100,10 @@ private:
     void setupFindResultPanel();
     void setupAuxiliaryPanels();
     void setupPluginSystem();
+    void showPluginAdmin();
+    bool schedulePluginOperations(
+        const QVector<PluginOperation>& operations);
+    bool launchPendingPluginUpdater(QString* error = nullptr);
     FindReplaceDlg* ensureFindReplaceDialog();
     void connectFindReplaceDialogSignals();
     QStringList projectFiles(int panelMask) const;
@@ -280,6 +286,8 @@ private:
     QDockWidget*       _characterDock    = nullptr;
     QListWidget*       _characterList    = nullptr;
     PluginManager*     _pluginManager    = nullptr;
+    QString _pendingPluginUpdatePlan;
+    bool _pluginUpdaterStarted = false;
 
     // 宏
     QString   _macroStr;

@@ -236,6 +236,8 @@
                     <!-- 运行、插件、窗口与帮助菜单 -->
                     <Item objectName="runDialogAction" name="运行..."/>
                     <Item objectName="noPluginsLoadedAction" name="未加载插件"/>
+                    <Item objectName="pluginsAdminAction" name="插件管理..."/>
+                    <Item objectName="openPluginsFolderAction" name="打开插件文件夹"/>
                     <Item objectName="windowsDialogAction" name="窗口..."/>
                     <Item objectName="sortByNameAscAction" name="按名称升序排序"/>
                     <Item objectName="sortByNameDescAction" name="按名称降序排序"/>
@@ -266,6 +268,15 @@
             </Main>
         </Menu>
 
+        <Dialog name="PluginsAdmin" title="插件管理">
+            <Item objectName="pluginsAdminSearchLabel" name="搜索："/>
+            <Item objectName="pluginsAdminTabs_0" name="可用"/>
+            <Item objectName="pluginsAdminTabs_1" name="更新"/>
+            <Item objectName="pluginsAdminTabs_2" name="已安装"/>
+            <Item objectName="pluginsAdminTabs_3" name="不兼容"/>
+            <Item objectName="pluginsAdminCloseButton" name="关闭"/>
+        </Dialog>
+
         <!-- 通用字符串（对应原版 <Strings>，用于消息框等）-->
         <Strings>
             <Item id="normalText"          name="普通文本"/>
@@ -273,6 +284,12 @@
             <Item id="fileReloaded"        name="文件已重新加载"/>
             <Item id="macroRecordStart"    name="宏录制已开始..."/>
             <Item id="macroRecordStop"     name="宏录制已停止。"/>
+            <Item id="pluginAdminInstall" name="安装"/>
+            <Item id="pluginAdminUpdate" name="更新"/>
+            <Item id="pluginAdminRemove" name="卸载"/>
+            <Item id="pluginAdminPluginColumn" name="插件"/>
+            <Item id="pluginAdminVersionColumn" name="版本"/>
+            <Item id="pluginAdminListVersion" name="插件列表版本：%1"/>
         </Strings>
 
         <!-- 偏好设置对话框 -->

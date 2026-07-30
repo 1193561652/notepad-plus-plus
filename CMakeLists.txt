@@ -148,6 +148,11 @@ set(SOURCES
     src/WinControls/DockingWnd/FunctionListPanel.cpp
     src/WinControls/ProjectPanel/WorkspaceDocument.cpp
     src/WinControls/ProjectPanel/ProjectPanel.cpp
+    src/PluginSystem/PluginArtifactResolver.cpp
+    src/PluginSystem/PluginCatalog.cpp
+    src/PluginSystem/PluginAdminModel.cpp
+    src/PluginSystem/PluginAdminDialog.cpp
+    src/PluginSystem/PluginUpdatePlan.cpp
     src/PluginSystem/PluginManager.cpp
 )
 
@@ -180,6 +185,11 @@ set(HEADERS
     src/WinControls/DockingWnd/FunctionListPanel.h
     src/WinControls/ProjectPanel/WorkspaceDocument.h
     src/WinControls/ProjectPanel/ProjectPanel.h
+    src/PluginSystem/PluginArtifactResolver.h
+    src/PluginSystem/PluginCatalog.h
+    src/PluginSystem/PluginAdminModel.h
+    src/PluginSystem/PluginAdminDialog.h
+    src/PluginSystem/PluginUpdatePlan.h
     src/PluginSystem/IPlugin.h
     src/PluginSystem/PluginManager.h
 )
@@ -243,8 +253,21 @@ add_custom_command(TARGET notepadpp-qt POST_BUILD
 )
 
 if(WIN32)
-    target_link_libraries(notepadpp-qt shell32 advapi32)
+    target_link_libraries(notepadpp-qt shell32 advapi32 version)
 endif()
+
+add_executable(npp-plugin-updater
+    src/PluginSystem/PluginUpdaterMain.cpp
+    src/PluginSystem/PluginArchiveExtractor.cpp
+    src/PluginSystem/PluginUpdatePlan.cpp
+)
+target_link_libraries(npp-plugin-updater Qt5::Core Qt5::Network)
+add_dependencies(notepadpp-qt npp-plugin-updater)
+add_custom_command(TARGET notepadpp-qt POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:npp-plugin-updater>"
+        "$<TARGET_FILE_DIR:notepadpp-qt>"
+)
 
 # 如果启用插件系统
 if(ENABLE_PLUGIN_SYSTEM)
@@ -303,6 +326,20 @@ if(BUILD_TESTING)
     )
     target_link_libraries(command-line-options-tests Qt5::Core)
     add_test(NAME command-line-options-tests COMMAND command-line-options-tests)
+
+    add_executable(plugin-admin-tests
+        tests/PluginAdminTests.cpp
+        src/PluginSystem/PluginArtifactResolver.cpp
+        src/PluginSystem/PluginCatalog.cpp
+        src/PluginSystem/PluginAdminModel.cpp
+        src/PluginSystem/PluginUpdatePlan.cpp
+        ${RESOURCES}
+    )
+    target_link_libraries(plugin-admin-tests Qt5::Core)
+    if(WIN32)
+        target_link_libraries(plugin-admin-tests version)
+    endif()
+    add_test(NAME plugin-admin-tests COMMAND plugin-admin-tests)
 
     add_executable(config-path-resolver-tests
         tests/ConfigPathResolverTests.cpp
@@ -389,7 +426,7 @@ if(BUILD_TESTING)
         Qt5::Xml
     )
     if(WIN32)
-        target_link_libraries(ui-parity-capture shell32 advapi32)
+        target_link_libraries(ui-parity-capture shell32 advapi32 version)
     endif()
     add_test(NAME ui-localization-runtime-100
         COMMAND ui-parity-capture
@@ -440,7 +477,7 @@ if(BUILD_TESTING)
         Qt5::Xml
     )
     if(WIN32)
-        target_link_libraries(p1-runtime-capture shell32 advapi32)
+        target_link_libraries(p1-runtime-capture shell32 advapi32 version)
     endif()
 
     add_executable(core-behavior-tests

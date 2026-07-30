@@ -19,6 +19,10 @@
 #include "WinControls/DockingWnd/FunctionListPanel.h"
 #include "WinControls/ProjectPanel/ProjectPanel.h"
 #include "PluginSystem/PluginManager.h"
+#include "PluginSystem/PluginAdminDialog.h"
+#include "PluginSystem/PluginAdminModel.h"
+#include "PluginSystem/PluginCatalog.h"
+#include "PluginSystem/PluginUpdatePlan.h"
 #include "Printing/NotepadPlusPrinter.h"
 
 #include "Parameters.h"
@@ -2330,6 +2334,11 @@ void MainWindow::closeEvent(QCloseEvent* event)
                     continue;
                 checked.insert(buffer);
                 if (!checkBufferSave(buffer)) {
+                    if (!_pendingPluginUpdatePlan.isEmpty() &&
+                        !_pluginUpdaterStarted) {
+                        QFile::remove(_pendingPluginUpdatePlan);
+                        _pendingPluginUpdatePlan.clear();
+                    }
                     event->ignore();
                     return;
                 }
@@ -2347,6 +2356,20 @@ void MainWindow::closeEvent(QCloseEvent* event)
         onBackupTimer();
     saveSession();
     params.writeNppGUI();
+
+    if (!_pendingPluginUpdatePlan.isEmpty() &&
+        !_pluginUpdaterStarted) {
+        QString updaterError;
+        if (!launchPendingPluginUpdater(&updaterError)) {
+            QMessageBox::warning(
+                this, tr("Plugins Admin"),
+                tr("Could not start the plugin updater:\n%1")
+                    .arg(updaterError));
+            event->ignore();
+            return;
+        }
+        _pluginUpdaterStarted = true;
+    }
 
     event->accept();
 }
@@ -3228,6 +3251,99 @@ void MainWindow::setupPluginSystem()
     QString pluginDir = QCoreApplication::applicationDirPath() + "/plugins";
     _pluginManager->loadPlugins(pluginDir, this);
 #endif
+}
+
+void MainWindow::showPluginAdmin()
+{
+    const QString pluginRoot =
+        QDir(NppParameters::getInstance().getNppPath())
+            .filePath(QStringLiteral("plugins"));
+    PluginCatalog catalog = PluginCatalog::embedded();
+    if (!catalog.isValid()) {
+        QMessageBox::warning(
+            this, tr("Plugins Admin"),
+            tr("The built-in plugin list is invalid."));
+        return;
+    }
+
+    PluginAdminModel model(
+        pluginRoot, catalog,
+        PluginVersion(QCoreApplication::applicationVersion()));
+    PluginAdminDialog dialog(&model, this);
+    dialog.applyLocalization(
+        NppParameters::getInstance().getNativeLangSpeaker());
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    if (!schedulePluginOperations(dialog.selectedOperations()))
+        return;
+    QTimer::singleShot(0, this, &QWidget::close);
+}
+
+bool MainWindow::schedulePluginOperations(
+    const QVector<PluginOperation>& operations)
+{
+    if (operations.isEmpty())
+        return false;
+
+    PluginUpdatePlan plan;
+    plan.applicationPath = QCoreApplication::applicationFilePath();
+    plan.pluginRoot =
+        QDir(NppParameters::getInstance().getNppPath())
+            .filePath(QStringLiteral("plugins"));
+    plan.operations = operations;
+
+    const QString planPath =
+        QDir(NppParameters::getInstance().getUserPath())
+            .filePath(QStringLiteral(
+                "plugins/Config/pending-plugin-update.json"));
+    QString error;
+    if (!plan.write(planPath, &error)) {
+        QMessageBox::warning(
+            this, tr("Plugins Admin"),
+            tr("Could not create the plugin update plan:\n%1")
+                .arg(error));
+        return false;
+    }
+    _pendingPluginUpdatePlan = planPath;
+    return true;
+}
+
+bool MainWindow::launchPendingPluginUpdater(QString* error)
+{
+    if (_pendingPluginUpdatePlan.isEmpty()) {
+        if (error)
+            *error = tr("No plugin update plan is pending.");
+        return false;
+    }
+
+    QString updaterName = QStringLiteral("npp-plugin-updater");
+#if defined(Q_OS_WIN)
+    updaterName += QStringLiteral(".exe");
+#endif
+    const QString applicationDirectory =
+        QCoreApplication::applicationDirPath();
+    const QString updaterPath =
+        QDir(applicationDirectory).filePath(updaterName);
+    if (!QFileInfo::exists(updaterPath)) {
+        if (error) {
+            *error = tr("Updater executable was not found: %1")
+                         .arg(QDir::toNativeSeparators(updaterPath));
+        }
+        return false;
+    }
+
+    const QStringList arguments = {
+        QStringLiteral("--plan"), _pendingPluginUpdatePlan,
+        QStringLiteral("--wait-pid"),
+        QString::number(QCoreApplication::applicationPid())
+    };
+    if (!QProcess::startDetached(
+            updaterPath, arguments, applicationDirectory)) {
+        if (error)
+            *error = tr("The updater process could not be created.");
+        return false;
+    }
+    return true;
 }
 
 void MainWindow::watchBufferFile(Buffer* buf)
@@ -6370,20 +6486,34 @@ void MainWindow::createMenus()
     // ── Plugins ──────────────────────────────────────────────
     _pluginsMenu = menuBar()->addMenu(tr("&Plugins"));
     _pluginsMenu->setObjectName("pluginsMenu");
+    bool hasLoadedPlugins = false;
 #ifdef ENABLE_PLUGIN_SYSTEM
     if (_pluginManager) {
         for (IPlugin* plugin : _pluginManager->plugins()) {
             QMenu* sub = _pluginsMenu->addMenu(plugin->getName());
             for (QAction* act : plugin->getMenuActions())
                 sub->addAction(act);
+            hasLoadedPlugins = true;
         }
     }
 #endif
-    if (_pluginsMenu->isEmpty()) {
+    if (!hasLoadedPlugins) {
         QAction* noPlugins = _pluginsMenu->addAction(tr("No plugins loaded"));
         noPlugins->setObjectName("noPluginsLoadedAction");
         noPlugins->setEnabled(false);
     }
+    _pluginsMenu->addSeparator();
+    addCommand(_pluginsMenu, tr("Plugins Admin..."),
+               "pluginsAdminAction",
+               [this]() { showPluginAdmin(); });
+    addCommand(_pluginsMenu, tr("Open Plugins Folder"),
+               "openPluginsFolderAction", []() {
+        const QString pluginRoot =
+            QDir(NppParameters::getInstance().getNppPath())
+                .filePath(QStringLiteral("plugins"));
+        QDir().mkpath(pluginRoot);
+        QDesktopServices::openUrl(QUrl::fromLocalFile(pluginRoot));
+    });
 
     // ── Window ───────────────────────────────────────────────
     QMenu* windowMenu = menuBar()->addMenu(tr("&Window"));

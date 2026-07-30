@@ -1,0 +1,209 @@
+{
+	"name": "npp-pluginList",
+	"version": "1.5.4",
+	"arch": "arm64",
+	"npp-plugins": [
+		{
+			"folder-name": "nppAutoDetectIndent",
+			"display-name": "Auto Detect Indention",
+			"version": "2.3",
+			"id": "dd4fd0bf10b5743c15cb7d012aed1bb0f482a1351376c3337d5c299e43a574db",
+			"repository": "https://github.com/Chocobo1/nppAutoDetectIndent/releases/download/2.3/arm64.zip",
+			"description": "Detects indention (tab or spaces) and auto adjust Tab key on-the-fly.",
+			"author": "Mike Tzou (Chocobo1)",
+			"homepage": "https://github.com/Chocobo1/nppAutoDetectIndent"
+		},
+		{
+			"folder-name": "ComparePlus",
+			"display-name": "ComparePlus",
+			"version": "1.0.0",
+			"npp-compatible-versions": "[8.4.2,]",
+			"id": "8833f1d9550edcda96a2153a12bc9057f9a316e9cc51dd4efa7151797269a0b7",
+			"repository": "https://github.com/pnedev/comparePlus/releases/download/cp_1.0.0/ComparePlus_1.0.0_arm64.zip",
+			"description": "Advanced compare tool based on the well-known Compare-plugin by Ty Landercasper and Jean-Sebastien Leroy.",
+			"author": "Pavel Nedev",
+			"homepage": "https://github.com/pnedev/comparePlus"
+		},
+		{
+			"folder-name": "FWDataViz",
+			"display-name": "Fixed-width Data Visualizer",
+			"version": "2.6.1.0",
+			"id": "3f914ae341940a2f43039bd5a5d642070b769c60a894c0ef7807a39a8ee0ffea",
+			"repository": "https://github.com/shriprem/FWDataViz/releases/download/v2.6.1.0/FWDataViz_arm64.zip",
+			"description": "Fixed Width Data Visualizer adds Excel-like features for fixed-width data files in Notepad++. Displays cursor position data. Foldable Record Blocks; Hop & Jump to specific fields. Field Copy & Field Paste. Data Extraction. Builtin dialogs to configure file-type, record-type & fields; and themes & colors. Automatic File Type Detection. Handles homogenous, mixed & multi-line records. Full Multi-byte character support. Darkmode enabled.",
+			"author": "Shridhar Kumar",
+			"homepage": "https://github.com/shriprem/FWDataViz"
+		},
+		{
+			"folder-name": "GotoLineCol",
+			"display-name": "GotoLineCol",
+			"version": "2.4.2.0",
+			"id": "26a353c0743db6cc561a521056918103d8a5992fa2b599206fdad775b574e5fe",
+			"repository": "https://github.com/shriprem/Goto-Line-Col-NPP-Plugin/releases/download/v2.4.2.0/GotoLineCol_arm64.zip",
+			"description": "A plugin to navigate to a specified line and (byte-based or character-based) column position. Will also display character byte code, UTF-8 byte sequence & Unicode code point at cursor position. Darkmode enabled. Command line options.",
+			"author": "Shridhar Kumar",
+			"homepage": "https://github.com/shriprem/Goto-Line-Col-NPP-Plugin"
+		},
+		{
+			"folder-name": "HexEditor",
+			"display-name": "HEX-Editor",
+			"version": "0.9.12.0",
+			"id": "cb26108b28588190b531f8e37f8d1acb73d589a55db727519daf9dcf1665ff58",
+			"repository": "https://github.com/chcg/NPP_HexEdit/releases/download/0.9.12/HexEditor_0.9.12_arm64.zip",
+			"description": "Hex editor. Some reported issues, however many bugs fixed in latest release.",
+			"author": "Jens Lorenz",
+			"homepage": "https://github.com/chcg/NPP_HexEdit"
+		},
+		{
+			"folder-name": "mimeTools",
+			"display-name": "Mime tools",
+			"version": "2.8",
+			"npp-compatible-versions": "[8.4,]",
+			"id": "32d87bda3d8e64fa9e83b415313e7643aa259b792d1ec9687a8647327523dcb1",
+			"repository": "https://github.com/npp-plugins/mimetools/releases/download/v2.8/mimetools.v2.8.arm64.zip",
+			"description": "Implements several main functionalities defined in MIME (Multipurpose Internet Mail Extensions).",
+			"author": "Don HO",
+			"homepage": "https://github.com/npp-plugins/mimetools"
+		},
+		{
+			"folder-name": "NppPluginDemo",
+			"display-name": "Notepad++ Plugin Demo",
+			"version": "4.2",
+			"id": "8937a30cd98ad14cc902f341b00f1b9f868aa433dd8b6c024752691432782975",
+			"repository": "https://github.com/npp-plugins/plugindemo/releases/download/v4.2/pluginDemo.v4.2.bin.arm64.zip",
+			"description": "Notepad++ Plugin Demo is written from Notepad++ Plugin Template to demonstrate the usage of plugin API.",
+			"author": "Don HO",
+			"homepage": "https://npp-user-manual.org/docs/plugins/"
+		},
+		{
+			"folder-name": "NppPluginTemplate",
+			"display-name": "Notepad++ Plugin Template",
+			"version": "4.2",
+			"id": "7e871c74f6f6a21a208e9eb977b91f246267302cb761a6d2c2015d80e9ed2b3e",
+			"repository": "https://github.com/npp-plugins/plugintemplate/releases/download/v4.2/pluginTemplate.v4.2.bin.arm64.zip",
+			"description": "Template for making plugin development as easy and simple as possible. Four steps and it's done.",
+			"author": "Don HO",
+			"homepage": "https://npp-user-manual.org/docs/plugins/"
+		},
+		{
+			"folder-name": "nppConverter",
+			"display-name": "Npp Converter",
+			"version": "4.4.0",
+			"id": "e334dc494c0c79f2c6514d2239bc42997a1e6a4783846a9007999ffad2e3fc95",
+			"repository": "https://github.com/npp-plugins/converter/releases/download/v4.4/nppConvert.v4.4.arm64.zip",
+			"description": "ASCII<->Hex converter.",
+			"author": "Don HO",
+			"homepage": "https://github.com/npp-plugins/converter/"
+		},
+		{
+			"folder-name": "NppExport",
+			"display-name": "NppExport",
+			"version": "0.4.0.0",
+			"id": "b23dee2b6b91f8be192ac28ee58c6c2780ecc8ec3a31841ab090ce7f87cdf628",
+			"repository": "https://github.com/chcg/NPP_ExportPlugin/releases/download/0.4.0/NppExport_0.4.0_arm64.zip",
+			"description": "True WYSIWYG exporter. Allows you not only to save your source code as an HTML/RTF file, but also to copy your source code in the clipboard in RTF/HTML format, so you can paste it into your word processor (Openoffice.org Writer, LibreOffice Writer, Abiword, MS Word) to get the same visual effect.",
+			"author": "",
+			"homepage": "https://github.com/chcg/NPP_ExportPlugin"
+		},
+		{
+			"folder-name": "NppJumpList",
+			"display-name": "NppJumpList",
+			"version": "1.2.2",
+			"id": "4ea59a8cc279092d30c847af1e75bde8a5b16a456449ed82c262bb9f4436235e",
+			"repository": "https://github.com/chcg/JumpList/releases/download/1.2.2.10/NppJumpList_1.2.2.10_arm64.zip",
+			"description": "Adds Windows 7 jump list support.",
+			"author": "ahvgeezer",
+			"homepage": "https://sourceforge.net/projects/nppjumplist/"
+		},
+		{
+			"folder-name": "NppDocShare",
+			"display-name": "NppNetNote",
+			"version": "0.1.0.0",
+			"id": "a0e6219399201d60b8f5c3ca702aa8de7b236b4c53a80366b1573527225e0928",
+			"repository": "https://github.com/chcg/NppDocShare/releases/download/0.1.13/NppDocShare_0.1.13_arm64.zip",
+			"description": "Allows the same document to be edited in real time on two different computers. Only needs a network connection between the two.",
+			"author": "Harrybharry",
+			"homepage": "https://sourceforge.net/projects/npp-plugins/files/NppDocShare/"
+		},
+		{
+			"folder-name": "pork2sausage",
+			"display-name": "Pork to Sausage",
+			"version": "2.2",
+			"id": "179d2ce71652d253a795ebe7fcb0ad8e88cce79b6c1ae80ce345bdf32af6a2e2",
+			"repository": "https://github.com/npp-plugins/pork2sausage/releases/download/v2.2/pork2sausage.2.2.bin.arm64.zip",
+			"description": "Pass any selected text to any command line program as input and take the output (the result of program) to replace the selected text.",
+			"author": "Don HO",
+			"homepage": "https://github.com/npp-plugins/pork2sausage"
+		},
+		{
+			"folder-name": "SecurePad",
+			"display-name": "SecurePad",
+			"version": "2.4",
+			"id": "a363fb850d04ac1eb0595fe8d146130a8f3176871ada0dac6540baae956c183d",
+			"repository": "https://github.com/DominicTobias/SecurePad/releases/download/v2.4/SecurePad_v2.4_arm64.zip",
+			"description": "Encrypt/decrypt whole documents or selected text with your own key. Useful for storing sensitive information like logins that you don't want lying around in a plaintext file.",
+			"author": "Dominic Tobias",
+			"homepage": "https://github.com/DominicTobias/SecurePad"
+		},
+		{
+			"folder-name": "SelectToClipboard",
+			"display-name": "Select to Clipboard",
+			"version": "1.0.3",
+			"id": "d21a4f13e5e405ae63caa93bdabddd81342acdb2f9f2917b90b2e787716e35ac",
+			"repository": "https://github.com/KubaDee/SelectToClipboard/releases/download/v1.0.3/SelectToClipboard_arm64_v1.0.3.zip",
+			"description": "Auto copy selected text to clipboard. You can automatically copy selected text like in PuTTY (or similar) terminal application.",
+			"author": "Jakub Dvorak",
+			"homepage": "https://github.com/KubaDee/SelectToClipboard"
+		},
+		{
+			"folder-name": "SessionMgr",
+			"display-name": "Session Manager",
+			"version": "1.4.4",
+			"id": "a75b73108ca90fc9968d1d89cca02566b6e943b177bbe86a98f338e1e8243404",
+			"repository": "https://github.com/chcg/npp-session-manager/releases/download/v1.4.4/SessionMgr_v1.4.4_arm64.zip",
+			"description": "Session manager. IMPORTANT: If you are upgrading from a version older than 1.2 then, immediately after the upgrade, open the Settings dialog and reconfigure your settings.",
+			"author": "Mike Foster",
+			"homepage": "https://mfoster.com/npp/SessionMgr.html"
+		},
+		{
+			"folder-name": "SpeechPlugin",
+			"display-name": "SpeechPlugin",
+			"version": "0.4.0.0",
+			"id": "7e20ecbe98a2df024c877ee14c082d3cbb3a8bb362590f69140d1515a2d8a3e2",
+			"repository": "https://github.com/chcg/SpeechPlugin/releases/download/v0.4.0/SpeechPlugin_v0.4.0_ARM64.zip",
+			"description": "No kidding, Notepad++ speaks now. With SpeechPlugin, you can make Notepad++ dictate your text or source code. Of course, speakers are necessary.",
+			"author": "Jim Xochellis",
+			"homepage": "https://github.com/chcg/SpeechPlugin"
+		},
+		{
+			"folder-name": "NppTaskList",
+			"display-name": "Task List",
+			"version": "2.4",
+			"id": "cae7724fcaab15a67a06d5106837b7c43a67e48e52308ac854e82c4cd0ca51d7",
+			"repository": "https://github.com/Megabyteceer/npp-task-list/releases/download/v2.4.0/NppTaskList_v2.4.0_arm64.zip",
+			"description": "Automatically scans the open document and adds all \"TODO:*\" items to your task list, a window pane docked on the right. Double-clicking an item in the list will take you to that line in the code.",
+			"author": "blitowitz",
+			"homepage": "https://code.google.com/p/npp-task-list/"
+		},
+		{
+			"folder-name": "urlPlugin",
+			"display-name": "URL Encode/Decode Plugin",
+			"version": "1.2.0.0",
+			"id": "2359ca7264b6670217c5b427a166c9e0f0260a777ae0956b550c88734aa424f6",
+			"repository": "https://github.com/SinghRajenM/nppURLPlugin/releases/download/1.2.0.0/urlPlugin_arm64.zip",
+			"description": "Hopefully a decent URL Encoder and Decoder plug-in for Notepad++ which helps to make developer's life easier by providing facility to encode/decode the URL within Notepad++. \r\n\r\nHow it works:\r\n1. Configure setting from menu (Plugins->URL Plugin->URL Plugin Settings). It is not mandatory, but recommended.\r\n2. Select text/URL which you want to encode/decode.\r\n3. Perform your task via Plugins->URL Plugin->Encode/Decode URL.\r\n\r\n",
+			"author": "Rajendra Singh",
+			"homepage": "https://github.com/SinghRajenM/nppURLPlugin"
+		},
+		{
+			"folder-name": "NPPJSONViewer",
+			"display-name": "JSON Viewer",
+			"version": "1.41",
+			"id": "bc35b2060215d8661d9da4827f5abcb4ede3efd3d188508ae974a9392c9f1730",
+			"repository": "https://github.com/kapilratnani/JSON-Viewer/releases/download/v1.41/NPPJSONViewer_ARM64.zip",
+			"description": "JSON viewer that displays the selected JSON string in a tree view.",
+			"author": "Kapil Ratnani",
+			"homepage": "https://github.com/kapilratnani/JSON-Viewer"
+		}
+	]
+}

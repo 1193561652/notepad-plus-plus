@@ -2,6 +2,18 @@
 
 缓存日期：2026-07-30
 
+## 2026-07-30 插件系统移植指导
+
+- 已核验 v8.4.6 的插件导出、加载顺序、`NPPM_*`、`NPPN_*` 和 Dock 边界。
+- 后续采用“跨平台版本化 C ABI + Windows 原版 ABI 适配器”双路线。
+- 当前 Qt/C++ `IPlugin` 仅是原型，不冻结为长期二进制接口。
+- 项目策略进一步明确为三类分流：有限兼容简单常用旧插件、通过新 API 移植常用
+  复杂插件、低价值长尾插件不提供官方移植。
+- Windows 兼容范围采用目标插件驱动的接口白名单；HexEditor 走自定义文档/视图。
+- 指导文档明确 Host Services、生命周期、命令/通知/Dock、可靠性、阶段计划和
+  Windows/Linux/macOS 测试矩阵。
+- 文档：`codex/guides/plugin-system-porting-guide.md`。
+
 ## 2026-07-30 非插件差异 1–6 收敛
 
 - 内置语言菜单全部接入 v8.4.6 对应的 Lexilla lexer。
@@ -333,3 +345,18 @@
 - Find in Projects 页补齐 3 个项目面板选项和 3 个按钮的控件标识及中文资源。
 - Debug 主程序构建成功；CTest `26/26` 通过。
 - 变更记录：`codex/changes/2026-07-28-find-dialog-localization.md`。
+
+## 2026-07-30 插件管理首轮移植
+
+- 完成跨平台插件 artifact 定位、v8.4.6 形状的清单解析和四类 Plugin Admin
+  数据模型。
+- 完成 Qt Plugin Admin 对话框，以及退出后执行下载、SHA-256、ZIP 校验、
+  安装/更新/卸载和重启的独立更新器。
+- Windows 保持原版插件路径；Linux/macOS 使用插件目录内的平台子目录，不增加
+  架构目录。管理器与现有加载器共用定位实现。
+- 已从 GitHub `nppPluginList/v1.5.4` tag 原样归档 x86 169 项、x64 134 项、
+  ARM64 20 项清单；合并后共 178 个插件。Windows 按进程架构启用相应清单，
+  Linux/macOS 保持空清单，避免安装 Windows DLL。
+- Ubuntu 下主程序、更新器和 `plugin-admin-tests` 构建通过，针对性测试通过；
+  Windows 与真实插件包验证项已单独记录。
+- 插件清单采集方法和逐插件兼容调查模板已写入 `codex/analysis/`。
