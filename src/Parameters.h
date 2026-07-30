@@ -37,6 +37,8 @@ struct WordsStyle {
     QColor  fgColor;            // 前景色
     QColor  bgColor;            // 背景色
     QString fontName;
+    QString keywordClass;
+    QString userKeywords;
     int     fontStyle = 0;      // 0=normal,1=bold,2=italic,4=underline
     int     fontSize  = 0;      // 0 = 使用编辑器默认字号
     bool    hasFg     = false;
@@ -444,12 +446,25 @@ public:
 
     // stylers.xml ── 颜色主题
     bool loadStylers();
+    bool writeStylers();
     const LexerStyler* getLexerStyler(const QString& nppLexerName) const;
+    QVector<LexerStyler>& getLexerStylers() { return _lexerStylers; }
+    const QVector<LexerStyler>& getLexerStylers() const { return _lexerStylers; }
+    QVector<WordsStyle>& getGlobalStyles() { return _globalStyles; }
     const QVector<WordsStyle>& getGlobalStyles() const { return _globalStyles; }
 
     // userDefineLang.xml - user-defined languages (read-only compatibility).
     bool loadUserDefinedLanguages();
     bool writeUserDefinedLanguage(const UserLangDesc& language);
+    bool createUserDefinedLanguage(const QString& name);
+    bool deleteUserDefinedLanguage(const QString& name,
+                                   const QString& sourceFilePath = QString());
+    bool renameUserDefinedLanguage(const QString& oldName,
+                                   const QString& newName,
+                                   const QString& sourceFilePath = QString());
+    bool importUserDefinedLanguages(const QString& filePath);
+    bool exportUserDefinedLanguage(const QString& name,
+                                   const QString& destinationPath) const;
     const QVector<UserLangDesc>& getUserLangs() const { return _userLangs; }
     const UserLangDesc* getUserLangByName(const QString& name) const;
     const UserLangDesc* getUserLangByExt(const QString& ext) const;

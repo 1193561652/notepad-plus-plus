@@ -44,6 +44,12 @@
 - `NppParameters::writeFindHistory()`
 - `NppParameters::writeSession()`
 - `NppParameters::writeShortcuts()`
+- `NppParameters::writeStylers()`
+- `NppParameters::createUserDefinedLanguage()`
+- `NppParameters::renameUserDefinedLanguage()`
+- `NppParameters::deleteUserDefinedLanguage()`
+- `NppParameters::importUserDefinedLanguages()`
+- `NppParameters::exportUserDefinedLanguage()`
 
 ## 缓存结论
 
@@ -52,6 +58,11 @@
 阶段一补充：默认 XML 模型已进入 qrc；首次缺失时会被复制到用户配置目录。`loadLangs()` 和 `loadShortcuts()` 已具备资源回退。配置目录初始化会创建 `backup/plugins/themes/autoCompletion/localization/nativeLang/userDefineLangs/toolbarIcons` 等兼容目录。`writeConfigXml()` 和 `writeShortcuts()` 已改为尽量保留当前未支持的原版 XML 结构。
 
 阶段五补充：`FindHistory` 已纳入 `config.xml` 读写；新建文档默认 EOL/编码和快照备份配置已从“可解析”进入“实际影响行为”的状态。
+
+2026-07-30 补充：`stylers.xml` 已支持保守写回，Style Configurator 可编辑全局
+和 lexer 样式；未知节点与属性保留。UDL 已支持创建、重命名、删除、导入和
+单语言导出。`autoCompletion/*.xml` 由 `MISC/AutoCompletionParser` 读取，
+用户目录优先于程序目录。
 
 ## 本地化索引
 

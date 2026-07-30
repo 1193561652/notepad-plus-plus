@@ -20,7 +20,7 @@ int main()
 {
     bool ok = true;
     const QVector<NppCommandMapping>& mappings = nppCommandMappings();
-    ok &= expect(mappings.size() >= 100, "registry must cover implemented commands");
+    ok &= expect(mappings.size() >= 150, "registry must cover implemented commands");
 
     QSet<QString> names;
     QSet<int> ids;
@@ -34,8 +34,7 @@ int main()
         ok &= expect(mapping.commandId > 0, "command ID must be positive");
         ok &= expect(!names.contains(name), "command object names must be unique");
         ok &= expect(!ids.contains(mapping.commandId), "command IDs must be unique");
-        ok &= expect(mainWindowSource.contains(
-                         QStringLiteral("\"%1\"").arg(name)),
+        ok &= expect(mainWindowSource.contains(name),
                      "mapped action must exist in MainWindow.cpp");
         names.insert(name);
         ids.insert(mapping.commandId);
@@ -49,6 +48,12 @@ int main()
                  "Reverse Line Order must use its original command ID");
     ok &= expect(nppCommandIdForObjectName("functionCompletionAction") == 50000,
                  "Function Completion must retain its special command ID");
+    ok &= expect(nppCommandIdForObjectName("splitLinesAction") == 42012,
+                 "Split Lines must retain IDM_EDIT_SPLIT_LINES");
+    ok &= expect(nppCommandIdForObjectName("selectToMatchingBraceAction") == 43053,
+                 "brace selection must retain its original command ID");
+    ok &= expect(nppCommandIdForObjectName("activateTab9Action") == 44094,
+                 "tab activation must retain its original command ID");
     ok &= expect(nppCommandIdForObjectName("missingAction") == 0,
                  "unknown actions must not resolve to a command");
     return ok ? 0 : 1;

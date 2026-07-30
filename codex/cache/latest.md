@@ -2,6 +2,19 @@
 
 缓存日期：2026-07-30
 
+## 2026-07-30 非插件差异 1–6 收敛
+
+- 内置语言菜单全部接入 v8.4.6 对应的 Lexilla lexer。
+- 补充高级编辑、搜索样式标记、Finder 导航、Tab/View、同步滚动、按层折叠等
+  命令入口及原版命令 ID。
+- Style Configurator 支持全局/lexer 颜色、字体、字形和用户自定义关键字，
+  并保守写回 `stylers.xml`。
+- 自动完成读取 `autoCompletion/*.xml` 的关键字、重载和参数签名。
+- UDL 设计器支持新建、重命名、删除、导入和单语言导出。
+- Finder 已改用只读 Scintilla 结果文档，支持结果 lexer、折叠、指示器和跳转。
+- Release 全量构建成功，CTest `24/24` 与 P1 功能捕获均通过。
+- 记录：`codex/cache/2026-07-30-non-plugin-gap-closure.md`。
+
 ## 2026-07-30 Ubuntu 编译适配
 
 - Ubuntu 22.04.5、GCC 11.4、Qt 5.15.3 的 Debug 全量构建成功。

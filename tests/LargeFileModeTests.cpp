@@ -131,6 +131,27 @@ int main(int argc, char** argv)
     bool ok = check(temporary.isValid(),
                     "Could not create temporary test directory");
 
+    const QStringList builtinLanguages = {
+        "php", "c", "cpp", "cs", "objc", "java", "rc", "html", "xml",
+        "makefile", "pascal", "batch", "ini", "asp", "sql", "vb",
+        "javascript", "css", "perl", "python", "lua", "tex", "fortran",
+        "bash", "actionscript", "nsis", "tcl", "lisp", "scheme", "asm",
+        "diff", "props", "postscript", "ruby", "smalltalk", "vhdl", "kix",
+        "autoit", "caml", "ada", "verilog", "matlab", "haskell", "inno",
+        "cmake", "yaml", "cobol", "gui4cli", "d", "powershell", "r", "jsp",
+        "coffeescript", "json", "javascript.js", "fortran77", "baanc",
+        "srec", "ihex", "tehex", "swift", "asn1", "avs", "blitzbasic",
+        "purebasic", "freebasic", "csound", "erlang", "escript", "forth",
+        "latex", "mmixal", "nim", "nncrontab", "oscript", "rebol",
+        "registry", "rust", "spice", "txt2tags", "visualprolog",
+        "typescript", "markdown", "searchResult"
+    };
+    for (const QString& language : builtinLanguages) {
+        ok &= check(
+            !ScintillaEditView::builtinLexerName(language).isEmpty(),
+            qPrintable(QStringLiteral("Missing built-in lexer mapping: %1")
+                           .arg(language)));
+    }
     QString utf8Text(IoBlockSize - 1, QLatin1Char('a'));
     utf8Text += QChar(0x20AC);
     utf8Text += QStringLiteral("\r\ntail");

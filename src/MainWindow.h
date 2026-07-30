@@ -259,7 +259,11 @@ private:
 
     // Find All 结果面板
     QDockWidget*       _findResultDock   = nullptr;
-    QListWidget*       _findResultList   = nullptr;
+    ScintillaEditView* _findResultView   = nullptr;
+    QList<FindAllResult> _lastFindResults;
+    QVector<int>       _findResultIndexByLine;
+    QMetaObject::Connection _syncVerticalConnections[2];
+    QMetaObject::Connection _syncHorizontalConnections[2];
     QDockWidget*       _fileBrowserDock  = nullptr;
     FileBrowserPanel*  _fileBrowserPanel = nullptr;
     QDockWidget*       _docMapDock       = nullptr;

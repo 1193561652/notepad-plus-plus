@@ -81,8 +81,10 @@ public:
 
     // 语法高亮
     void setLexerForFile(const QString& filePath);
+    void setBuiltinLanguage(const QString& languageName);
     void setLexerByExtension(const QString& ext);
     bool setLexerByName(const QString& name);
+    static QString builtinLexerName(const QString& nppLanguageName);
     void setUserDefinedLanguage(const UserLangDesc& language);
     void clearLexer();
 
@@ -113,6 +115,7 @@ public:
     void applyStylers(const QString& nppLexerName);
     // 应用全局样式（编辑器背景、行号边距等）
     void applyGlobalStyles();
+    void reloadConfiguredStyles();
 
     // 当前行注释字符（从 langs.xml 读取，setLexerForFile 后有效）
     const QString& commentLine()  const { return _commentLine;  }

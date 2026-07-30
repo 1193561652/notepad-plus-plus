@@ -43,6 +43,7 @@
 #include <QSaveFile>
 #include <QTextStream>
 #include <QSplitter>
+#include <QScrollBar>
 #include <QListWidget>
 #include <Qsci/qsciscintilla.h>
 #include <QApplication>
@@ -55,20 +56,24 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QHBoxLayout>
 #include <QComboBox>
 #include <QLineEdit>
 #include <QTextEdit>
 #include <QSpinBox>
 #include <QCheckBox>
+#include <QPushButton>
 #include <QLabel>
 #include <QPalette>
 #include <QRandomGenerator>
 #include <QCollator>
 #include <QCryptographicHash>
 #include <QClipboard>
+#include <QMimeData>
 #include <QDesktopServices>
 #include <QProcess>
 #include <QFontDialog>
+#include <QColorDialog>
 #include <QTableWidget>
 #include <QHeaderView>
 #include <QKeySequenceEdit>
@@ -2548,22 +2553,35 @@ void MainWindow::setupAuxiliaryPanels()
 
 void MainWindow::setupFindResultPanel()
 {
-    _findResultList = new QListWidget(this);
-    _findResultList->setFont(QFont("Courier New", 9));
+    _findResultView = new ScintillaEditView(this);
+    _findResultView->setObjectName(QStringLiteral("findResultView"));
+    _findResultView->setFont(QFont(QStringLiteral("Courier New"), 9));
+    _findResultView->setBuiltinLanguage(QStringLiteral("searchResult"));
+    _findResultView->setFolding(QsciScintilla::BoxedTreeFoldStyle);
+    _findResultView->setMarginWidth(0, 0);
+    _findResultView->setMarginWidth(1, 0);
+    _findResultView->setReadOnly(true);
 
     _findResultDock = new QDockWidget(tr("Find Result"), this);
     _findResultDock->setObjectName("FindResultDock");
-    _findResultDock->setWidget(_findResultList);
+    _findResultDock->setWidget(_findResultView);
     _findResultDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
     addDockWidget(Qt::BottomDockWidgetArea, _findResultDock);
     _findResultDock->hide();
 
-    // 点击结果项 → 跳转到对应行
-    connect(_findResultList, &QListWidget::itemActivated, this, [this](QListWidgetItem* item) {
-        const qintptr matchStart =
-            static_cast<qintptr>(item->data(Qt::UserRole).toLongLong());
-        QString filePath = item->data(Qt::UserRole + 1).toString();
-        QString sourceName = item->data(Qt::UserRole + 2).toString();
+    // 双击结果行 → 跳转到对应文档位置。
+    connect(_findResultView, &QsciScintillaBase::SCN_DOUBLECLICK, this,
+            [this](int, int resultLine, int) {
+        if (resultLine < 0 ||
+            resultLine >= _findResultIndexByLine.size())
+            return;
+        const int resultIndex = _findResultIndexByLine.at(resultLine);
+        if (resultIndex < 0 || resultIndex >= _lastFindResults.size())
+            return;
+        const FindAllResult& result = _lastFindResults.at(resultIndex);
+        const qintptr matchStart = static_cast<qintptr>(result.matchStart);
+        const QString filePath = result.filePath;
+        const QString sourceName = result.sourceName;
         if (!filePath.isEmpty()) {
             doOpenFile(filePath, _activeDocTab);
         } else if (!sourceName.isEmpty()) {
@@ -2633,21 +2651,17 @@ FindReplaceDlg* MainWindow::ensureFindReplaceDialog()
 void MainWindow::onFindAllResults(const QString& searchText,
                                   const QList<FindAllResult>& results)
 {
-    _findResultList->clear();
-
-    // 标题行：显示搜索词和匹配数（对应原版 Finder 窗口顶部）
-    auto* header = new QListWidgetItem(
-        tr("Search \"%1\": %2 match(es) found").arg(searchText).arg(results.count()));
-    QFont boldFont = _findResultList->font();
-    boldFont.setBold(true);
-    header->setFont(boldFont);
-    header->setFlags(header->flags() & ~Qt::ItemIsSelectable);
+    _lastFindResults = results;
+    _findResultIndexByLine.clear();
+    QStringList output;
+    output << tr("Search \"%1\": %2 match(es) found")
+                  .arg(searchText).arg(results.count());
+    _findResultIndexByLine << -1;
     _findResultDock->setWindowTitle(tr("Find Result - \"%1\"").arg(searchText));
-    _findResultList->addItem(header);
 
-    // 结果条目：对应原版 "  Line X: <text>"
     QString currentSource;
-    for (const FindAllResult& r : results) {
+    for (int resultIndex = 0; resultIndex < results.size(); ++resultIndex) {
+        const FindAllResult& r = results.at(resultIndex);
         QString source = r.sourceName;
         if (source.isEmpty() && !r.filePath.isEmpty())
             source = QFileInfo(r.filePath).fileName();
@@ -2656,48 +2670,48 @@ void MainWindow::onFindAllResults(const QString& searchText,
             QString groupLabel = source;
             if (!r.filePath.isEmpty() && r.filePath != source)
                 groupLabel += QStringLiteral(" - ") + r.filePath;
-            auto* group = new QListWidgetItem(groupLabel);
-            group->setFont(boldFont);
-            group->setFlags(group->flags() & ~Qt::ItemIsSelectable);
-            _findResultList->addItem(group);
+            output << groupLabel;
+            _findResultIndexByLine << -1;
         }
-        QString label = QString("  Line %1:\t%2")
-                            .arg(r.lineNo + 1)   // 转为 1-based 显示
-                            .arg(r.lineText);
-        auto* item = new QListWidgetItem(label);
-        item->setData(Qt::UserRole, r.matchStart);  // 存储字节偏移用于导航
-        item->setData(Qt::UserRole + 1, r.filePath);
-        item->setData(Qt::UserRole + 2, r.sourceName);
-        _findResultList->addItem(item);
-        const QByteArray lineBytes = r.lineText.toUtf8();
-        const int byteStart = qBound(
-            0, static_cast<int>(r.lineMatchStart), lineBytes.size());
-        const int byteLength = qBound(
-            0, static_cast<int>(r.matchLen), lineBytes.size() - byteStart);
-        const QString before =
-            QString::fromUtf8(lineBytes.left(byteStart)).toHtmlEscaped();
-        const QString match = QString::fromUtf8(
-            lineBytes.mid(byteStart, byteLength)).toHtmlEscaped();
-        const QString after = QString::fromUtf8(
-            lineBytes.mid(byteStart + byteLength)).toHtmlEscaped();
-        QLabel* styledResult = new QLabel(_findResultList);
-        styledResult->setFont(_findResultList->font());
-        styledResult->setTextFormat(Qt::RichText);
-        styledResult->setText(
-            QStringLiteral("  Line %1:&nbsp;&nbsp;%2"
-                           "<span style=\"background:%3;color:%4;\">%5</span>%6")
-                .arg(r.lineNo + 1)
-                .arg(before)
-                .arg(palette().color(QPalette::Highlight).name())
-                .arg(palette().color(QPalette::HighlightedText).name())
-                .arg(match)
-                .arg(after));
-        styledResult->setAttribute(Qt::WA_TransparentForMouseEvents);
-        item->setSizeHint(styledResult->sizeHint());
-        item->setText(QString());
-        _findResultList->setItemWidget(item, styledResult);
+        output << QStringLiteral("  Line %1:\t%2")
+                      .arg(r.lineNo + 1).arg(r.lineText);
+        _findResultIndexByLine << resultIndex;
     }
 
+    _findResultView->setReadOnly(false);
+    _findResultView->setText(output.join(QStringLiteral("\n")));
+    _findResultView->setReadOnly(true);
+    const int base = QsciScintillaBase::SC_FOLDLEVELBASE;
+    const int header = QsciScintillaBase::SC_FOLDLEVELHEADERFLAG;
+    int currentGroupLine = -1;
+    for (int line = 0; line < _findResultIndexByLine.size(); ++line) {
+        const int resultIndex = _findResultIndexByLine.at(line);
+        if (line == 0) {
+            _findResultView->SendScintillaNpp(
+                QsciScintillaBase::SCI_SETFOLDLEVEL, line, base | header);
+        } else if (resultIndex < 0) {
+            currentGroupLine = line;
+            _findResultView->SendScintillaNpp(
+                QsciScintillaBase::SCI_SETFOLDLEVEL,
+                line, (base + 1) | header);
+        } else {
+            _findResultView->SendScintillaNpp(
+                QsciScintillaBase::SCI_SETFOLDLEVEL,
+                line, base + (currentGroupLine >= 0 ? 2 : 1));
+            const FindAllResult& result = results.at(resultIndex);
+            const QByteArray prefix =
+                QStringLiteral("  Line %1:\t").arg(result.lineNo + 1).toUtf8();
+            const qintptr lineStart = _findResultView->SendScintillaNpp(
+                QsciScintillaBase::SCI_POSITIONFROMLINE, line);
+            _findResultView->SendScintillaNpp(
+                QsciScintillaBase::SCI_SETINDICATORCURRENT,
+                ScintillaEditView::FIND_MARK_INDICATOR);
+            _findResultView->SendScintillaNpp(
+                QsciScintillaBase::SCI_INDICATORFILLRANGE,
+                lineStart + prefix.size() + result.lineMatchStart,
+                result.matchLen);
+        }
+    }
     _findResultDock->show();
     _findResultDock->raise();
 }
@@ -4628,6 +4642,46 @@ void MainWindow::createMenus()
     lineOpsMenu->addAction(_moveLineUpAction);
     lineOpsMenu->addAction(_moveLineDownAction);
     lineOpsMenu->addSeparator();
+    addCommand(lineOpsMenu, tr("Duplicate Current Line Selection"),
+               "duplicateSelectionAction", [this]() {
+        if (auto* view = currentActiveView()) {
+            if (view->hasSelectedText()) {
+                const QString selected = view->selectedText();
+                const qintptr end = view->SendScintillaNpp(
+                    QsciScintilla::SCI_GETSELECTIONEND);
+                view->SendScintillaNpp(
+                    QsciScintilla::SCI_INSERTTEXT, end,
+                    reinterpret_cast<qintptr>(selected.toUtf8().constData()));
+            } else {
+                view->SendScintillaNpp(QsciScintilla::SCI_LINEDUPLICATE);
+            }
+        }
+    });
+    addCommand(lineOpsMenu, tr("Split Lines"), "splitLinesAction",
+               [this]() { if (auto* view = currentActiveView())
+                    view->SendScintillaNpp(QsciScintilla::SCI_LINESSPLIT, 0); });
+    addCommand(lineOpsMenu, tr("Join Lines"), "joinLinesAction",
+               [this]() { if (auto* view = currentActiveView())
+                    view->SendScintillaNpp(QsciScintilla::SCI_LINESJOIN); });
+    addCommand(lineOpsMenu, tr("Insert Blank Line Above"),
+               "insertBlankLineAboveAction", [this]() {
+        if (auto* view = currentActiveView()) {
+            int line = 0, index = 0;
+            view->getCursorPosition(&line, &index);
+            view->insertAt(QStringLiteral("\n"), line, 0);
+            view->setCursorPosition(line, 0);
+        }
+    });
+    addCommand(lineOpsMenu, tr("Insert Blank Line Below"),
+               "insertBlankLineBelowAction", [this]() {
+        if (auto* view = currentActiveView()) {
+            int line = 0, index = 0;
+            view->getCursorPosition(&line, &index);
+            view->insertAt(QStringLiteral("\n"), line, view->lineLength(line));
+            view->setCursorPosition(line + 1, 0);
+        }
+    });
+    lineOpsMenu->addSeparator();
     QAction* removeEmpty = lineOpsMenu->addAction(tr("Remove Empty Lines"));
     removeEmpty->setObjectName("removeEmptyLinesAction");
     connect(removeEmpty, &QAction::triggered, this, [this]() { transformLines(0); });
@@ -4698,6 +4752,68 @@ void MainWindow::createMenus()
     addCommand(blankOpsMenu, tr("Space to TAB (All)"), "spaceToTabAllAction",
                [this]() { transformLines(7); });
 
+    QMenu* indentationMenu = _editMenu->addMenu(tr("Indentation"));
+    indentationMenu->setObjectName("indentationMenu");
+    addCommand(indentationMenu, tr("Increase Line Indent"),
+               "increaseIndentAction", [this]() {
+        if (auto* view = currentActiveView())
+            view->SendScintillaNpp(QsciScintilla::SCI_TAB);
+    });
+    addCommand(indentationMenu, tr("Decrease Line Indent"),
+               "decreaseIndentAction", [this]() {
+        if (auto* view = currentActiveView())
+            view->SendScintillaNpp(QsciScintilla::SCI_BACKTAB);
+    });
+
+    QMenu* copySpecialMenu = _editMenu->addMenu(tr("Copy to Clipboard"));
+    copySpecialMenu->setObjectName("copySpecialMenu");
+    auto copyBufferPath = [this](int part) {
+        Buffer* buffer = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
+        if (!buffer)
+            return;
+        const QFileInfo info(buffer->getFullPath());
+        QString value;
+        if (part == 0) value = info.absoluteFilePath();
+        else if (part == 1) value = info.fileName();
+        else value = info.absolutePath();
+        QApplication::clipboard()->setText(value);
+    };
+    addCommand(copySpecialMenu, tr("Current Full File Path"),
+               "copyCurrentPathAction", [copyBufferPath]() { copyBufferPath(0); });
+    addCommand(copySpecialMenu, tr("Current File Name"),
+               "copyCurrentNameAction", [copyBufferPath]() { copyBufferPath(1); });
+    addCommand(copySpecialMenu, tr("Current Directory Path"),
+               "copyCurrentDirectoryAction",
+               [copyBufferPath]() { copyBufferPath(2); });
+    addCommand(copySpecialMenu, tr("Copy Styled Text"),
+               "copyStyledTextAction",
+               [this]() { if (auto* view = currentActiveView()) view->copy(); });
+
+    QMenu* pasteSpecialMenu = _editMenu->addMenu(tr("Paste Special"));
+    pasteSpecialMenu->setObjectName("pasteSpecialMenu");
+    addCommand(pasteSpecialMenu, tr("Paste HTML Content"),
+               "pasteHtmlAction", [this]() {
+        if (auto* view = currentActiveView()) {
+            const QMimeData* mime = QApplication::clipboard()->mimeData();
+            view->insert(mime->hasHtml() ? mime->html() : mime->text());
+        }
+    });
+    addCommand(pasteSpecialMenu, tr("Paste RTF Content"),
+               "pasteRtfAction", [this]() {
+        if (auto* view = currentActiveView()) {
+            const QMimeData* mime = QApplication::clipboard()->mimeData();
+            const QByteArray rtf = mime->data(QStringLiteral("text/rtf"));
+            view->insert(rtf.isEmpty() ? mime->text()
+                                       : QString::fromLocal8Bit(rtf));
+        }
+    });
+    QAction* readOnlyAction = addCommand(
+        _editMenu, tr("Set Read-Only"), "readOnlyAction", [this]() {
+        if (auto* view = currentActiveView())
+            view->setReadOnly(!view->isReadOnly());
+    });
+    readOnlyAction->setCheckable(true);
+
     QAction* columnModeTip = _editMenu->addAction(tr("Column Mode..."));
     columnModeTip->setObjectName("columnModeTipAction");
     connect(columnModeTip, &QAction::triggered, this, [this]() {
@@ -4734,6 +4850,30 @@ void MainWindow::createMenus()
                    if (view && (!buffer || !buffer->isLargeFile()))
                        view->callTip();
                });
+    addCommand(autoCompletionMenu, tr("Path Completion"),
+               "pathCompletionAction", [this]() {
+        ScintillaEditView* view = currentActiveView();
+        if (!view)
+            return;
+        Buffer* buffer = _activeDocTab
+            ? _activeDocTab->currentBuffer() : nullptr;
+        const QString directory = buffer && !buffer->isUntitled()
+            ? QFileInfo(buffer->getFullPath()).absolutePath()
+            : QDir::currentPath();
+        QStringList entries = QDir(directory).entryList(
+            QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot,
+            QDir::Name | QDir::IgnoreCase);
+        const QByteArray list = entries.join(QStringLiteral(" ")).toUtf8();
+        view->SendScintillaNpp(
+            QsciScintilla::SCI_AUTOCSHOW, 0,
+            reinterpret_cast<qintptr>(list.constData()));
+    });
+    addCommand(autoCompletionMenu, tr("Previous Function Parameter Hint"),
+               "previousFunctionParameterHintAction",
+               [this]() { if (auto* view = currentActiveView()) view->callTip(); });
+    addCommand(autoCompletionMenu, tr("Next Function Parameter Hint"),
+               "nextFunctionParameterHintAction",
+               [this]() { if (auto* view = currentActiveView()) view->callTip(); });
 
     // EOL Conversion submenu
     QMenu* eolEditMenu = _editMenu->addMenu(tr("&EOL Conversion"));
@@ -4819,6 +4959,44 @@ void MainWindow::createMenus()
     _searchMenu->addAction(_goToLineAction);
     addCommand(_searchMenu, tr("Go to Matching Brace"), "goToMatchingBraceAction",
                [this]() { goToMatchingBrace(); });
+    addCommand(_searchMenu, tr("Select to Matching Brace"),
+               "selectToMatchingBraceAction", [this]() {
+        if (auto* view = currentActiveView()) {
+            const qintptr current = view->getCurrentPos();
+            const qintptr match = view->SendScintillaNpp(
+                QsciScintilla::SCI_BRACEMATCH, current);
+            if (match >= 0)
+                view->SendScintillaNpp(
+                    QsciScintilla::SCI_SETSEL, current, match + 1);
+        }
+    });
+    addCommand(_searchMenu, tr("Next Search Result"),
+               "nextSearchResultAction", [this]() {
+        if (!_findResultView || !_findResultDock->isVisible())
+            return;
+        int line = 0, index = 0;
+        _findResultView->getCursorPosition(&line, &index);
+        for (int candidate = line + 1;
+             candidate < _findResultIndexByLine.size(); ++candidate) {
+            if (_findResultIndexByLine.at(candidate) >= 0) {
+                _findResultView->setCursorPosition(candidate, 0);
+                return;
+            }
+        }
+    });
+    addCommand(_searchMenu, tr("Previous Search Result"),
+               "previousSearchResultAction", [this]() {
+        if (!_findResultView || !_findResultDock->isVisible())
+            return;
+        int line = 0, index = 0;
+        _findResultView->getCursorPosition(&line, &index);
+        for (int candidate = line - 1; candidate >= 0; --candidate) {
+            if (_findResultIndexByLine.at(candidate) >= 0) {
+                _findResultView->setCursorPosition(candidate, 0);
+                return;
+            }
+        }
+    });
     _searchMenu->addSeparator();
 
     // Bookmark submenu
@@ -4845,6 +5023,45 @@ void MainWindow::createMenus()
                [this]() { jumpSearchMark(true); });
     addCommand(markMenu, tr("Clear All Marks"), "clearAllMarksAction",
                [this]() { clearSearchMarks(); });
+    QMenu* styleTokenMenu = markMenu->addMenu(tr("Using Style"));
+    styleTokenMenu->setObjectName("markUsingStyleMenu");
+    static const char* const markStyleObjectNames[] = {
+        "markStyle1Action", "markStyle2Action", "markStyle3Action",
+        "markStyle4Action", "markStyle5Action"
+    };
+    for (int style = 1; style <= 5; ++style) {
+        QAction* action = styleTokenMenu->addAction(
+            tr("Style %1").arg(style));
+        action->setObjectName(
+            QString::fromLatin1(markStyleObjectNames[style - 1]));
+        connect(action, &QAction::triggered, this, [this, style]() {
+            ScintillaEditView* view = currentActiveView();
+            if (!view || !view->hasSelectedText())
+                return;
+            const qintptr start = view->SendScintillaNpp(
+                QsciScintilla::SCI_GETSELECTIONSTART);
+            const qintptr end = view->SendScintillaNpp(
+                QsciScintilla::SCI_GETSELECTIONEND);
+            view->SendScintillaNpp(
+                QsciScintilla::SCI_SETINDICATORCURRENT, 26 - style);
+            view->SendScintillaNpp(
+                QsciScintilla::SCI_INDICATORFILLRANGE,
+                start, end - start);
+        });
+    }
+    addCommand(styleTokenMenu, tr("Clear All Styles"),
+               "clearStyleMarksAction", [this]() {
+        if (auto* view = currentActiveView()) {
+            const qintptr length = view->SendScintillaNpp(
+                QsciScintilla::SCI_GETLENGTH);
+            for (int style = 1; style <= 5; ++style) {
+                view->SendScintillaNpp(
+                    QsciScintilla::SCI_SETINDICATORCURRENT, 26 - style);
+                view->SendScintillaNpp(
+                    QsciScintilla::SCI_INDICATORCLEARRANGE, 0, length);
+            }
+        }
+    });
 
     // ── View ─────────────────────────────────────────────────
     _viewMenu = menuBar()->addMenu(tr("&View"));
@@ -4861,6 +5078,19 @@ void MainWindow::createMenus()
     fullScreenAction->setCheckable(true);
     connect(fullScreenAction, &QAction::toggled, this, [this](bool enabled) {
         enabled ? showFullScreen() : showNormal();
+    });
+    QAction* distractionFreeAction =
+        _viewMenu->addAction(tr("Distraction Free Mode"));
+    distractionFreeAction->setObjectName("distractionFreeAction");
+    distractionFreeAction->setCheckable(true);
+    connect(distractionFreeAction, &QAction::toggled, this,
+            [this](bool enabled) {
+        menuBar()->setVisible(!enabled);
+        statusBar()->setVisible(!enabled);
+        for (QToolBar* bar : findChildren<QToolBar*>())
+            bar->setVisible(!enabled);
+        for (QDockWidget* dock : findChildren<QDockWidget*>())
+            dock->setVisible(!enabled);
     });
     QAction* postItAction = _viewMenu->addAction(tr("Post-It"));
     postItAction->setObjectName("postItAction");
@@ -4931,9 +5161,182 @@ void MainWindow::createMenus()
     moveCloneMenu->addAction(_cloneToOtherAction);
 
     _viewMenu->addAction(_wordWrapAction);
+    addCommand(_viewMenu, tr("Hide Selected Lines"), "hideLinesAction",
+               [this]() {
+        if (auto* view = currentActiveView()) {
+            const int start = view->SendScintillaNpp(
+                QsciScintilla::SCI_LINEFROMPOSITION,
+                view->SendScintillaNpp(QsciScintilla::SCI_GETSELECTIONSTART));
+            const int end = view->SendScintillaNpp(
+                QsciScintilla::SCI_LINEFROMPOSITION,
+                view->SendScintillaNpp(QsciScintilla::SCI_GETSELECTIONEND));
+            view->SendScintillaNpp(
+                QsciScintilla::SCI_HIDELINES, start, end);
+        }
+    });
+    addCommand(_viewMenu, tr("Show All Hidden Lines"), "showHiddenLinesAction",
+               [this]() { if (auto* view = currentActiveView())
+                    view->SendScintillaNpp(
+                        QsciScintilla::SCI_SHOWLINES, 0, view->lines()); });
+    addCommand(_viewMenu, tr("Text Direction RTL"), "textDirectionRtlAction",
+               [this]() { if (auto* view = currentActiveView())
+                    view->setLayoutDirection(Qt::RightToLeft); });
+    addCommand(_viewMenu, tr("Text Direction LTR"), "textDirectionLtrAction",
+               [this]() { if (auto* view = currentActiveView())
+                    view->setLayoutDirection(Qt::LeftToRight); });
+    addCommand(_viewMenu, tr("Document Summary"), "documentSummaryAction",
+               [this]() {
+        ScintillaEditView* view = currentActiveView();
+        if (!view) return;
+        const QString contents = view->text();
+        const int words = contents.split(
+            QRegularExpression(QStringLiteral("\\s+")),
+            QString::SkipEmptyParts).size();
+        QMessageBox::information(
+            this, tr("Document Summary"),
+            tr("Characters: %1\nWords: %2\nLines: %3")
+                .arg(contents.size()).arg(words).arg(view->lines()));
+    });
+    QAction* monitoringAction = addCommand(
+        _viewMenu, tr("Monitoring (tail -f)"), "monitoringAction",
+        [this]() {
+        Buffer* buffer = _activeDocTab
+            ? _activeDocTab->currentBuffer() : nullptr;
+        if (!buffer || buffer->isUntitled())
+            return;
+        const bool enabled = !buffer->isMonitoring();
+        buffer->setMonitoring(enabled);
+        const bool readOnly = enabled || buffer->isCommandLineReadOnly() ||
+            !QFileInfo(buffer->getFullPath()).isWritable();
+        buffer->setReadOnly(readOnly);
+        for (ScintillaEditView* view : buffer->views())
+            if (view) view->setReadOnly(readOnly);
+        if (enabled) watchBufferFile(buffer);
+    });
+    monitoringAction->setCheckable(true);
     _viewMenu->addSeparator();
     _viewMenu->addAction(_splitViewAction);
     _viewMenu->addAction(_rotateSplitAction);
+    QAction* syncVerticalAction = addCommand(
+        _viewMenu, tr("Synchronize Vertical Scrolling"),
+        "synchronizeVerticalAction", [this]() {
+        QAction* action =
+            findChild<QAction*>(QStringLiteral("synchronizeVerticalAction"));
+        if (!action) return;
+        const bool enabled = action->isChecked();
+        for (QMetaObject::Connection& connection :
+             _syncVerticalConnections)
+            QObject::disconnect(connection);
+        ScintillaEditView* mainView = qobject_cast<ScintillaEditView*>(
+            _mainDocTab->currentWidget());
+        ScintillaEditView* subView = qobject_cast<ScintillaEditView*>(
+            _subDocTab->currentWidget());
+        if (enabled && mainView && subView) {
+            QScrollBar* first =
+                mainView->verticalScrollBar();
+            QScrollBar* second =
+                subView->verticalScrollBar();
+            _syncVerticalConnections[0] = connect(
+                first, &QScrollBar::valueChanged,
+                second, &QScrollBar::setValue);
+            _syncVerticalConnections[1] = connect(
+                second, &QScrollBar::valueChanged,
+                first, &QScrollBar::setValue);
+        }
+    });
+    syncVerticalAction->setCheckable(true);
+    QAction* syncHorizontalAction = addCommand(
+        _viewMenu, tr("Synchronize Horizontal Scrolling"),
+        "synchronizeHorizontalAction", [this]() {
+        QAction* action =
+            findChild<QAction*>(QStringLiteral("synchronizeHorizontalAction"));
+        if (!action) return;
+        const bool enabled = action->isChecked();
+        for (QMetaObject::Connection& connection :
+             _syncHorizontalConnections)
+            QObject::disconnect(connection);
+        ScintillaEditView* mainView = qobject_cast<ScintillaEditView*>(
+            _mainDocTab->currentWidget());
+        ScintillaEditView* subView = qobject_cast<ScintillaEditView*>(
+            _subDocTab->currentWidget());
+        if (enabled && mainView && subView) {
+            QScrollBar* first =
+                mainView->horizontalScrollBar();
+            QScrollBar* second =
+                subView->horizontalScrollBar();
+            _syncHorizontalConnections[0] = connect(
+                first, &QScrollBar::valueChanged,
+                second, &QScrollBar::setValue);
+            _syncHorizontalConnections[1] = connect(
+                second, &QScrollBar::valueChanged,
+                first, &QScrollBar::setValue);
+        }
+    });
+    syncHorizontalAction->setCheckable(true);
+    QMenu* tabMenu = _viewMenu->addMenu(tr("Tab"));
+    tabMenu->setObjectName("tabMenu");
+    static const char* const activateTabObjectNames[] = {
+        "activateTab1Action", "activateTab2Action", "activateTab3Action",
+        "activateTab4Action", "activateTab5Action", "activateTab6Action",
+        "activateTab7Action", "activateTab8Action", "activateTab9Action"
+    };
+    for (int tabNumber = 1; tabNumber <= 9; ++tabNumber) {
+        QAction* tabAction = tabMenu->addAction(
+            tr("Activate Tab %1").arg(tabNumber));
+        tabAction->setObjectName(
+            QString::fromLatin1(activateTabObjectNames[tabNumber - 1]));
+        tabAction->setShortcut(
+            QKeySequence(Qt::ALT | (Qt::Key_0 + tabNumber)));
+        connect(tabAction, &QAction::triggered, this,
+                [this, tabNumber]() {
+            if (_activeDocTab && _activeDocTab->count() >= tabNumber)
+                _activeDocTab->setCurrentIndex(tabNumber - 1);
+        });
+    }
+    addCommand(tabMenu, tr("Move Tab Forward"), "moveTabForwardAction",
+               [this]() {
+        if (!_activeDocTab) return;
+        const int from = _activeDocTab->currentIndex();
+        if (from >= 0 && from + 1 < _activeDocTab->count())
+            _activeDocTab->tabBar()->moveTab(from, from + 1);
+    });
+    addCommand(tabMenu, tr("Move Tab Backward"), "moveTabBackwardAction",
+               [this]() {
+        if (!_activeDocTab) return;
+        const int from = _activeDocTab->currentIndex();
+        if (from > 0)
+            _activeDocTab->tabBar()->moveTab(from, from - 1);
+    });
+    QMenu* tabColorMenu = tabMenu->addMenu(tr("Apply Colour to Tab"));
+    tabColorMenu->setObjectName("tabColorMenu");
+    const QList<QColor> tabColors = {
+        QColor(255, 128, 128), QColor(128, 255, 128),
+        QColor(128, 192, 255), QColor(255, 192, 96),
+        QColor(192, 128, 255)
+    };
+    static const char* const tabColorObjectNames[] = {
+        "tabColor1Action", "tabColor2Action", "tabColor3Action",
+        "tabColor4Action", "tabColor5Action"
+    };
+    for (int colorIndex = 0; colorIndex < tabColors.size(); ++colorIndex) {
+        QAction* colorAction = tabColorMenu->addAction(
+            tr("Colour %1").arg(colorIndex + 1));
+        colorAction->setObjectName(
+            QString::fromLatin1(tabColorObjectNames[colorIndex]));
+        connect(colorAction, &QAction::triggered, this,
+                [this, tabColors, colorIndex]() {
+            if (_activeDocTab && _activeDocTab->currentIndex() >= 0)
+                _activeDocTab->tabBar()->setTabTextColor(
+                    _activeDocTab->currentIndex(),
+                    tabColors.at(colorIndex));
+        });
+    }
+    addCommand(tabColorMenu, tr("Remove Colour"), "removeTabColorAction",
+               [this]() {
+        if (_activeDocTab && _activeDocTab->currentIndex() >= 0)
+            _activeDocTab->tabBar()->setTabTextColor(
+                _activeDocTab->currentIndex(), palette().color(QPalette::Text));
+    });
     _viewMenu->addSeparator();
     _viewMenu->addAction(_fileBrowserAction);
     _viewMenu->addAction(_docMapAction);
@@ -4978,6 +5381,39 @@ void MainWindow::createMenus()
                [this]() { if (auto* view = currentActiveView())
                     view->SendScintilla(QsciScintilla::SCI_FOLDALL,
                                         QsciScintilla::SC_FOLDACTION_EXPAND); });
+    QMenu* foldLevelMenu = foldMenu->addMenu(tr("Collapse Level"));
+    foldLevelMenu->setObjectName("foldLevelMenu");
+    QMenu* unfoldLevelMenu = foldMenu->addMenu(tr("Uncollapse Level"));
+    unfoldLevelMenu->setObjectName("unfoldLevelMenu");
+    for (int level = 1; level <= 8; ++level) {
+        auto addLevelAction = [this, level](
+            QMenu* menu, bool expand, const QString& objectName) {
+            QAction* action = menu->addAction(tr("Level %1").arg(level));
+            action->setObjectName(objectName);
+            connect(action, &QAction::triggered, this,
+                    [this, level, expand]() {
+                ScintillaEditView* view = currentActiveView();
+                if (!view) return;
+                for (int line = 0; line < view->lines(); ++line) {
+                    const int foldLevel = view->SendScintillaNpp(
+                        QsciScintilla::SCI_GETFOLDLEVEL, line);
+                    if ((foldLevel & QsciScintilla::SC_FOLDLEVELNUMBERMASK) ==
+                        QsciScintilla::SC_FOLDLEVELBASE + level - 1) {
+                        view->SendScintillaNpp(
+                            QsciScintilla::SCI_FOLDLINE, line,
+                            expand ? QsciScintilla::SC_FOLDACTION_EXPAND
+                                   : QsciScintilla::SC_FOLDACTION_CONTRACT);
+                    }
+                }
+            });
+        };
+        addLevelAction(
+            foldLevelMenu, false,
+            QStringLiteral("collapseLevel%1Action").arg(level));
+        addLevelAction(
+            unfoldLevelMenu, true,
+            QStringLiteral("uncollapseLevel%1Action").arg(level));
+    }
 
     // ── Encoding ─────────────────────────────────────────────
     createEncodingMenu();
@@ -5106,27 +5542,44 @@ void MainWindow::createMenus()
     addLang(langXY, "YAML",         "yaml");
 
     const QVector<UserLangDesc>& userLangs = NppParameters::getInstance().getUserLangs();
-    if (!userLangs.isEmpty()) {
+    {
         _languageMenu->addSeparator();
         QMenu* userLangMenu = _languageMenu->addMenu(tr("User Defined Language"));
         userLangMenu->setObjectName("userDefinedLanguageMenu");
         for (const UserLangDesc& language : userLangs) {
             QAction* action = userLangMenu->addAction(language.name);
+            action->setProperty("udlLanguage", true);
             connect(action, &QAction::triggered, this, [this, language]() {
                 if (auto* view = currentActiveView()) view->setUserDefinedLanguage(language);
             });
         }
         userLangMenu->addSeparator();
         addCommand(userLangMenu, tr("Define your language..."),
-                   "userDefinedLanguageDialogAction", [this, userLangs]() {
+                   "userDefinedLanguageDialogAction", [this, userLangMenu]() {
+            QVector<UserLangDesc> editableLanguages =
+                NppParameters::getInstance().getUserLangs();
             QDialog dialog(this);
             dialog.setWindowTitle(tr("User Defined Language"));
             dialog.resize(820, 620);
             QVBoxLayout layout(&dialog);
             QComboBox languageCombo;
-            for (const UserLangDesc& language : userLangs)
+            for (const UserLangDesc& language : editableLanguages)
                 languageCombo.addItem(language.name);
             layout.addWidget(&languageCombo);
+            QWidget managementBar;
+            QHBoxLayout managementLayout(&managementBar);
+            QPushButton newButton(tr("New"));
+            QPushButton renameButton(tr("Rename"));
+            QPushButton deleteButton(tr("Delete"));
+            QPushButton importButton(tr("Import..."));
+            QPushButton exportButton(tr("Export..."));
+            managementLayout.addWidget(&newButton);
+            managementLayout.addWidget(&renameButton);
+            managementLayout.addWidget(&deleteButton);
+            managementLayout.addStretch();
+            managementLayout.addWidget(&importButton);
+            managementLayout.addWidget(&exportButton);
+            layout.addWidget(&managementBar);
             QTabWidget tabs;
 
             QWidget generalPage;
@@ -5185,9 +5638,14 @@ void MainWindow::createMenus()
             layout.addWidget(&tabs);
 
             auto populate = [&](int index) {
-                if (index < 0 || index >= userLangs.size())
+                if (index < 0 || index >= editableLanguages.size()) {
+                    extensions.clear();
+                    keywordTable.clearContents();
+                    styleTable.setRowCount(0);
                     return;
-                const UserLangDesc& language = userLangs.at(index);
+                }
+                const UserLangDesc& language =
+                    editableLanguages.at(index);
                 extensions.setText(language.exts.join(QStringLiteral(" ")));
                 caseSensitive.setChecked(language.caseSensitive);
                 foldComments.setChecked(language.foldComments);
@@ -5220,6 +5678,110 @@ void MainWindow::createMenus()
             connect(&languageCombo,
                     QOverload<int>::of(&QComboBox::currentIndexChanged),
                     &dialog, populate);
+            auto reloadLanguages = [&](const QString& selectName) {
+                editableLanguages =
+                    NppParameters::getInstance().getUserLangs();
+                languageCombo.blockSignals(true);
+                languageCombo.clear();
+                int selected = -1;
+                for (int i = 0; i < editableLanguages.size(); ++i) {
+                    languageCombo.addItem(editableLanguages.at(i).name);
+                    if (editableLanguages.at(i).name == selectName)
+                        selected = i;
+                }
+                languageCombo.blockSignals(false);
+                languageCombo.setCurrentIndex(
+                    selected >= 0 ? selected
+                                  : (editableLanguages.isEmpty() ? -1 : 0));
+                populate(languageCombo.currentIndex());
+            };
+            connect(&newButton, &QPushButton::clicked, &dialog, [&]() {
+                bool ok = false;
+                const QString name = QInputDialog::getText(
+                    &dialog, tr("New User Defined Language"),
+                    tr("Name:"), QLineEdit::Normal, QString(), &ok).trimmed();
+                if (!ok || name.isEmpty())
+                    return;
+                if (!NppParameters::getInstance()
+                         .createUserDefinedLanguage(name)) {
+                    QMessageBox::warning(
+                        &dialog, tr("User Defined Language"),
+                        tr("The language could not be created. "
+                           "Its name may already exist."));
+                    return;
+                }
+                reloadLanguages(name);
+            });
+            connect(&renameButton, &QPushButton::clicked, &dialog, [&]() {
+                const int index = languageCombo.currentIndex();
+                if (index < 0 || index >= editableLanguages.size())
+                    return;
+                const UserLangDesc oldLanguage =
+                    editableLanguages.at(index);
+                bool ok = false;
+                const QString name = QInputDialog::getText(
+                    &dialog, tr("Rename User Defined Language"),
+                    tr("Name:"), QLineEdit::Normal,
+                    oldLanguage.name, &ok).trimmed();
+                if (!ok || name.isEmpty() || name == oldLanguage.name)
+                    return;
+                if (!NppParameters::getInstance().renameUserDefinedLanguage(
+                        oldLanguage.name, name,
+                        oldLanguage.sourceFilePath)) {
+                    QMessageBox::warning(
+                        &dialog, tr("User Defined Language"),
+                        tr("The language could not be renamed."));
+                    return;
+                }
+                reloadLanguages(name);
+            });
+            connect(&deleteButton, &QPushButton::clicked, &dialog, [&]() {
+                const int index = languageCombo.currentIndex();
+                if (index < 0 || index >= editableLanguages.size())
+                    return;
+                const UserLangDesc language =
+                    editableLanguages.at(index);
+                if (QMessageBox::question(
+                        &dialog, tr("Delete User Defined Language"),
+                        tr("Delete \"%1\"?").arg(language.name)) !=
+                    QMessageBox::Yes)
+                    return;
+                if (NppParameters::getInstance()
+                        .deleteUserDefinedLanguage(
+                            language.name, language.sourceFilePath))
+                    reloadLanguages(QString());
+            });
+            connect(&importButton, &QPushButton::clicked, &dialog, [&]() {
+                const QString path = QFileDialog::getOpenFileName(
+                    &dialog, tr("Import User Defined Language"),
+                    QString(), tr("XML files (*.xml)"));
+                if (path.isEmpty())
+                    return;
+                if (!NppParameters::getInstance()
+                         .importUserDefinedLanguages(path)) {
+                    QMessageBox::warning(
+                        &dialog, tr("User Defined Language"),
+                        tr("No new language could be imported."));
+                }
+                reloadLanguages(QString());
+            });
+            connect(&exportButton, &QPushButton::clicked, &dialog, [&]() {
+                const int index = languageCombo.currentIndex();
+                if (index < 0 || index >= editableLanguages.size())
+                    return;
+                const QString path = QFileDialog::getSaveFileName(
+                    &dialog, tr("Export User Defined Language"),
+                    editableLanguages.at(index).name + QStringLiteral(".xml"),
+                    tr("XML files (*.xml)"));
+                if (!path.isEmpty() &&
+                    !NppParameters::getInstance()
+                         .exportUserDefinedLanguage(
+                             editableLanguages.at(index).name, path)) {
+                    QMessageBox::warning(
+                        &dialog, tr("User Defined Language"),
+                        tr("The language could not be exported."));
+                }
+            });
             populate(0);
 
             QDialogButtonBox buttons(
@@ -5229,13 +5791,42 @@ void MainWindow::createMenus()
                     &dialog, &QDialog::accept);
             connect(&buttons, &QDialogButtonBox::rejected,
                     &dialog, &QDialog::reject);
+            connect(&dialog, &QDialog::finished, this,
+                    [this, userLangMenu](int) {
+                for (QAction* action : userLangMenu->actions()) {
+                    if (action->property("udlLanguage").toBool()) {
+                        userLangMenu->removeAction(action);
+                        action->deleteLater();
+                    }
+                }
+                QAction* before = nullptr;
+                for (QAction* action : userLangMenu->actions()) {
+                    if (action->isSeparator() ||
+                        action->objectName() ==
+                            QStringLiteral("userDefinedLanguageDialogAction")) {
+                        before = action;
+                        break;
+                    }
+                }
+                for (const UserLangDesc& language :
+                     NppParameters::getInstance().getUserLangs()) {
+                    QAction* action = new QAction(language.name, userLangMenu);
+                    action->setProperty("udlLanguage", true);
+                    userLangMenu->insertAction(before, action);
+                    connect(action, &QAction::triggered, this,
+                            [this, language]() {
+                        if (auto* view = currentActiveView())
+                            view->setUserDefinedLanguage(language);
+                    });
+                }
+            });
             if (dialog.exec() != QDialog::Accepted)
                 return;
 
             const int index = languageCombo.currentIndex();
-            if (index < 0 || index >= userLangs.size())
+            if (index < 0 || index >= editableLanguages.size())
                 return;
-            UserLangDesc language = userLangs.at(index);
+            UserLangDesc language = editableLanguages.at(index);
             language.exts = extensions.text().toLower().split(
                 QRegularExpression(QStringLiteral("\\s+")),
                 QString::SkipEmptyParts);
@@ -5280,17 +5871,142 @@ void MainWindow::createMenus()
     addCommand(_settingsMenu, tr("Style Configurator..."), "styleConfiguratorAction",
                [this]() {
         NppParameters& params = NppParameters::getInstance();
-        NppGUI& gui = params.getNppGUI();
-        bool accepted = false;
-        QFont font = QFontDialog::getFont(&accepted,
-            QFont(gui._editorFontName, gui._editorFontSize), this,
-            tr("Style Configurator"));
-        if (!accepted)
+        QVector<LexerStyler> lexers = params.getLexerStylers();
+        QVector<WordsStyle> globals = params.getGlobalStyles();
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Style Configurator"));
+        dialog.resize(920, 620);
+        QVBoxLayout layout(&dialog);
+        QComboBox languageCombo;
+        languageCombo.addItem(tr("Global Styles"));
+        for (const LexerStyler& lexer : lexers)
+            languageCombo.addItem(
+                lexer.desc.isEmpty() ? lexer.name : lexer.desc);
+        layout.addWidget(&languageCombo);
+        QTableWidget styles;
+        styles.setColumnCount(9);
+        styles.setHorizontalHeaderLabels({
+            tr("Style"), tr("Foreground"), tr("Background"), tr("Font"),
+            tr("Size"), tr("Bold"), tr("Italic"), tr("Underline"),
+            tr("User-defined keywords")
+        });
+        styles.horizontalHeader()->setSectionResizeMode(
+            0, QHeaderView::Stretch);
+        styles.horizontalHeader()->setSectionResizeMode(
+            3, QHeaderView::Stretch);
+        layout.addWidget(&styles);
+        QLabel hint(tr("Double-click a colour cell to choose a colour. "
+                       "Leave it empty to inherit the default."));
+        layout.addWidget(&hint);
+
+        int previousLanguage = 0;
+        auto selectedStyles = [&]() -> QVector<WordsStyle>* {
+            return previousLanguage == 0
+                ? &globals : &lexers[previousLanguage - 1].styles;
+        };
+        auto saveTable = [&]() {
+            QVector<WordsStyle>* values = selectedStyles();
+            const int count = qMin(values->size(), styles.rowCount());
+            for (int row = 0; row < count; ++row) {
+                WordsStyle& style = (*values)[row];
+                auto text = [&](int column) {
+                    QTableWidgetItem* item = styles.item(row, column);
+                    return item ? item->text().trimmed() : QString();
+                };
+                const QColor foreground(
+                    QStringLiteral("#") + text(1));
+                const QColor background(
+                    QStringLiteral("#") + text(2));
+                style.hasFg = !text(1).isEmpty() && foreground.isValid();
+                style.hasBg = !text(2).isEmpty() && background.isValid();
+                if (style.hasFg) style.fgColor = foreground;
+                if (style.hasBg) style.bgColor = background;
+                style.fontName = text(3);
+                style.fontSize = text(4).toInt();
+                style.fontStyle =
+                    (styles.item(row, 5)->checkState() == Qt::Checked ? 1 : 0) |
+                    (styles.item(row, 6)->checkState() == Qt::Checked ? 2 : 0) |
+                    (styles.item(row, 7)->checkState() == Qt::Checked ? 4 : 0);
+                style.userKeywords = text(8);
+            }
+        };
+        auto populate = [&](int languageIndex) {
+            previousLanguage = languageIndex;
+            QVector<WordsStyle>* values = selectedStyles();
+            styles.setRowCount(values->size());
+            for (int row = 0; row < values->size(); ++row) {
+                const WordsStyle& style = values->at(row);
+                QTableWidgetItem* name = new QTableWidgetItem(style.name);
+                name->setFlags(name->flags() & ~Qt::ItemIsEditable);
+                styles.setItem(row, 0, name);
+                styles.setItem(row, 1, new QTableWidgetItem(
+                    style.hasFg
+                        ? style.fgColor.name().mid(1).toUpper() : QString()));
+                styles.setItem(row, 2, new QTableWidgetItem(
+                    style.hasBg
+                        ? style.bgColor.name().mid(1).toUpper() : QString()));
+                styles.setItem(row, 3, new QTableWidgetItem(style.fontName));
+                styles.setItem(row, 4, new QTableWidgetItem(
+                    style.fontSize > 0 ? QString::number(style.fontSize)
+                                       : QString()));
+                for (int column = 5; column <= 7; ++column) {
+                    QTableWidgetItem* check = new QTableWidgetItem;
+                    check->setFlags(Qt::ItemIsEnabled |
+                                    Qt::ItemIsUserCheckable);
+                    check->setCheckState(
+                        style.fontStyle & (1 << (column - 5))
+                            ? Qt::Checked : Qt::Unchecked);
+                    styles.setItem(row, column, check);
+                }
+                QTableWidgetItem* keywords =
+                    new QTableWidgetItem(style.userKeywords);
+                if (style.keywordClass.isEmpty())
+                    keywords->setFlags(
+                        keywords->flags() & ~Qt::ItemIsEditable);
+                styles.setItem(row, 8, keywords);
+            }
+        };
+        connect(&languageCombo,
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
+                &dialog, [&](int index) {
+            saveTable();
+            populate(index);
+        });
+        connect(&styles, &QTableWidget::cellDoubleClicked, &dialog,
+                [&](int row, int column) {
+            if (column != 1 && column != 2)
+                return;
+            const QString current = styles.item(row, column)->text();
+            const QColor color = QColorDialog::getColor(
+                QColor(QStringLiteral("#") + current), &dialog);
+            if (color.isValid())
+                styles.item(row, column)->setText(
+                    color.name().mid(1).toUpper());
+        });
+        populate(0);
+        QDialogButtonBox buttons(
+            QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        layout.addWidget(&buttons);
+        connect(&buttons, &QDialogButtonBox::accepted,
+                &dialog, &QDialog::accept);
+        connect(&buttons, &QDialogButtonBox::rejected,
+                &dialog, &QDialog::reject);
+        if (dialog.exec() != QDialog::Accepted)
             return;
-        gui._editorFontName = font.family();
-        gui._editorFontSize = font.pointSize();
-        params.writeNppGUI();
+        saveTable();
+        params.getLexerStylers() = lexers;
+        params.getGlobalStyles() = globals;
+        if (!params.writeStylers()) {
+            QMessageBox::warning(
+                this, tr("Style Configurator"),
+                tr("Could not save stylers.xml."));
+            params.loadStylers();
+            return;
+        }
         applyPreferencesToAllViews();
+        for (ScintillaEditView* view :
+             findChildren<ScintillaEditView*>())
+            view->reloadConfiguredStyles();
     });
     addCommand(_settingsMenu, tr("Shortcut Mapper..."), "shortcutMapperAction",
                [this]() {

@@ -8,8 +8,6 @@
 #include <QDockWidget>
 #include <QFile>
 #include <QFileSystemWatcher>
-#include <QLabel>
-#include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSpinBox>
@@ -97,6 +95,11 @@ int main(int argc, char* argv[])
     };
     progress("start");
 
+    const QString settingsPath =
+        temporary.filePath(QStringLiteral("settings"));
+    if (!QDir().mkpath(settingsPath) ||
+        !NppParameters::getInstance().setUserPathOverride(settingsPath))
+        return 5;
     NppParameters::getInstance().load();
     NppParameters::getInstance().reloadNativeLang();
     MainWindow window;
@@ -136,11 +139,13 @@ int main(int argc, char* argv[])
     QApplication::processEvents();
     QDockWidget* resultDock =
         window.findChild<QDockWidget*>(QStringLiteral("FindResultDock"));
-    QListWidget* resultList =
-        resultDock ? resultDock->findChild<QListWidget*>() : nullptr;
-    if (!resultDock || !resultDock->isVisible() || !resultList
-        || resultList->count() != 3
-        || resultList->findChildren<QLabel*>().size() != 2
+    ScintillaEditView* resultView = resultDock
+        ? resultDock->findChild<ScintillaEditView*>(
+              QStringLiteral("findResultView")) : nullptr;
+    if (!resultDock || !resultDock->isVisible() || !resultView
+        || resultView->lines() < 3
+        || !resultView->text().contains(QStringLiteral("Line 1:"))
+        || !resultView->text().contains(QStringLiteral("Line 2:"))
         || !saveWidget(&window, output + QStringLiteral("/finder-results.png")))
         return 13;
 

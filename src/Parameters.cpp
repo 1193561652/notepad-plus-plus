@@ -677,8 +677,16 @@ bool NppParameters::writeUserDefinedLanguage(const UserLangDesc& language)
             break;
         }
     }
-    if (!target)
-        return false;
+    if (!target) {
+        if (language.name.trimmed().isEmpty() ||
+            getUserLangByName(language.name))
+            return false;
+        target = new TiXmlElement(L"UserLang");
+        target->SetAttribute(
+            L"name", language.name.trimmed().toStdWString().c_str());
+        target->SetAttribute(L"udlVersion", L"2.1");
+        root->LinkEndChild(target);
+    }
 
     target->SetAttribute(
         L"ext", language.exts.join(QStringLiteral(" "))
@@ -802,6 +810,151 @@ bool NppParameters::writeUserDefinedLanguage(const UserLangDesc& language)
     if (saved)
         loadUserDefinedLanguages();
     return saved;
+}
+
+bool NppParameters::createUserDefinedLanguage(const QString& name)
+{
+    UserLangDesc language;
+    language.name = name.trimmed();
+    language.sourceFilePath = userDefineLangFilePath();
+    const QStringList styleNames = {
+        QStringLiteral("DEFAULT"), QStringLiteral("COMMENT"),
+        QStringLiteral("COMMENT LINE"), QStringLiteral("NUMBER"),
+        QStringLiteral("KEYWORD1"), QStringLiteral("KEYWORD2"),
+        QStringLiteral("KEYWORD3"), QStringLiteral("KEYWORD4"),
+        QStringLiteral("KEYWORD5"), QStringLiteral("KEYWORD6"),
+        QStringLiteral("KEYWORD7"), QStringLiteral("KEYWORD8"),
+        QStringLiteral("OPERATOR"), QStringLiteral("FOLDER IN CODE1"),
+        QStringLiteral("FOLDER IN CODE2"),
+        QStringLiteral("FOLDER IN COMMENT"),
+        QStringLiteral("DELIMITER1"), QStringLiteral("DELIMITER2"),
+        QStringLiteral("DELIMITER3"), QStringLiteral("DELIMITER4"),
+        QStringLiteral("DELIMITER5"), QStringLiteral("DELIMITER6"),
+        QStringLiteral("DELIMITER7"), QStringLiteral("DELIMITER8"),
+        QStringLiteral("IDENTIFIER")
+    };
+    for (int styleId = 0; styleId < styleNames.size(); ++styleId) {
+        WordsStyle style;
+        style.name = styleNames.at(styleId);
+        style.styleID = styleId;
+        style.xmlStyleID = styleId;
+        style.hasFg = true;
+        style.hasBg = true;
+        style.fgColor = (styleId == 1 || styleId == 2)
+            ? QColor(0, 128, 0) : QColor(0, 0, 0);
+        style.bgColor = QColor(255, 255, 255);
+        language.styles.append(style);
+    }
+    return writeUserDefinedLanguage(language);
+}
+
+bool NppParameters::deleteUserDefinedLanguage(
+    const QString& name, const QString& sourceFilePath)
+{
+    const QString path = sourceFilePath.isEmpty()
+        ? userDefineLangFilePath() : sourceFilePath;
+    TiXmlDocument doc;
+    if (!loadTiXmlDoc(doc, path))
+        return false;
+    TiXmlElement* root = doc.FirstChildElement(L"NotepadPlus");
+    if (!root)
+        return false;
+    for (TiXmlElement* item = root->FirstChildElement(L"UserLang"); item;
+         item = item->NextSiblingElement(L"UserLang")) {
+        if (xmlAttr(item, L"name") == name) {
+            root->RemoveChild(item);
+            const bool saved = doc.SaveFile(path.toStdWString().c_str());
+            if (saved) loadUserDefinedLanguages();
+            return saved;
+        }
+    }
+    return false;
+}
+
+bool NppParameters::renameUserDefinedLanguage(
+    const QString& oldName, const QString& newName,
+    const QString& sourceFilePath)
+{
+    const QString trimmed = newName.trimmed();
+    if (trimmed.isEmpty() ||
+        (oldName.compare(trimmed, Qt::CaseInsensitive) != 0 &&
+         getUserLangByName(trimmed)))
+        return false;
+    const QString path = sourceFilePath.isEmpty()
+        ? userDefineLangFilePath() : sourceFilePath;
+    TiXmlDocument doc;
+    if (!loadTiXmlDoc(doc, path))
+        return false;
+    TiXmlElement* root = doc.FirstChildElement(L"NotepadPlus");
+    if (!root)
+        return false;
+    for (TiXmlElement* item = root->FirstChildElement(L"UserLang"); item;
+         item = item->NextSiblingElement(L"UserLang")) {
+        if (xmlAttr(item, L"name") == oldName) {
+            item->SetAttribute(L"name", trimmed.toStdWString().c_str());
+            const bool saved = doc.SaveFile(path.toStdWString().c_str());
+            if (saved) loadUserDefinedLanguages();
+            return saved;
+        }
+    }
+    return false;
+}
+
+bool NppParameters::importUserDefinedLanguages(const QString& filePath)
+{
+    TiXmlDocument imported;
+    TiXmlDocument destination;
+    if (!loadTiXmlDoc(imported, filePath) ||
+        !loadTiXmlDoc(destination, userDefineLangFilePath()))
+        return false;
+    TiXmlElement* importedRoot =
+        imported.FirstChildElement(L"NotepadPlus");
+    TiXmlElement* destinationRoot =
+        destination.FirstChildElement(L"NotepadPlus");
+    if (!importedRoot || !destinationRoot)
+        return false;
+    bool added = false;
+    for (TiXmlElement* item = importedRoot->FirstChildElement(L"UserLang");
+         item; item = item->NextSiblingElement(L"UserLang")) {
+        const QString name = xmlAttr(item, L"name");
+        if (name.isEmpty() || getUserLangByName(name))
+            continue;
+        destinationRoot->InsertEndChild(*item);
+        added = true;
+    }
+    const bool saved = added && destination.SaveFile(
+        userDefineLangFilePath().toStdWString().c_str());
+    if (saved) loadUserDefinedLanguages();
+    return saved;
+}
+
+bool NppParameters::exportUserDefinedLanguage(
+    const QString& name, const QString& destinationPath) const
+{
+    const UserLangDesc* language = getUserLangByName(name);
+    if (!language)
+        return false;
+    TiXmlDocument source;
+    if (!loadTiXmlDoc(source, language->sourceFilePath.isEmpty()
+                                  ? userDefineLangFilePath()
+                                  : language->sourceFilePath))
+        return false;
+    TiXmlElement* sourceRoot = source.FirstChildElement(L"NotepadPlus");
+    if (!sourceRoot)
+        return false;
+    for (TiXmlElement* item = sourceRoot->FirstChildElement(L"UserLang");
+         item; item = item->NextSiblingElement(L"UserLang")) {
+        if (xmlAttr(item, L"name") != name)
+            continue;
+        TiXmlDocument output;
+        output.LinkEndChild(
+            new TiXmlDeclaration(L"1.0", L"UTF-8", L""));
+        TiXmlElement* root = new TiXmlElement(L"NotepadPlus");
+        output.LinkEndChild(root);
+        root->InsertEndChild(*item);
+        return output.SaveFile(destinationPath.toStdWString().c_str());
+    }
+    return false;
 }
 
 const UserLangDesc* NppParameters::getUserLangByName(const QString& name) const
@@ -940,6 +1093,8 @@ bool NppParameters::loadStylers()
                 s.styleID   = parseInt(txAttr(we, L"styleID"), 0);
                 s.name      = txAttr(we, L"name");
                 s.fontName  = txAttr(we, L"fontName");
+                s.keywordClass = txAttr(we, L"keywordClass");
+                s.userKeywords = txAttr(we, L"userDefine");
                 s.fontStyle = parseInt(txAttr(we, L"fontStyle"), 0);
                 QString fs  = txAttr(we, L"fontSize");
                 s.fontSize  = fs.isEmpty() ? 0 : fs.toInt();
@@ -964,6 +1119,8 @@ bool NppParameters::loadStylers()
             s.styleID   = parseInt(txAttr(we, L"styleID"), 0);
             s.name      = txAttr(we, L"name");
             s.fontName  = txAttr(we, L"fontName");
+            s.keywordClass = txAttr(we, L"keywordClass");
+            s.userKeywords = txAttr(we, L"userDefine");
             s.fontStyle = parseInt(txAttr(we, L"fontStyle"), 0);
             QString fs  = txAttr(we, L"fontSize");
             s.fontSize  = fs.isEmpty() ? 0 : fs.toInt();
@@ -984,6 +1141,84 @@ const LexerStyler* NppParameters::getLexerStyler(const QString& nppLexerName) co
     for (const LexerStyler& ls : _lexerStylers)
         if (ls.name == n) return &ls;
     return nullptr;
+}
+
+bool NppParameters::writeStylers()
+{
+    const QString path = stylersFilePath();
+    TiXmlDocument doc;
+    if (!loadTiXmlDoc(doc, path))
+        return false;
+    TiXmlElement* root = doc.FirstChildElement(L"NotepadPlus");
+    if (!root)
+        return false;
+
+    auto writeStyle = [](TiXmlElement* element, const WordsStyle& style) {
+        element->SetAttribute(L"fontName", style.fontName.toStdWString().c_str());
+        if (!style.userKeywords.isEmpty())
+            element->SetAttribute(
+                L"userDefine", style.userKeywords.toStdWString().c_str());
+        else
+            element->RemoveAttribute(L"userDefine");
+        element->SetAttribute(L"fontStyle", style.fontStyle);
+        if (style.fontSize > 0)
+            element->SetAttribute(L"fontSize", style.fontSize);
+        else
+            element->SetAttribute(L"fontSize", L"");
+        auto writeColor = [element](const wchar_t* name, bool enabled,
+                                    const QColor& color) {
+            if (!enabled) {
+                element->RemoveAttribute(name);
+                return;
+            }
+            element->SetAttribute(
+                name, color.name(QColor::HexRgb).mid(1).toUpper()
+                          .toStdWString().c_str());
+        };
+        writeColor(L"fgColor", style.hasFg, style.fgColor);
+        writeColor(L"bgColor", style.hasBg, style.bgColor);
+    };
+
+    TiXmlElement* lexerStyles = root->FirstChildElement(L"LexerStyles");
+    for (const LexerStyler& lexer : _lexerStylers) {
+        TiXmlElement* lexerElement = nullptr;
+        for (TiXmlElement* item = lexerStyles
+                 ? lexerStyles->FirstChildElement(L"LexerType") : nullptr;
+             item; item = item->NextSiblingElement(L"LexerType")) {
+            if (xmlAttr(item, L"name").compare(lexer.name,
+                                               Qt::CaseInsensitive) == 0) {
+                lexerElement = item;
+                break;
+            }
+        }
+        if (!lexerElement)
+            continue;
+        for (const WordsStyle& style : lexer.styles) {
+            for (TiXmlElement* item =
+                     lexerElement->FirstChildElement(L"WordsStyle");
+                 item; item = item->NextSiblingElement(L"WordsStyle")) {
+                if (xmlAttr(item, L"name") == style.name &&
+                    xmlAttr(item, L"styleID").toInt() == style.styleID) {
+                    writeStyle(item, style);
+                    break;
+                }
+            }
+        }
+    }
+
+    TiXmlElement* globalStyles = root->FirstChildElement(L"GlobalStyles");
+    for (const WordsStyle& style : _globalStyles) {
+        for (TiXmlElement* item = globalStyles
+                 ? globalStyles->FirstChildElement(L"WidgetStyle") : nullptr;
+             item; item = item->NextSiblingElement(L"WidgetStyle")) {
+            if (xmlAttr(item, L"name") == style.name &&
+                xmlAttr(item, L"styleID").toInt() == style.styleID) {
+                writeStyle(item, style);
+                break;
+            }
+        }
+    }
+    return doc.SaveFile(path.toStdWString().c_str());
 }
 
 // ── shortcuts.xml ─────────────────────────────────────────────────────────────

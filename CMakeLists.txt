@@ -137,6 +137,7 @@ set(SOURCES
     src/MISC/FileAssociationModel.cpp
     src/MISC/ConfigPathResolver.cpp
     src/MISC/ClosedFileHistory.cpp
+    src/MISC/AutoCompletionParser.cpp
     src/MISC/FunctionListParser.cpp
     src/MISC/ToolbarIconTheme.cpp
     src/Printing/NotepadPlusPrinter.cpp
@@ -168,6 +169,7 @@ set(HEADERS
     src/MISC/FileAssociationModel.h
     src/MISC/ConfigPathResolver.h
     src/MISC/ClosedFileHistory.h
+    src/MISC/AutoCompletionParser.h
     src/MISC/FunctionListParser.h
     src/MISC/ToolbarIconTheme.h
     src/Printing/NotepadPlusPrinter.h
@@ -316,6 +318,36 @@ if(BUILD_TESTING)
     target_link_libraries(closed-file-history-tests Qt5::Core)
     add_test(NAME closed-file-history-tests COMMAND closed-file-history-tests)
 
+    add_executable(auto-completion-parser-tests
+        tests/AutoCompletionParserTests.cpp
+        src/MISC/AutoCompletionParser.cpp
+    )
+    target_link_libraries(auto-completion-parser-tests Qt5::Core)
+    add_test(NAME auto-completion-parser-tests
+        COMMAND auto-completion-parser-tests)
+
+    add_executable(parameters-style-udl-tests
+        tests/ParametersStyleUdlTests.cpp
+        src/Parameters.cpp
+        src/MISC/ConfigPathResolver.cpp
+        src/NativeLangSpeaker.cpp
+        src/TinyXml/tinyxml.cpp
+        src/TinyXml/tinyxmlerror.cpp
+        src/TinyXml/tinyxmlparser.cpp
+        resources/resources.qrc
+    )
+    target_compile_definitions(parameters-style-udl-tests PRIVATE
+        NPP_TEST_STYLERS_SOURCE="${CMAKE_SOURCE_DIR}/resources/stylers.model.xml"
+        NPP_TEST_UDL_SOURCE="${CMAKE_SOURCE_DIR}/resources/userDefineLang.xml")
+    target_link_libraries(parameters-style-udl-tests
+        Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Xml)
+    add_test(NAME parameters-style-udl-tests
+        COMMAND parameters-style-udl-tests)
+    if(UNIX AND NOT APPLE)
+        set_tests_properties(parameters-style-udl-tests PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endif()
+
     add_executable(function-list-parser-tests
         tests/FunctionListParserTests.cpp
         src/MISC/FunctionListParser.cpp
@@ -442,6 +474,7 @@ if(BUILD_TESTING)
         src/MISC/FileManager.cpp
         src/MISC/EncodingMapper.cpp
         src/MISC/TextFileCodec.cpp
+        src/MISC/AutoCompletionParser.cpp
         ${UCHARDET_SOURCES}
     )
     target_link_libraries(large-file-mode-tests

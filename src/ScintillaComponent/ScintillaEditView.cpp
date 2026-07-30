@@ -5,8 +5,10 @@
 #include "../../third_party/boostregex/BoostRegexSearch.h"
 #include "UserDefinedLexer.h"
 #include "../Parameters.h"
+#include "../MISC/AutoCompletionParser.h"
 #include <Qsci/qsciapis.h>
 #include <Qsci/qscidocument.h>
+#include <Qsci/qscilexer.h>
 #include <Qsci/qscilexerbash.h>
 #include <Qsci/qscilexerbatch.h>
 #include <Qsci/qscilexercmake.h>
@@ -36,6 +38,88 @@
 #include <QRegularExpression>
 #include <QTimer>
 #include <QUrl>
+
+namespace {
+
+class NppBuiltinLexer final : public QsciLexer
+{
+public:
+    NppBuiltinLexer(const QString& languageName, const QString& lexerName,
+                    const LangDesc* language, QObject* parent)
+        : QsciLexer(parent),
+          _languageName(languageName.toUtf8()),
+          _lexerName(lexerName.toUtf8())
+    {
+        if (language) {
+            for (int i = 0; i < 4; ++i)
+                _keywords[i] = language->keywords[i].toUtf8();
+        }
+    }
+
+    const char* language() const override { return _languageName.constData(); }
+    const char* lexer() const override { return _lexerName.constData(); }
+
+    const char* keywords(int set) const override
+    {
+        return set >= 1 && set <= 4 && !_keywords[set - 1].isEmpty()
+            ? _keywords[set - 1].constData() : nullptr;
+    }
+
+    QString description(int style) const override
+    {
+        return style >= 0 && style < 128
+            ? QStringLiteral("Style %1").arg(style) : QString();
+    }
+
+private:
+    QByteArray _languageName;
+    QByteArray _lexerName;
+    QByteArray _keywords[4];
+};
+
+struct LexerNameMapping
+{
+    const char* nppName;
+    const char* scintillaName;
+};
+
+// v8.4.6 ScintillaEditView::_langNameInfoArray, excluding normal, UDL and
+// external lexers. Keeping this table independent from the UI also makes
+// command-line and automatic extension selection use the same mapping.
+const LexerNameMapping lexerNameMappings[] = {
+    {"php", "phpscript"}, {"c", "cpp"}, {"cpp", "cpp"},
+    {"cs", "cpp"}, {"objc", "objc"}, {"java", "cpp"}, {"rc", "cpp"},
+    {"html", "hypertext"}, {"xml", "xml"}, {"makefile", "makefile"},
+    {"pascal", "pascal"}, {"batch", "batch"}, {"ini", "props"},
+    {"asp", "hypertext"}, {"sql", "sql"}, {"vb", "vb"},
+    {"javascript", "cpp"}, {"css", "css"}, {"perl", "perl"},
+    {"python", "python"}, {"lua", "lua"}, {"tex", "tex"},
+    {"fortran", "fortran"}, {"bash", "bash"}, {"actionscript", "cpp"},
+    {"nsis", "nsis"}, {"tcl", "tcl"}, {"lisp", "lisp"},
+    {"scheme", "lisp"}, {"asm", "asm"}, {"diff", "diff"},
+    {"props", "props"}, {"postscript", "ps"}, {"ruby", "ruby"},
+    {"smalltalk", "smalltalk"}, {"vhdl", "vhdl"}, {"kix", "kix"},
+    {"autoit", "au3"}, {"caml", "caml"}, {"ada", "ada"},
+    {"verilog", "verilog"}, {"matlab", "matlab"},
+    {"haskell", "haskell"}, {"inno", "inno"}, {"cmake", "cmake"},
+    {"yaml", "yaml"}, {"cobol", "COBOL"}, {"gui4cli", "gui4cli"},
+    {"d", "d"}, {"powershell", "powershell"}, {"r", "r"},
+    {"jsp", "hypertext"}, {"coffeescript", "coffeescript"},
+    {"json", "json"}, {"javascript.js", "cpp"}, {"fortran77", "f77"},
+    {"baanc", "baan"}, {"srec", "srec"}, {"ihex", "ihex"},
+    {"tehex", "tehex"}, {"swift", "cpp"}, {"asn1", "asn1"},
+    {"avs", "avs"}, {"blitzbasic", "blitzbasic"},
+    {"purebasic", "purebasic"}, {"freebasic", "freebasic"},
+    {"csound", "csound"}, {"erlang", "erlang"}, {"escript", "escript"},
+    {"forth", "forth"}, {"latex", "latex"}, {"mmixal", "mmixal"},
+    {"nim", "nimrod"}, {"nncrontab", "nncrontab"},
+    {"oscript", "oscript"}, {"rebol", "rebol"}, {"registry", "registry"},
+    {"rust", "rust"}, {"spice", "spice"}, {"txt2tags", "txt2tags"},
+    {"visualprolog", "visualprolog"}, {"typescript", "cpp"},
+    {"markdown", "markdown"}, {"searchresult", "errorlist"}
+};
+
+} // namespace
 
 // 静态成员初始化
 const int ScintillaEditView::_SC_MARGE_LINENUMBER;
@@ -490,32 +574,49 @@ static QString extToNppName(const QString& ext, const QString& fileName)
 }
 
 // Notepad++ 语言名 → QsciLexer 实例
+QString ScintillaEditView::builtinLexerName(const QString& nppLanguageName)
+{
+    const QString normalized = nppLanguageName.trimmed().toLower();
+    for (const LexerNameMapping& mapping : lexerNameMappings) {
+        if (normalized == QLatin1String(mapping.nppName))
+            return QString::fromLatin1(mapping.scintillaName);
+    }
+    return QString();
+}
+
 static QsciLexer* createLexer(const QString& nppName, QObject* parent)
 {
-    if (nppName=="cpp"||nppName=="c"||nppName=="objc") return new QsciLexerCPP(parent);
-    if (nppName=="cs")         return new QsciLexerCSharp(parent);
-    if (nppName=="java")       return new QsciLexerJava(parent);
-    if (nppName=="python")     return new QsciLexerPython(parent);
-    if (nppName=="javascript") return new QsciLexerJavaScript(parent);
-    if (nppName=="html"||nppName=="php") return new QsciLexerHTML(parent);
-    if (nppName=="css")        return new QsciLexerCSS(parent);
-    if (nppName=="xml")        return new QsciLexerXML(parent);
-    if (nppName=="bash")       return new QsciLexerBash(parent);
-    if (nppName=="batch")      return new QsciLexerBatch(parent);
-    if (nppName=="sql")        return new QsciLexerSQL(parent);
-    if (nppName=="lua")        return new QsciLexerLua(parent);
-    if (nppName=="ruby")       return new QsciLexerRuby(parent);
-    if (nppName=="perl")       return new QsciLexerPerl(parent);
-    if (nppName=="json")       return new QsciLexerJSON(parent);
-    if (nppName=="yaml")       return new QsciLexerYAML(parent);
-    if (nppName=="markdown")   return new QsciLexerMarkdown(parent);
-    if (nppName=="cmake")      return new QsciLexerCMake(parent);
-    if (nppName=="makefile")   return new QsciLexerMakefile(parent);
-    if (nppName=="tex")        return new QsciLexerTeX(parent);
-    if (nppName=="diff")       return new QsciLexerDiff(parent);
-    if (nppName=="vhdl")       return new QsciLexerVHDL(parent);
-    if (nppName=="ini")        return new QsciLexerProperties(parent);
-    return nullptr;
+    const QString normalized = nppName.trimmed().toLower();
+    if (normalized=="cpp"||normalized=="c"||normalized=="objc") return new QsciLexerCPP(parent);
+    if (normalized=="cs")         return new QsciLexerCSharp(parent);
+    if (normalized=="java")       return new QsciLexerJava(parent);
+    if (normalized=="python")     return new QsciLexerPython(parent);
+    if (normalized=="javascript") return new QsciLexerJavaScript(parent);
+    if (normalized=="html")       return new QsciLexerHTML(parent);
+    if (normalized=="css")        return new QsciLexerCSS(parent);
+    if (normalized=="xml")        return new QsciLexerXML(parent);
+    if (normalized=="bash")       return new QsciLexerBash(parent);
+    if (normalized=="batch")      return new QsciLexerBatch(parent);
+    if (normalized=="sql")        return new QsciLexerSQL(parent);
+    if (normalized=="lua")        return new QsciLexerLua(parent);
+    if (normalized=="ruby")       return new QsciLexerRuby(parent);
+    if (normalized=="perl")       return new QsciLexerPerl(parent);
+    if (normalized=="json")       return new QsciLexerJSON(parent);
+    if (normalized=="yaml")       return new QsciLexerYAML(parent);
+    if (normalized=="markdown")   return new QsciLexerMarkdown(parent);
+    if (normalized=="cmake")      return new QsciLexerCMake(parent);
+    if (normalized=="makefile")   return new QsciLexerMakefile(parent);
+    if (normalized=="tex")        return new QsciLexerTeX(parent);
+    if (normalized=="diff")       return new QsciLexerDiff(parent);
+    if (normalized=="vhdl")       return new QsciLexerVHDL(parent);
+    if (normalized=="ini")        return new QsciLexerProperties(parent);
+
+    const QString lexerName = ScintillaEditView::builtinLexerName(normalized);
+    if (lexerName.isEmpty())
+        return nullptr;
+    return new NppBuiltinLexer(
+        normalized, lexerName,
+        NppParameters::getInstance().getLangDescByName(normalized), parent);
 }
 
 void ScintillaEditView::setLexerForFile(const QString& filePath)
@@ -570,6 +671,22 @@ void ScintillaEditView::setLexerForFile(const QString& filePath)
     refreshXmlTagHighlight();
 }
 
+void ScintillaEditView::setBuiltinLanguage(const QString& languageName)
+{
+    if (_largeFileMode)
+        return;
+    _currentLexerName = languageName.toLower();
+    QsciLexer* old = lexer();
+    QsciLexer* configured = createLexer(_currentLexerName, this);
+    if (configured)
+        configured->setDefaultFont(editorFont());
+    setLexer(configured);
+    delete old;
+    if (configured)
+        applyStylers(_currentLexerName);
+    applyGlobalStyles();
+}
+
 void ScintillaEditView::setUserDefinedLanguage(const UserLangDesc& language)
 {
     if (_largeFileMode) {
@@ -608,6 +725,42 @@ void ScintillaEditView::applyStylers(const QString& nppLexerName)
         lexer()->setFont(f, ws.styleID);
         if (ws.hasFg) lexer()->setColor(ws.fgColor, ws.styleID);
         if (ws.hasBg) lexer()->setPaper(ws.bgColor, ws.styleID);
+    }
+
+    QString keywordSets[9];
+    const LangDesc* language =
+        NppParameters::getInstance().getLangDescByName(nppLexerName);
+    if (language) {
+        for (int set = 0; set < 4; ++set)
+            keywordSets[set] = language->keywords[set];
+    }
+    static const QMap<QString, int> keywordClassSets = {
+        {QStringLiteral("instre1"), 0},
+        {QStringLiteral("instre2"), 1},
+        {QStringLiteral("type1"), 2},
+        {QStringLiteral("type2"), 3},
+        {QStringLiteral("type3"), 4},
+        {QStringLiteral("type4"), 5},
+        {QStringLiteral("type5"), 6},
+        {QStringLiteral("type6"), 7},
+        {QStringLiteral("type7"), 8}
+    };
+    for (const WordsStyle& style : ls->styles) {
+        const auto set = keywordClassSets.constFind(
+            style.keywordClass.toLower());
+        if (set == keywordClassSets.constEnd() ||
+            style.userKeywords.trimmed().isEmpty())
+            continue;
+        if (!keywordSets[set.value()].isEmpty())
+            keywordSets[set.value()].append(QLatin1Char(' '));
+        keywordSets[set.value()].append(style.userKeywords.trimmed());
+    }
+    for (int set = 0; set < 9; ++set) {
+        if (keywordSets[set].isEmpty())
+            continue;
+        const QByteArray utf8 = keywordSets[set].toUtf8();
+        execute(SCI_SETKEYWORDS, set,
+                reinterpret_cast<qintptr>(utf8.constData()));
     }
 }
 
@@ -738,6 +891,13 @@ void ScintillaEditView::applyGlobalStyles()
         if (pStyle->hasFg)
             execute(SCI_STYLESETFORE, is.id, toSci(pStyle->fgColor));
     }
+}
+
+void ScintillaEditView::reloadConfiguredStyles()
+{
+    if (lexer() && !_currentLexerName.isEmpty())
+        applyStylers(_currentLexerName);
+    applyGlobalStyles();
 }
 
 void ScintillaEditView::setLexerByExtension(const QString& ext)
@@ -908,6 +1068,13 @@ void ScintillaEditView::setupAutoComplete()
         for (const QString& word : kwStr.split(' ', QString::SkipEmptyParts))
             api->add(word);
     }
+    const NppParameters& parameters = NppParameters::getInstance();
+    const QVector<AutoCompletionEntry> configured =
+        AutoCompletionParser::loadLanguage(
+            _currentLexerName, parameters.getUserPath(),
+            parameters.getNppPath());
+    for (const AutoCompletionEntry& entry : configured)
+        api->add(entry.apiText());
     api->prepare();
 
     // 从文档单词和 API 两处补全
