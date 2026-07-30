@@ -216,4 +216,8 @@ v8.4.6 用户实际收到的 DLL 资源是否与 tag 完全一致。
 - 没有混入无法证明属于 v8.4.6 的插件条目。
 
 当前已完成三份 GitHub 历史 JSON 的归档、哈希、严格解析和基础架构差异统计。
-逐插件源码、API 和兼容难度调查尚未开始；发行包 DLL 资源复核仍是待办项。
+按 `PS-030`，逐插件源码、API 和兼容难度调查只处理 x86 清单中的 169 项；x64
+和 ARM64 不进入本轮调查。169 项首轮静态调查现已完成，索引、分批记录和统计见
+[`plugins-v846/README.md`](plugins-v846/README.md)；重要度首评见
+[`plugins-v846/importance.md`](plugins-v846/importance.md)。发行包 DLL 资源
+复核和 Windows x86 实机验证仍是待办项。
