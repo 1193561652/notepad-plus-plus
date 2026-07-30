@@ -1,6 +1,16 @@
 # 本地缓存：最新分析
 
-缓存日期：2026-07-29
+缓存日期：2026-07-30
+
+## 2026-07-30 Ubuntu 编译适配
+
+- Ubuntu 22.04.5、GCC 11.4、Qt 5.15.3 的 Debug 全量构建成功。
+- TinyXml 在所有平台统一使用 `wchar_t`、标准宽字符函数和 Qt Unicode 文件 API，
+  不再依赖 `tchar.h`、`_wtoi`、`_wtof`、`_wfopen`、`wcscpy_s` 或平台格式化分支。
+- 统一使用编码往返校验，避免 QTextCodec 后端静默替换不可表示字符。
+- 配置语料测试改用跨平台设置目录覆盖，并在 Linux CTest 中使用 offscreen 平台。
+- CTest 22/22 通过；无头主程序启动 3 秒保持运行并创建完整隔离配置。
+- 记录：`codex/changes/2026-07-30-ubuntu-build-adaptation.md`。
 
 ## 2026-07-29 Git 仓库迁移
 

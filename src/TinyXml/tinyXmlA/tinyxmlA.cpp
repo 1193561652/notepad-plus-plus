@@ -24,11 +24,12 @@ distribution.
 
 #include "MISC/Common/Common.h"
 #include "tinyxmlA.h"
+#include <cstdio>
+#include <QFile>
 
 #ifdef TIXMLA_USE_STL
 #include <sstream>
 #include <string.h>
-#include "define.h"
 #endif
 
 bool TiXmlBaseA::condenseWhiteSpace = true;
@@ -773,46 +774,20 @@ bool TiXmlDocumentA::LoadUnicodeFilePath( const TCHAR* filename )
 	// See STL_STRING_BUG above.
 	// Fixed with the StringToBuffer class.
 
-	FILE* file = generic_fopen(filename, TEXT("r"));
-
-	if ( file )
+	QFile file(QString::fromWCharArray(filename));
+	if (!file.open(QFile::ReadOnly))
 	{
-		// Get the file size, so we can pre-allocate the generic_string. HUGE speed impact.
-		long length = 0;
-		fseek( file, 0, SEEK_END );
-		length = ftell( file );
-		fseek( file, 0, SEEK_SET );
-
-		// Strange case, but good to handle up front.
-		if ( length == 0 )
-		{
-			fclose( file );
-			return false;
-		}
-
-		// If we have a file, assume it is all one big XML file, and read it in.
-		// The document parser may decide the document ends sooner than the entire file, however.
-		TIXMLA_STRING data;
-		data.reserve( length );
-
-		const int BUF_SIZE = 2048;
-		char buf[BUF_SIZE];
-
-		while( fgets( buf, BUF_SIZE, file ) )
-		{
-			data += buf;
-		}
-		fclose( file );
-
-		Parse( data.c_str(), 0 );
-
-		if (  Error() )
-            return false;
-        else
-			return true;
+		SetError( TIXMLA_ERROR_OPENING_FILE, 0, 0 );
+		return false;
 	}
-	SetError( TIXMLA_ERROR_OPENING_FILE, 0, 0 );
-	return false;
+
+	const QByteArray bytes = file.readAll();
+	if (bytes.isEmpty())
+		return false;
+	TIXMLA_STRING data;
+	data.append(bytes.constData(), bytes.size());
+	Parse( data.c_str(), 0 );
+	return !Error();
 }
 
 bool TiXmlDocumentA::SaveFile( const char * filename ) const
@@ -830,16 +805,28 @@ bool TiXmlDocumentA::SaveFile( const char * filename ) const
 }
 bool TiXmlDocumentA::SaveUnicodeFilePath( const TCHAR* filename ) const
 {
-	// The old c stuff lives on...
-	FILE* fp = generic_fopen( filename, TEXT("wc") );
-	if ( fp )
-	{
-		Print( fp, 0 );
-		fflush( fp );
-		fclose( fp );
-		return true;
-	}
-	return false;
+	FILE* temporary = std::tmpfile();
+	if (!temporary)
+		return false;
+
+	Print( temporary, 0 );
+	std::fflush( temporary );
+	std::rewind( temporary );
+
+	QByteArray output;
+	char buffer[4096];
+	size_t bytesRead = 0;
+	while ((bytesRead = std::fread(buffer, 1, sizeof(buffer), temporary)) > 0)
+		output.append(buffer, static_cast<int>(bytesRead));
+	const bool readSucceeded = std::ferror(temporary) == 0;
+	std::fclose( temporary );
+	if (!readSucceeded)
+		return false;
+
+	QFile file(QString::fromWCharArray(filename));
+	if (!file.open(QFile::WriteOnly | QFile::Truncate))
+		return false;
+	return file.write(output) == output.size();
 }
 
 

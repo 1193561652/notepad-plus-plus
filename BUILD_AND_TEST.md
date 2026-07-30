@@ -21,7 +21,8 @@ compiler or a `qmake` from another Qt installation.
 | --- | --- | --- |
 | Windows | Qt 5.12.12 + MinGW 7.3 | Built and tested |
 | Windows | Qt 5 + MSVC | CMake path present; not currently verified |
-| Linux | Qt 5 + GCC/Clang | Build path present; pending Linux verification |
+| Ubuntu 22.04 | Qt 5.15.3 + GCC 11.4 | Built and tested |
+| Other Linux | Qt 5 + GCC/Clang | Build path present; not currently verified |
 | macOS | Qt 5 + Apple Clang | Build path present; pending macOS verification |
 
 Plugin loading is disabled by default on every platform. The current status
@@ -113,10 +114,14 @@ Before diagnosing a QScintilla build failure, verify that CMake and qmake found
 the same Qt installation:
 
 ```bash
-qmake -query QT_VERSION
-qmake -query QT_INSTALL_PREFIX
+qmake -qt=5 -query QT_VERSION
+qmake -qt=5 -query QT_INSTALL_PREFIX
 cmake -S . -B build-linux -LA | grep -E "Qt5_DIR|CMAKE_(CXX_)?COMPILER"
 ```
+
+On Debian or Ubuntu, `qmake` may be managed by `qtchooser` without a default
+selection. In that case use `qmake -qt=5` for manual diagnostics. CMake obtains
+the matching executable from the imported `Qt5::qmake` target.
 
 The UI tests set `QT_QPA_PLATFORM=offscreen` through CTest on non-Windows
 platforms, so the automated suite should run in a headless shell. Interactive
@@ -130,6 +135,12 @@ The first Linux validation should record:
 - complete CTest results;
 - startup, configuration path, localization, fonts, clipboard, printing, file
   dialogs, and high-DPI behavior.
+
+The Ubuntu 22.04 validation completed on 2026-07-30 covers a clean Debug build,
+the bundled static QScintilla/Boost.Regex editor core, all 22 CTest entries,
+offscreen light/dark UI tests at 100% and 150%, isolated configuration creation,
+and a headless startup smoke test. See
+`codex/changes/2026-07-30-ubuntu-build-adaptation.md`.
 
 ## macOS
 

@@ -1,4 +1,4 @@
-// FileInterface.h - 精简版，仅为 TinyXml::SaveFile 提供 Win32_IO_File
+// FileInterface.h - 保留 TinyXml 既有包装名，内部统一使用跨平台 Qt 文件写入
 // 移植自: v8.4.6:PowerEditor/src/MISC/Common/FileInterface.h
 #pragma once
 

@@ -24,7 +24,6 @@ distribution.
 
 
 #include <sstream>
-#include <tchar.h>
 #include "TinyXml/tinyxml.h"
 
 //#define DEBUG_PARSER
@@ -157,7 +156,7 @@ const TCHAR* TiXmlBase::SkipWhiteSpace( const TCHAR* p )
 	}
 	while ( p && *p )
 	{
-		if ( _istspace( *p ) || *p == '\n' || *p =='\r' )		// Still using old rules for white space.
+		if ( std::iswspace( *p ) || *p == '\n' || *p =='\r' )		// Still using old rules for white space.
 			++p;
 		else
 			break;
@@ -205,10 +204,10 @@ const TCHAR* TiXmlBase::ReadName( const TCHAR* p, TIXML_STRING * name )
 	// hyphens, or colons. (Colons are valid ony for namespaces,
 	// but tinyxml can't tell namespaces from names.)
 	if (    p && *p 
-		 && ( _istalpha( *p ) || *p == '_' ) )
+		 && ( std::iswalpha( *p ) || *p == '_' ) )
 	{
 		while(		p && *p
-				&&	(		_istalnum( *p ) 
+				&&	(		std::iswalnum( *p )
 						 || *p == '_'
 						 || *p == '-'
 						 || *p == '.'
@@ -271,7 +270,7 @@ bool TiXmlBase::StringEqual( const TCHAR* p,
 		return false;
 	}
 
-    if ( _totlower( *p ) == _totlower( *tag ) )
+    if ( std::towlower( *p ) == std::towlower( *tag ) )
 	{
 		const TCHAR* q = p;
 
@@ -290,7 +289,7 @@ bool TiXmlBase::StringEqual( const TCHAR* p,
 		}
 		else
 		{
-			while ( *q && *tag && _totlower( *q ) == _totlower( *tag ) )
+			while ( *q && *tag && std::towlower( *q ) == std::towlower( *tag ) )
 			{
 				++q;
 				++tag;
@@ -339,7 +338,7 @@ const TCHAR* TiXmlBase::ReadText(	const TCHAR* p,
 				whitespace = true;
 				++p;
 			}
-			else if ( _istspace( *p ) )
+			else if ( std::iswspace( *p ) )
 			{
 				whitespace = true;
 				++p;
@@ -534,7 +533,7 @@ TiXmlNode* TiXmlNode::Identify( const TCHAR* p )
 		#endif
 		returnNode = new TiXmlDeclaration();
 	}
-	else if (    _istalpha( *(p+1) )
+	else if (    std::iswalpha( *(p+1) )
 			  || *(p+1) == '_' )
 	{
 		#ifdef DEBUG_PARSER
@@ -1010,7 +1009,7 @@ const TCHAR* TiXmlAttribute::Parse( const TCHAR* p, TiXmlParsingData* data )
 		// its best, even without them.
 		value = L"";
 		while (    p && *p										// existence
-				&& !_istspace( *p ) && *p != '\n' && *p != '\r'	// whitespace
+				&& !std::iswspace( *p ) && *p != '\n' && *p != '\r'	// whitespace
 				&& *p != '/' && *p != '>' )						// tag end
 		{
 			value += *p;
@@ -1123,7 +1122,7 @@ const TCHAR* TiXmlDeclaration::Parse( const TCHAR* p, TiXmlParsingData* data )
 		else
 		{
 			// Read over whatever it is.
-			while( p && *p && *p != '>' && !_istspace( *p ) )
+			while( p && *p && *p != '>' && !std::iswspace( *p ) )
 				++p;
 		}
 	}
@@ -1133,8 +1132,7 @@ const TCHAR* TiXmlDeclaration::Parse( const TCHAR* p, TiXmlParsingData* data )
 bool TiXmlText::Blank() const
 {
 	for (size_t i = 0, len = value.length(); i < len; i++)
-		if ( !_istspace( value[i] ) )
+		if ( !std::iswspace( value[i] ) )
 			return false;
 	return true;
 }
-

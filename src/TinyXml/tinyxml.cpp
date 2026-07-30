@@ -91,7 +91,8 @@ void TiXmlBase::PutString( const TIXML_STRING& str, TIXML_STRING* outString )
 			// Easy pass at non-alpha/numeric/symbol
 			// 127 is the delete key. Below 32 is symbolic.
 			TCHAR buf[32];
-            swprintf( buf, L"&#x%04X;", static_cast<unsigned int>(c & 0xffff) );
+            std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"&#x%04X;",
+                static_cast<unsigned int>(c & 0xffff));
 			outString->append( buf, wcslen( buf ) );
 			++i;
 		}
@@ -112,7 +113,7 @@ TiXmlBase::StringToBuffer::StringToBuffer( const TIXML_STRING& str )
 	buffer = new TCHAR[strLen];
 	if (buffer)
 	{
-		wcscpy_s(buffer, strLen, str.c_str());
+		std::wmemcpy(buffer, str.c_str(), strLen);
 	}
 }
 
@@ -528,7 +529,7 @@ int TiXmlElement::QueryDoubleAttribute( const TCHAR* name, double* dval ) const
 void TiXmlElement::SetAttribute( const TCHAR * name, int val )
 {	
 	TCHAR buf[64];
-    swprintf( buf, L"%d", val );
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"%d", val);
 	SetAttribute( name, buf );
 }
 
@@ -735,63 +736,27 @@ bool TiXmlDocument::LoadFile( const TCHAR* filename )
 	// Fixed with the StringToBuffer class.
 	value = filename;
 
-	FILE* file = generic_fopen( value.c_str (), L"r" );
-
-	if ( file )
+	QFile file(QString::fromWCharArray(filename));
+	if (!file.open(QFile::ReadOnly))
 	{
-		// Get the file size, so we can pre-allocate the string. HUGE speed impact.
-		long length = 0;
-		fseek( file, 0, SEEK_END );
-		length = ftell( file );
-		fseek( file, 0, SEEK_SET );
-
-		// Strange case, but good to handle up front.
-		if ( length == 0 )
-		{
-			fclose( file );
-			return false;
-		}
-
-		// If we have a file, assume it is all one big XML file, and read it in.
-		// The document parser may decide the document ends sooner than the entire file, however.
-		TIXML_STRING data;
-		data.reserve( length );
-
-		const int BUF_SIZE = 2048;
-		TCHAR buf[BUF_SIZE];
-
-		while( generic_fgets( buf, BUF_SIZE, file ) )
-		{
-			data += buf;
-		}
-		fclose( file );
-
-		Parse( data.c_str(), 0 );
-
-		if (  Error() )
-            return false;
-        else
-			return true;
+		SetError( TIXML_ERROR_OPENING_FILE, 0, 0 );
+		return false;
 	}
-	SetError( TIXML_ERROR_OPENING_FILE, 0, 0 );
-	return false;
+
+	const QByteArray bytes = file.readAll();
+	if (bytes.isEmpty())
+		return false;
+
+	QString decoded = QString::fromUtf8(bytes);
+	if (!decoded.isEmpty() && decoded.front() == QChar::ByteOrderMark)
+		decoded.remove(0, 1);
+	const TIXML_STRING data = decoded.toStdWString();
+	Parse( data.c_str(), 0 );
+	return !Error();
 }
 
 bool TiXmlDocument::SaveFile( const TCHAR * filename ) const
 {
-	/*
-	// The old c stuff lives on...
-	FILE* fp = generic_fopen( filename, L"wc" );
-	if ( fp )
-	{
-		Print( fp, 0 );
-		fflush( fp );
-		fclose( fp );
-		return true;
-	}
-	return false;
-	*/
-
 	Win32_IO_File file(filename);
 
 	if (file.isOpened())
@@ -935,14 +900,14 @@ int TiXmlAttribute::QueryDoubleValue( double* dval ) const
 void TiXmlAttribute::SetIntValue( int _value )
 {
 	TCHAR buf [64];
-    swprintf (buf, L"%d", _value);
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"%d", _value);
 	SetValue (buf);
 }
 
 void TiXmlAttribute::SetDoubleValue( double _value )
 {
 	TCHAR buf [64];
-    swprintf (buf, L"%lf", _value);
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"%lf", _value);
 	SetValue (buf);
 }
 

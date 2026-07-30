@@ -1806,7 +1806,7 @@ bool NppParameters::loadSession(const QString& path)
 }
 
 // ── 写入 config.xml / session.xml（使用 TiXml，非 ASCII 字符输出为 &#xHHHH; 纯 ASCII）
-// 原因：QXmlStreamWriter 写入原始 UTF-8 字节；原版用 _wfopen+fgetws (GBK) 读取会乱码。
+// 原因：QXmlStreamWriter 写入原始 UTF-8 字节；依赖本地代码页的宽字符 C I/O 会乱码。
 // TiXml 的 EncodeString 将所有非 ASCII wchar_t 转为纯 ASCII 数字字符引用，两版均可正确读取。
 // ─────────────────────────────────────────────────────────────────────────────
 

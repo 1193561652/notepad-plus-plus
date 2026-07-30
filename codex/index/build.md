@@ -10,7 +10,7 @@
 
 - Qt 5.12.12 或更高版本。
 - CMake 3.10 或更高版本。
-- MinGW 或 MSVC。
+- Windows 使用 MinGW 或 MSVC；Linux 使用 GCC 或 Clang。
 - QScintilla 2.13.3，来源于 `third_party/qscintilla/`。
 
 ## 现有构建配置
@@ -82,6 +82,16 @@ ctest --test-dir build -R "^(core-behavior-tests|large-file-mode-tests)$" \
 ```
 
 完整验证可直接执行 `ctest --test-dir build --output-on-failure`。
+
+## Ubuntu 验证状态
+
+2026-07-30 已在 Ubuntu 22.04.5、GCC 11.4、Qt 5.15.3、GNU Make 4.3 上完成
+Debug 全量构建和独立 Release 主程序构建。仓库内静态 QScintilla、Boost.Regex 和
+LexUser 均由主线源码成功构建；CTest 22/22 通过，包含无头 UI、本地化、配置语料、
+搜索正则和大文件测试。
+
+详细修复与验证记录：
+`codex/changes/2026-07-30-ubuntu-build-adaptation.md`。
 
 如使用 MSVC：
 

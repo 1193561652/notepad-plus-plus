@@ -26,7 +26,6 @@ distribution.
 #include "tinyxml.h"
 #endif //TINYXML_INCLUDED
 #include <cassert>
-#include "define.h"
 
 #ifndef TIXML_USE_STL
 
@@ -52,7 +51,7 @@ class TiXmlString
     TiXmlString ()
     {
         allocated = 0;
-        cstring = NULL;
+        cstring = nullptr;
         current_length = 0;
     }
 
@@ -70,7 +69,7 @@ class TiXmlString
     {
         if (allocated)
             return cstring;
-        return TEXT("");
+        return L"";
     }
 
     // Return the length of a TiXmlString
@@ -116,7 +115,7 @@ class TiXmlString
     }
 
     // Checks if a TiXmlString contains only whitespace (same rules as isspace)
-	// Not actually used in tinyxml. Conflicts with a C macro, TEXT("isblank"),
+	// Not actually used in tinyxml. Conflicts with a C macro named isblank,
 	// which is a problem. Commenting out. -lee
 //    bool isblank () const;
 
@@ -185,7 +184,7 @@ class TiXmlString
     {
         if (cstring)
             delete [] cstring;
-        cstring = NULL;
+        cstring = nullptr;
         allocated = 0;
         current_length = 0;
     }

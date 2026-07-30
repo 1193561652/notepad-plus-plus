@@ -295,10 +295,19 @@ bool TextFileCodec::encode(const QString& text, const QString& encoding,
     QTextCodec::ConverterState state(
         QTextCodec::ConvertInvalidToNull | QTextCodec::IgnoreHeader);
     QByteArray encoded = codec->fromUnicode(text.constData(), text.size(), &state);
-    if (state.invalidChars > 0) {
+    int invalidChars = state.invalidChars;
+    // Codec backends do not report every substitution consistently. Verify the
+    // result on every platform so saving can never silently lose text.
+    QTextCodec::ConverterState verificationState(
+        QTextCodec::ConvertInvalidToNull | QTextCodec::IgnoreHeader);
+    const QString verifiedText = codec->toUnicode(
+        encoded.constData(), encoded.size(), &verificationState);
+    invalidChars += verificationState.invalidChars;
+    if (invalidChars > 0 || verifiedText != text) {
         if (errorMessage) {
             *errorMessage = QString("%1 character(s) cannot be represented in %2.")
-                .arg(state.invalidChars).arg(normalized);
+                .arg(qMax(1, invalidChars))
+                .arg(normalized);
         }
         return false;
     }

@@ -1,4 +1,5 @@
 #include "Parameters.h"
+#include "TinyXml/tinyxml.h"
 
 #include <QApplication>
 #include <QDir>
@@ -221,7 +222,31 @@ int main(int argc, char** argv)
         return 2;
     }
 
+    const std::wstring targetPathWide = targetPath.toStdWString();
+    TiXmlDocument directDocument;
+    if (!directDocument.LoadFile(targetPathWide.c_str())) {
+        std::fprintf(stderr, "TinyXml direct Unicode-path load failed\n");
+        return 1;
+    }
+    const QString unicodeRoundTripPath =
+        temporary.path() + QString::fromUtf8("/统一路径.xml");
+    const std::wstring unicodeRoundTripPathWide =
+        unicodeRoundTripPath.toStdWString();
+    if (!directDocument.SaveFile(unicodeRoundTripPathWide.c_str())) {
+        std::fprintf(stderr, "TinyXml direct Unicode-path save failed\n");
+        return 1;
+    }
+    TiXmlDocument reloadedDocument;
+    if (!reloadedDocument.LoadFile(unicodeRoundTripPathWide.c_str())) {
+        std::fprintf(stderr, "TinyXml Unicode-path round trip failed\n");
+        return 1;
+    }
+
     NppParameters& parameters = NppParameters::getInstance();
+    if (!parameters.setUserPathOverride(userPath)) {
+        std::fprintf(stderr, "could not select isolated settings directory\n");
+        return 2;
+    }
     if (!parameters.load()) {
         std::fprintf(stderr, "NppParameters::load failed for %s\n",
                      qPrintable(sourcePath));

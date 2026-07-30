@@ -37,8 +37,9 @@ validation commands.
 ## Platform Support
 
 - Windows with Qt 5.12.12 and MinGW is the currently verified build.
-- Linux with Qt 5 and GCC/Clang is supported by the build system and is the next
-  validation target.
+- Ubuntu 22.04 with Qt 5.15.3 and GCC 11.4 is built and tested.
+- Other Linux distributions and Clang remain supported build paths but are not
+  yet part of the verified matrix.
 - macOS with Qt 5 and Apple Clang has a build path but has not yet been verified.
 
 Each platform builds the bundled, project-specific static QScintilla library

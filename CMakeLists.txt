@@ -506,6 +506,10 @@ if(BUILD_TESTING)
         if(EXISTS "${corpus_path}")
             add_test(NAME "${test_name}"
                 COMMAND config-corpus-tests "${mode}" "${corpus_path}")
+            if(UNIX AND NOT APPLE)
+                set_tests_properties("${test_name}" PROPERTIES
+                    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+            endif()
         endif()
     endfunction()
 

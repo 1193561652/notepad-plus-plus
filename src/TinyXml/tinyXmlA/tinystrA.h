@@ -29,7 +29,7 @@ distribution.
 
 #ifndef TIXMLA_USE_STL
 
-#ifndef _INCLUDED
+#ifndef TIXMLA_STRING_INCLUDED
 #define TIXMLA_STRING_INCLUDED
 
 #pragma warning( disable : 4514 )
@@ -52,7 +52,7 @@ class TiXmlStringA
     TiXmlStringA ()
     {
         allocated = 0;
-        cstring = NULL;
+        cstring = nullptr;
         current_length = 0;
     }
 
@@ -145,7 +145,7 @@ class TiXmlStringA
         if (size)
         {
             allocated = size;
-			TIXMLA_STRING cstring = new char [size];
+			cstring = new char [size];
             cstring [0] = 0;
             current_length = 0;
         }
@@ -185,7 +185,7 @@ class TiXmlStringA
     {
         if (cstring)
             delete [] cstring;
-        cstring = NULL;
+        cstring = nullptr;
         allocated = 0;
         current_length = 0;
     }
