@@ -32,7 +32,7 @@
 
 ## UDL
 
-- 使用 v8.4.6 原版 `LexUser.cxx`，编入项目自有 QScintilla 静态库。
+- 使用 v8.4.6 原版 `LexUser.cxx`，编入独立 `npp-lexilla` 静态库。
 - QScintilla 扩展到 31 个关键词集合，并补入 LexUser 所需 lexlib API。
 - 解析 28 个关键词列表、8 组前缀、折叠、样式和 nesting。
 - 同时加载根 `userDefineLang.xml` 与 `userDefineLangs/*.xml`。

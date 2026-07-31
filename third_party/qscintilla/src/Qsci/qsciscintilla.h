@@ -1897,10 +1897,12 @@ public slots:
     virtual void setIndentationWidth(int width);
 
     //! Sets the specific language lexer used to style text to \a lex.  If
-    //! \a lex is 0 then syntax styling is disabled.
+    //! \a lexerInstance is non-zero it is passed to SCI_SETILEXER and
+    //! Scintilla takes ownership.  If \a lex is 0 then syntax styling is
+    //! disabled.
     //!
     //! \sa lexer()
-    virtual void setLexer(QsciLexer *lexer = 0);
+    virtual void setLexer(QsciLexer *lexer = 0, void *lexerInstance = 0);
 
     //! Set the background colour of all margins to \a col.  The default is a
     //! gray.

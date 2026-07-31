@@ -10,6 +10,7 @@ Win32-specific implementation with Qt and standard C++.
 - Qt 5 / Qt Widgets
 - CMake
 - Bundled QScintilla 2.13.3 / Scintilla
+- Separately linked static Lexilla
 - Notepad++ Boost.Regex search backend
 
 ## Build
@@ -43,9 +44,10 @@ validation commands.
 - macOS with Qt 5 and Apple Clang has a build path but has not yet been verified.
 
 Each platform builds the bundled, project-specific static QScintilla library
-with the Notepad++ Boost.Regex backend. Linux and macOS therefore require
-`qmake` and GNU Make in addition to the CMake build tool. Packaging and plugin
-ABI compatibility are outside the current platform-build scope.
+with the Notepad++ Boost.Regex backend and a separate static Lexilla library.
+Linux and macOS therefore require `qmake` and GNU Make in addition to the CMake
+build tool. Packaging and plugin ABI compatibility are outside the current
+platform-build scope.
 
 ## Repository Layout
 
@@ -54,7 +56,8 @@ ABI compatibility are outside the current platform-build scope.
 - `tests/`: behavior, configuration, and UI runtime tests
 - `third_party/qscintilla/`: bundled QScintilla and Scintilla source
 - `third_party/boostregex/`: Boost.Regex integration
-- `third_party/lexilla/`: LexUser source used by the static editor core
+- `third_party/lexilla/`: separately built Lexilla, lexlib, built-in lexers,
+  and the v8.4.6 LexUser lexer
 - `codex/`: project knowledge base and implementation records
 
 ## Original Source

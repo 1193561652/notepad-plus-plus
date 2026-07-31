@@ -9,6 +9,7 @@
 #include <QTextCodec>
 #include <Qsci/qsciscintilla.h>
 #include <Scintilla.h>
+#include <SciLexer.h>
 #include <cstdio>
 
 namespace {
@@ -236,7 +237,14 @@ int main(int argc, char** argv)
     ok &= check((urlMask & (1 << 27)) != 0,
                 "URL hotspot indicator was not applied");
     behaviorView.setLexerForFile(QStringLiteral("sample.xml"));
+    ok &= check(
+        behaviorView.SendScintillaNpp(SCI_GETLEXER) == SCLEX_AUTOMATIC,
+        "Built-in language did not install a Lexilla lexer instance");
     behaviorView.setText(QStringLiteral("<root><child/></root>"));
+    behaviorView.SendScintilla(SCI_COLOURISE, 0, -1);
+    ok &= check(
+        behaviorView.SendScintillaNpp(SCI_GETSTYLEAT, 2, 0) == SCE_H_TAG,
+        "Independent Lexilla XML lexer did not style the document");
     behaviorView.setCurrentPositionNpp(2);
     behaviorView.refreshXmlTagHighlight();
     const int openTagMask = static_cast<int>(behaviorView.SendScintillaNpp(

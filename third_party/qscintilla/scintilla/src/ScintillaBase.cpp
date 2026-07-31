@@ -29,11 +29,6 @@
 
 #include "PropSetSimple.h"
 
-#ifdef SCI_LEXER
-#include "LexerModule.h"
-#include "Catalogue.h"
-#endif
-
 #include "Position.h"
 #include "UniqueString.h"
 #include "SplitVector.h"
@@ -545,8 +540,6 @@ void ScintillaBase::RightButtonDownWithModifiers(Point pt, unsigned int curTime,
 namespace Scintilla {
 
 class LexState : public LexInterface {
-	const LexerModule *lexCurrent;
-	void SetLexerModule(const LexerModule *lex);
 	PropSetSimple props;
 	int interfaceVersion;
 public:
@@ -561,6 +554,7 @@ public:
 	~LexState() override;
 	void SetLexer(uptr_t wParam);
 	void SetLexerLanguage(const char *languageName);
+	void SetILexer(ILexer *lexer);
 	const char *DescribeWordListSets();
 	void SetWordList(int n, const char *wl);
 	const char *GetName() const;
@@ -592,7 +586,6 @@ public:
 }
 
 LexState::LexState(Document *pdoc_) : LexInterface(pdoc_) {
-	lexCurrent = nullptr;
 	performingStyle = false;
 	interfaceVersion = lvOriginal;
 	lexLanguage = SCLEX_CONTAINER;
@@ -612,41 +605,24 @@ LexState *ScintillaBase::DocumentLexState() {
 	return static_cast<LexState *>(pdoc->GetLexInterface());
 }
 
-void LexState::SetLexerModule(const LexerModule *lex) {
-	if (lex != lexCurrent) {
-		if (instance) {
-			instance->Release();
-			instance = nullptr;
-		}
-		interfaceVersion = lvOriginal;
-		lexCurrent = lex;
-		if (lexCurrent) {
-			instance = lexCurrent->Create();
-			interfaceVersion = instance->Version();
-		}
-		pdoc->LexerChanged();
-	}
+void LexState::SetILexer(ILexer *lexer) {
+	if (instance == lexer)
+		return;
+	if (instance)
+		instance->Release();
+	instance = lexer;
+	interfaceVersion = instance ? instance->Version() : lvOriginal;
+	lexLanguage = instance ? SCLEX_AUTOMATIC : SCLEX_CONTAINER;
+	pdoc->LexerChanged();
 }
 
 void LexState::SetLexer(uptr_t wParam) {
 	lexLanguage = static_cast<int>(wParam);
-	if (lexLanguage == SCLEX_CONTAINER) {
-		SetLexerModule(nullptr);
-	} else {
-		const LexerModule *lex = Catalogue::Find(lexLanguage);
-		if (!lex)
-			lex = Catalogue::Find(SCLEX_NULL);
-		SetLexerModule(lex);
-	}
+	SetILexer(nullptr);
 }
 
-void LexState::SetLexerLanguage(const char *languageName) {
-	const LexerModule *lex = Catalogue::Find(languageName);
-	if (!lex)
-		lex = Catalogue::Find(SCLEX_NULL);
-	if (lex)
-		lexLanguage = lex->GetLanguage();
-	SetLexerModule(lex);
+void LexState::SetLexerLanguage(const char *) {
+	SetILexer(nullptr);
 }
 
 const char *LexState::DescribeWordListSets() {
@@ -667,7 +643,7 @@ void LexState::SetWordList(int n, const char *wl) {
 }
 
 const char *LexState::GetName() const {
-	return lexCurrent ? lexCurrent->languageName : "";
+	return "";
 }
 
 void *LexState::PrivateCall(int operation, void *pointer) {
@@ -1081,6 +1057,10 @@ sptr_t ScintillaBase::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lPara
 
 	case SCI_SETLEXERLANGUAGE:
 		DocumentLexState()->SetLexerLanguage(ConstCharPtrFromSPtr(lParam));
+		break;
+
+	case SCI_SETILEXER:
+		DocumentLexState()->SetILexer(reinterpret_cast<ILexer *>(lParam));
 		break;
 
 	case SCI_GETLEXERLANGUAGE:

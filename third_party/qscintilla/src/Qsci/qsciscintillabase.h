@@ -2371,6 +2371,7 @@ public:
 
         //!
         SCI_DESCRIPTIONOFSTYLE = 4032,
+        SCI_SETILEXER = 4033,
 
         //!
         SCI_GETMOVEEXTENDSSELECTION = 2706,

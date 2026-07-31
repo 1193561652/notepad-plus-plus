@@ -32,6 +32,7 @@
 #include <Qsci/qscilexervhdl.h>
 #include <Qsci/qscilexerxml.h>
 #include <Qsci/qscilexeryaml.h>
+#include <Lexilla.h>
 #include <QFileInfo>
 #include <QFont>
 #include <QDesktopServices>
@@ -619,6 +620,28 @@ static QsciLexer* createLexer(const QString& nppName, QObject* parent)
         NppParameters::getInstance().getLangDescByName(normalized), parent);
 }
 
+bool ScintillaEditView::installLexer(QsciLexer* configured)
+{
+    Scintilla::ILexer* instance = nullptr;
+    if (configured) {
+        const char* lexerName = configured->lexer();
+        if (!lexerName || !*lexerName) {
+            delete configured;
+            return false;
+        }
+        instance = CreateLexer(lexerName);
+        if (!instance) {
+            delete configured;
+            return false;
+        }
+    }
+
+    QsciLexer* old = lexer();
+    setLexer(configured, instance);
+    delete old;
+    return true;
+}
+
 void ScintillaEditView::setLexerForFile(const QString& filePath)
 {
     if (_largeFileMode) {
@@ -656,9 +679,8 @@ void ScintillaEditView::setLexerForFile(const QString& filePath)
     if (newLexer)
         newLexer->setDefaultFont(editorFont());
 
-    QsciLexer* old = lexer();
-    setLexer(newLexer);
-    delete old;
+    if (!installLexer(newLexer))
+        newLexer = nullptr;
 
     if (newLexer) {
         applyStylers(nppName);  // 从 stylers.xml 应用颜色
@@ -676,13 +698,10 @@ void ScintillaEditView::setBuiltinLanguage(const QString& languageName)
     if (_largeFileMode)
         return;
     _currentLexerName = languageName.toLower();
-    QsciLexer* old = lexer();
     QsciLexer* configured = createLexer(_currentLexerName, this);
     if (configured)
         configured->setDefaultFont(editorFont());
-    setLexer(configured);
-    delete old;
-    if (configured)
+    if (installLexer(configured))
         applyStylers(_currentLexerName);
     applyGlobalStyles();
 }
@@ -698,11 +717,10 @@ void ScintillaEditView::setUserDefinedLanguage(const UserLangDesc& language)
     _commentStart = language.blockCommentStart;
     _commentEnd = language.blockCommentEnd;
 
-    QsciLexer* old = lexer();
     UserDefinedLexer* custom = new UserDefinedLexer(language, this);
     custom->setDefaultFont(editorFont());
-    setLexer(custom);
-    delete old;
+    if (!installLexer(custom))
+        return;
     setupAutoComplete();
     applyGlobalStyles();
 }
@@ -933,9 +951,8 @@ bool ScintillaEditView::setLexerByName(const QString& name)
         _commentEnd = language->commentEnd;
     }
     newLexer->setDefaultFont(editorFont());
-    QsciLexer* old = lexer();
-    setLexer(newLexer);
-    delete old;
+    if (!installLexer(newLexer))
+        return false;
     applyStylers(normalized);
     setupAutoComplete();
     applyGlobalStyles();
@@ -947,9 +964,7 @@ bool ScintillaEditView::setLexerByName(const QString& name)
 void ScintillaEditView::clearLexer()
 {
     _currentLexerName.clear();
-    QsciLexer* old = lexer();
-    setLexer(nullptr);
-    delete old;
+    installLexer(nullptr);
     setFont(editorFont());
 }
 
@@ -1154,7 +1169,7 @@ void ScintillaEditView::applyFont(const QString& family, int size)
     // 同步更新词法分析器字体
     if (lexer()) {
         lexer()->setDefaultFont(f);
-        setLexer(lexer());  // 刷新样式
+        reloadConfiguredStyles();
     }
 }
 

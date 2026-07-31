@@ -136,6 +136,7 @@ private slots:
 
 private:
     bool doNppFind();
+    bool installLexer(QsciLexer* configured);
 
     void setupDefaultStyles();
     void setupMargins();

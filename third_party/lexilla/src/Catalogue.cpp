@@ -56,6 +56,16 @@ void Catalogue::AddLexerModule(LexerModule *plm) {
 	lexerCatalogue.push_back(plm);
 }
 
+size_t Catalogue::Count() {
+	Scintilla_LinkLexers();
+	return lexerCatalogue.size();
+}
+
+const char *Catalogue::Name(size_t index) {
+	Scintilla_LinkLexers();
+	return index < lexerCatalogue.size() ? lexerCatalogue[index]->languageName : nullptr;
+}
+
 // To add or remove a lexer, add or remove its file and run LexGen.py.
 
 // Force a reference to all of the Scintilla lexers so that the linker will

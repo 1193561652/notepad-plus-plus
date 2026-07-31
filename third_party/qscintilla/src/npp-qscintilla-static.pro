@@ -1,4 +1,4 @@
-# Notepad++ Qt editor core: QScintilla plus the original Boost.Regex backend.
+# Notepad++ Qt editor core. Lexilla is built as a separate static library.
 
 CONFIG += staticlib
 DEFINES += SCI_OWNREGEX
@@ -8,8 +8,8 @@ include(qscintilla.pro)
 TARGET = qscintilla2_qt$${QT_MAJOR_VERSION}_npp
 
 NPP_BOOSTREGEX_ROOT = $$clean_path($$NPP_BOOSTREGEX_SOURCE_ROOT)
-NPP_LEXUSER = $$clean_path($$NPP_LEXUSER_SOURCE)
-INCLUDEPATH += $$NPP_BOOSTREGEX_ROOT
+NPP_LEXILLA = $$clean_path($$NPP_LEXILLA_ROOT)
+INCLUDEPATH += $$NPP_BOOSTREGEX_ROOT $$NPP_LEXILLA/lexlib
 
 HEADERS += \
     $$NPP_BOOSTREGEX_ROOT/AnsiDocumentIterator.h \
@@ -18,5 +18,4 @@ HEADERS += \
 
 SOURCES += \
     $$NPP_BOOSTREGEX_ROOT/BoostRegExSearch.cxx \
-    $$NPP_BOOSTREGEX_ROOT/UTF8DocumentIterator.cxx \
-    $$NPP_LEXUSER
+    $$NPP_BOOSTREGEX_ROOT/UTF8DocumentIterator.cxx

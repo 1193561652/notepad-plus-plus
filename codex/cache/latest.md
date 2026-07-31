@@ -2,6 +2,28 @@
 
 缓存日期：2026-07-30
 
+## 2026-07-30 Scintilla 5 Qt 迁移决策
+
+- 原版 v8.4.6 携带 Scintilla 5.3.0（`530`）和 Lexilla 5.1.9（`519`）。
+- 后续编辑器核心固定使用这两个精确版本，不在迁移期间改用最新上游版本。
+- 目标采用官方 Qt `ScintillaEditBase`、独立静态 Scintilla/Lexilla、
+  真正的 `ILexer5` 和原版 `CreateLexer -> SCI_SETILEXER` 调用链。
+- `ScintillaEditView::execute(SCI_*, ...)` 保留为业务边界；QScintilla
+  高层类型分阶段替换。
+- 迁移需要 C++17；旧、新 Scintilla 不得链接进同一可执行文件。
+- 当前仅完成方案和索引记录，尚未切换实现。
+- 方案：`codex/analysis/2026-07-30-scintilla5-qt-migration-plan.md`。
+
+## 2026-07-30 Lexilla 独立静态库
+
+- Lexilla lexer、lexlib、Catalogue 和 LexUser 已从 QScintilla 静态库中分离。
+- CMake 独立构建 `npp-lexilla`，应用通过 `CreateLexer` 和
+  `SCI_SETILEXER` 安装 lexer，Scintilla 接管实例生命周期。
+- 当前实现复刻原版库边界与调用方向，同时保留 QScintilla 2.13.3 的旧
+  `ILexer` ABI；外部 `ILexer5` 二进制兼容仍属于插件后续范围。
+- 空 QScintilla 子构建重建成功，完整 CTest `29/29` 通过。
+- 详细分析：`codex/analysis/2026-07-30-lexilla-architecture.md`。
+
 ## 2026-07-30 插件系统移植指导
 
 - 已核验 v8.4.6 的插件导出、加载顺序、`NPPM_*`、`NPPN_*` 和 Dock 边界。
@@ -41,7 +63,8 @@
 
 - 当前 Git 仓库根目录是 Qt 移植唯一主线。
 - 原版 v8.4.6 通过 `git show v8.4.6:<path>` 查阅。
-- QScintilla、Scintilla 和 LexUser 已纳入 `third_party/`，构建不再依赖旧工作区。
+- QScintilla、Scintilla、独立 Lexilla 和 LexUser 已纳入 `third_party/`，
+  构建不再依赖旧工作区。
 - 配置兼容测试语料已固定在 `tests/corpus/v8.4.6/`。
 - `AGENTS.md`、`codex/`、源码、资源和测试均由当前仓库管理。
 - 新仓库空构建成功，CTest `25/25` 通过。
@@ -320,7 +343,7 @@
 
 - Finder、Copy Marked Text、外部文件变化、打印、高级排序、Column Editor、
   UDL 2.1 和保存搜索宏 type 3 的代码开发已完成。
-- 原版 LexUser 已编入自有 QScintilla 静态库。
+- 原版 LexUser 已编入独立 `npp-lexilla` 静态库。
 - Debug 构建成功，CTest `18/18` 通过。
 - 按用户要求未启动程序、未截图、未执行人工交互验证。
 - 最新缓存：`codex/cache/2026-07-26-p1-compatibility.md`。

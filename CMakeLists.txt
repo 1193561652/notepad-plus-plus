@@ -21,6 +21,32 @@ find_package(Qt5 REQUIRED COMPONENTS Core Gui Widgets Network PrintSupport Xml)
 # Bundled QScintilla source used by the Notepad++ static editor core.
 set(QSCINTILLA_ROOT "${CMAKE_SOURCE_DIR}/third_party/qscintilla")
 set(QSCINTILLA_INCLUDE_DIR "${QSCINTILLA_ROOT}/src")
+set(LEXILLA_ROOT "${CMAKE_SOURCE_DIR}/third_party/lexilla")
+
+file(GLOB NPP_LEXILLA_LEXER_SOURCES CONFIGURE_DEPENDS
+    "${LEXILLA_ROOT}/lexers/*.cpp")
+list(REMOVE_ITEM NPP_LEXILLA_LEXER_SOURCES
+    "${LEXILLA_ROOT}/lexers/LexLPeg.cpp")
+file(GLOB NPP_LEXILLA_LEXLIB_SOURCES CONFIGURE_DEPENDS
+    "${LEXILLA_ROOT}/lexlib/*.cpp")
+
+add_library(npp-lexilla STATIC
+    ${NPP_LEXILLA_LEXER_SOURCES}
+    ${NPP_LEXILLA_LEXLIB_SOURCES}
+    "${LEXILLA_ROOT}/src/Catalogue.cpp"
+    "${LEXILLA_ROOT}/src/Lexilla.cpp"
+    "${LEXILLA_ROOT}/LexUser.cxx"
+)
+target_compile_definitions(npp-lexilla PRIVATE SCINTILLA_QT)
+target_include_directories(npp-lexilla
+    PUBLIC
+        "${LEXILLA_ROOT}/include"
+        "${QSCINTILLA_ROOT}/scintilla/include"
+    PRIVATE
+        "${LEXILLA_ROOT}/lexlib"
+        "${LEXILLA_ROOT}/src"
+)
+
 get_target_property(NPP_QMAKE_EXECUTABLE Qt5::qmake IMPORTED_LOCATION)
 if(NOT NPP_QMAKE_EXECUTABLE)
     find_program(NPP_QMAKE_EXECUTABLE NAMES qmake qmake-qt5 REQUIRED)
@@ -61,7 +87,7 @@ add_custom_command(
         "-DNPP_QSCINTILLA_PROJECT=${QSCINTILLA_ROOT}/src/npp-qscintilla-static.pro"
         "-DNPP_QSCINTILLA_ROOT=${QSCINTILLA_ROOT}"
         "-DNPP_BOOSTREGEX_ROOT=${CMAKE_SOURCE_DIR}/third_party/boostregex"
-        "-DNPP_LEXUSER_SOURCE=${CMAKE_SOURCE_DIR}/third_party/lexilla/LexUser.cxx"
+        "-DNPP_LEXILLA_ROOT=${LEXILLA_ROOT}"
         "-DNPP_QSCINTILLA_BUILD_DIR=${NPP_QSCINTILLA_BUILD_DIR}"
         "-DNPP_QSCINTILLA_CONFIG=${NPP_QSCINTILLA_CONFIG}"
         "-DNPP_QSCINTILLA_OUTPUT=${NPP_QSCINTILLA_ARCHIVE}"
@@ -73,11 +99,8 @@ add_custom_command(
         "${QSCINTILLA_ROOT}/scintilla/include/SciLexer.h"
         "${QSCINTILLA_ROOT}/scintilla/include/Scintilla.h"
         "${QSCINTILLA_ROOT}/scintilla/include/Scintilla.iface"
-        "${QSCINTILLA_ROOT}/scintilla/src/Catalogue.cpp"
-        "${QSCINTILLA_ROOT}/scintilla/lexlib/StyleContext.h"
-        "${QSCINTILLA_ROOT}/scintilla/lexlib/StyleContext.cpp"
-        "${QSCINTILLA_ROOT}/scintilla/lexlib/WordList.h"
-        "${CMAKE_SOURCE_DIR}/third_party/lexilla/LexUser.cxx"
+        "${LEXILLA_ROOT}/lexlib/PropSetSimple.h"
+        "${LEXILLA_ROOT}/lexlib/CharacterCategory.h"
         "${CMAKE_SOURCE_DIR}/third_party/boostregex/BoostRegExSearch.cxx"
         "${CMAKE_SOURCE_DIR}/third_party/boostregex/UTF8DocumentIterator.cxx"
         "${QSCINTILLA_ROOT}/src/qscintilla.pro"
@@ -92,6 +115,7 @@ add_library(npp-qscintilla STATIC IMPORTED GLOBAL)
 set_target_properties(npp-qscintilla PROPERTIES
     IMPORTED_LOCATION "${NPP_QSCINTILLA_ARCHIVE}"
     INTERFACE_INCLUDE_DIRECTORIES "${QSCINTILLA_INCLUDE_DIR}"
+    INTERFACE_LINK_LIBRARIES npp-lexilla
 )
 add_dependencies(npp-qscintilla npp-qscintilla-build)
 
@@ -496,6 +520,12 @@ if(BUILD_TESTING)
     )
     target_link_libraries(workspace-document-tests Qt5::Core)
     add_test(NAME workspace-document-tests COMMAND workspace-document-tests)
+
+    add_executable(lexilla-integration-tests
+        tests/LexillaIntegrationTests.cpp)
+    target_link_libraries(lexilla-integration-tests npp-lexilla)
+    add_test(NAME lexilla-integration-tests
+        COMMAND lexilla-integration-tests)
 
     add_executable(large-file-mode-tests
         tests/LargeFileModeTests.cpp

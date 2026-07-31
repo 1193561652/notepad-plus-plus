@@ -8,8 +8,8 @@
 - qmake and the matching native build tool
 - GNU Make on Linux and macOS, including when CMake itself uses Ninja
 
-QScintilla, Scintilla, Boost.Regex integration, and LexUser are bundled under
-`third_party/`; no sibling source directories are required.
+QScintilla, Scintilla, Lexilla, Boost.Regex integration, and LexUser are
+bundled under `third_party/`; no sibling source directories are required.
 
 The Qt libraries, `qmake`, compiler, and build tool must belong to one compatible
 toolchain. In particular, do not mix a distribution Qt build with an unrelated
@@ -50,8 +50,16 @@ cmake --build build -j 4
 ctest --test-dir build --output-on-failure
 ```
 
-The build first creates the project-specific static QScintilla archive and then
-links the application and tests.
+The build creates two editor-core archives:
+
+- `npp-lexilla`: built-in lexers, lexlib, the Lexilla catalogue, and the
+  v8.4.6 LexUser lexer;
+- `npp-qscintilla`: the Qt/Scintilla editor widget and the Notepad++
+  Boost.Regex backend, without embedded lexers.
+
+The application links both archives and installs Lexilla instances through
+`CreateLexer` and `SCI_SETILEXER`, matching the original Notepad++ ownership
+flow.
 
 ## Windows
 

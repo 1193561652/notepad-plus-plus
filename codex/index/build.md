@@ -29,6 +29,20 @@
 - 静态库同时包含大文件文档选项和指针宽度 Scintilla 消息扩展。
 - 主程序链接 imported target `npp-qscintilla`，不依赖 QScintilla DLL。
 
+## 已确定的编辑器核心迁移
+
+当前构建仍使用 QScintilla。后续迁移已经确定以下目标，但尚未实施：
+
+- 从原版 v8.4.6 精确导入 Scintilla 5.3.0 和 Lexilla 5.1.9。
+- 使用官方 `scintilla/qt/ScintillaEditBase`，不使用新版替代版本。
+- 构建独立静态目标 `npp-scintilla-qt` 和 `npp-lexilla`。
+- Scintilla 继续通过 `SCI_OWNREGEX` 编译原版 Boost.Regex 适配层。
+- 迁移构建标准提升到 C++17，与 Scintilla 5.3.0 Qt 工程要求一致。
+- 旧、新 Scintilla 在过渡期只能进入不同测试进程，不得链接到同一可执行文件。
+
+详细方案：
+`codex/analysis/2026-07-30-scintilla5-qt-migration-plan.md`。
+
 ## 插件构建注意
 
 当前 `ENABLE_PLUGIN_SYSTEM` 选项默认值为 `OFF`。项目约束已确认插件不是近期功能目标，但代码接口继续保留。

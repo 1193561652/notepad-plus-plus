@@ -168,3 +168,12 @@
 - `DocTabView::setIndividualTabColour()`：恢复 `tabColourId` 并触发重绘。
 - `FileBrowserPanel::selectedPath()` / `setSelectedPath()`：读写
   `FileBrowser latestSelectedItem`。
+
+## 2026-07-30 Scintilla 5 Qt 目标架构
+
+- 目标版本固定为原版 v8.4.6 的 Scintilla 5.3.0 和 Lexilla 5.1.9。
+- `ScintillaEditView` 将从 QScintilla 切换到官方
+  `ScintillaEditBase`，继续以 `execute(SCI_*, ...)` 为主要业务边界。
+- 模块索引：`codex/modules/notepad-plus-plus/scintilla5-qt.md`。
+- 迁移尚未实施；详细阶段和验收门槛见
+  `codex/analysis/2026-07-30-scintilla5-qt-migration-plan.md`。

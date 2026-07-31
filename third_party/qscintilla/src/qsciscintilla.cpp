@@ -3372,7 +3372,7 @@ void QsciScintilla::detachLexer()
 
 
 // Set the lexer.
-void QsciScintilla::setLexer(QsciLexer *lexer)
+void QsciScintilla::setLexer(QsciLexer *lexer, void *lexerInstance)
 {
     // Detach any current lexer.
     detachLexer();
@@ -3384,7 +3384,10 @@ void QsciScintilla::setLexer(QsciLexer *lexer)
     {
         SendScintilla(SCI_CLEARDOCUMENTSTYLE);
 
-        if (lex->lexer())
+        if (lexerInstance)
+            SendScintillaNpp(SCI_SETILEXER, 0,
+                    reinterpret_cast<qintptr>(lexerInstance));
+        else if (lex->lexer())
             SendScintilla(SCI_SETLEXERLANGUAGE, lex->lexer());
         else
             SendScintilla(SCI_SETLEXER, lex->lexerId());

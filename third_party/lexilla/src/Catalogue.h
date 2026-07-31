@@ -10,6 +10,8 @@
 #ifndef CATALOGUE_H
 #define CATALOGUE_H
 
+#include <cstddef>
+
 namespace Scintilla {
 
 class Catalogue {
@@ -17,6 +19,8 @@ public:
 	static const LexerModule *Find(int language);
 	static const LexerModule *Find(const char *languageName);
 	static void AddLexerModule(LexerModule *plm);
+	static size_t Count();
+	static const char *Name(size_t index);
 };
 
 }

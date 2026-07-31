@@ -17,7 +17,8 @@
 - `tests/`：纯逻辑、配置语料、编辑器行为和 UI 运行测试。
 - `third_party/qscintilla/`：QScintilla 2.13.3 与其 Scintilla 源码。
 - `third_party/boostregex/`：Notepad++ Boost.Regex 适配层和精简 Boost。
-- `third_party/lexilla/LexUser.cxx`：原版 v8.4.6 UDL lexer。
+- `third_party/lexilla/`：独立静态 Lexilla、内建 lexer、lexlib 与原版
+  v8.4.6 `LexUser.cxx`。
 - `codex/`：代码知识库、索引、分析、决策和验证记录。
 
 原版源码通过当前仓库历史读取，例如：
@@ -73,7 +74,10 @@ git show v8.4.6:PowerEditor/src/Parameters.cpp
 
 - 主线通过 `third_party/qscintilla/src/npp-qscintilla-static.pro` 构建静态
   QScintilla。
-- 静态库启用 `SCI_OWNREGEX`，并编入 Boost.Regex 适配层与 LexUser。
+- QScintilla 静态库启用 `SCI_OWNREGEX` 并编入 Boost.Regex 适配层，但不内嵌
+  lexer。
+- Lexilla 由 CMake 独立构建为 `npp-lexilla` 静态库；应用调用
+  `CreateLexer()`，通过 `SCI_SETILEXER` 将实例交给 Scintilla。
 - 正则修改必须验证当前文档、打开文档和文件范围均走 Scintilla 语义，不得使用
   `QRegularExpression` 代替用户搜索引擎。
 - 修改第三方源码应仅限版本适配或主线集成所必需的局部变更。

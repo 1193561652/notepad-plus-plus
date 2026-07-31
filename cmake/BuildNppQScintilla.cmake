@@ -12,7 +12,7 @@ execute_process(
         "CONFIG+=${NPP_QSCINTILLA_CONFIG}"
         "NPP_QSCINTILLA_ROOT=${NPP_QSCINTILLA_ROOT}"
         "NPP_BOOSTREGEX_SOURCE_ROOT=${NPP_BOOSTREGEX_ROOT}"
-        "NPP_LEXUSER_SOURCE=${NPP_LEXUSER_SOURCE}"
+        "NPP_LEXILLA_ROOT=${NPP_LEXILLA_ROOT}"
     WORKING_DIRECTORY "${NPP_QSCINTILLA_BUILD_DIR}"
     RESULT_VARIABLE qmake_result
 )
@@ -49,3 +49,7 @@ execute_process(
 if(NOT copy_result EQUAL 0)
     message(FATAL_ERROR "Could not stage QScintilla static archive (${copy_result})")
 endif()
+
+# Keep the declared custom-command output newer than all dependencies even
+# when qmake determines that the archive contents did not change.
+file(TOUCH "${NPP_QSCINTILLA_OUTPUT}")
