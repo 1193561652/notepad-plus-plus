@@ -22,6 +22,33 @@
 #include <QLineEdit>
 #include <QToolButton>
 #include <QStyle>
+#include <QSlider>
+#include <QTextEdit>
+#include <QRegExp>
+
+namespace {
+
+QRect prefGeometry(int x, int y, int width, int height)
+{
+    return QRect(qRound(x * 1.45), qRound(y * 1.58),
+                 qRound(width * 1.45), qRound(height * 1.58));
+}
+
+template <typename T>
+T* placePreferenceControl(T* control, int x, int y, int width, int height)
+{
+    control->setGeometry(prefGeometry(x, y, width, height));
+    return control;
+}
+
+QWidget* preferenceCanvas()
+{
+    QWidget* page = new QWidget();
+    page->setFixedSize(660, 320);
+    return page;
+}
+
+} // namespace
 
 // ── 辅助：将内容 widget 包入 QScrollArea ─────────────────────────────────────
 QScrollArea* PreferenceDlg::wrapScroll(QWidget* inner)
@@ -39,8 +66,7 @@ PreferenceDlg::PreferenceDlg(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Preferences"));
-    setMinimumSize(760, 360);
-    resize(830, 372);
+    setFixedSize(830, 372);
     setupUi();
     loadSettings();
 }
@@ -50,11 +76,13 @@ void PreferenceDlg::setupUi()
     // 左侧列表
     _pageList = new QListWidget(this);
     _pageList->setObjectName("pageList");
-    _pageList->setFixedWidth(180);
+    _pageList->setGeometry(10, 10, 120, 330);
     _pageList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    _pageList->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     // 右侧堆叠
     _pageStack = new QStackedWidget(this);
+    _pageStack->setGeometry(158, 1, 666, 336);
 
     // 按原版顺序添加页面
     struct { QString name; QWidget* page; } pages[] = {
@@ -84,33 +112,48 @@ void PreferenceDlg::setupUi()
         _pageStack->addWidget(p.page);
     }
 
+    auto ensureStableName = [](QObject* object, const QString& source) {
+        if (!object->objectName().isEmpty() || source.trimmed().isEmpty())
+            return;
+        QString slug = source;
+        slug.remove(QLatin1Char('&'));
+        slug.replace(QRegExp(QStringLiteral("[^A-Za-z0-9]+")),
+                     QStringLiteral("_"));
+        slug = slug.left(72).trimmed();
+        if (!slug.isEmpty())
+            object->setObjectName(QStringLiteral("prefText_") + slug);
+    };
+    for (QLabel* label : findChildren<QLabel*>())
+        ensureStableName(label, label->text());
+    for (QGroupBox* group : findChildren<QGroupBox*>())
+        ensureStableName(group, group->title());
+    for (QAbstractButton* button : findChildren<QAbstractButton*>())
+        ensureStableName(button, button->text());
+
     connect(_pageList, &QListWidget::currentRowChanged,
             _pageStack, &QStackedWidget::setCurrentIndex);
     _pageList->setCurrentRow(0);
 
     // 分隔线
-    QFrame* sep = new QFrame();
+    QFrame* sep = new QFrame(this);
     sep->setFrameShape(QFrame::VLine);
     sep->setFrameShadow(QFrame::Sunken);
 
-    QHBoxLayout* body = new QHBoxLayout();
-    body->addWidget(_pageList);
-    body->addWidget(sep);
-    body->addWidget(_pageStack, 1);
+    sep->setGeometry(148, 8, 2, 332);
 
-    QDialogButtonBox* btns = new QDialogButtonBox(
-        QDialogButtonBox::Ok | QDialogButtonBox::Apply | QDialogButtonBox::Cancel, this);
-    btns->button(QDialogButtonBox::Ok)->setObjectName("btnPrefsOk");
-    btns->button(QDialogButtonBox::Apply)->setObjectName("btnPrefsApply");
-    btns->button(QDialogButtonBox::Cancel)->setObjectName("btnPrefsCancel");
-    connect(btns, &QDialogButtonBox::accepted, this, [this]{ onApply(); accept(); });
-    connect(btns, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    connect(btns->button(QDialogButtonBox::Apply), &QPushButton::clicked,
-            this, &PreferenceDlg::onApply);
+    QPushButton* closeButton = new QPushButton(tr("Close"), this);
+    closeButton->setObjectName("btnPrefsClose");
+    closeButton->setGeometry(380, 343, 70, 23);
+    connect(closeButton, &QPushButton::clicked, this, [this] {
+        onApply();
+        accept();
+    });
 
-    QVBoxLayout* main = new QVBoxLayout(this);
-    main->addLayout(body);
-    main->addWidget(btns);
+    setStyleSheet(QStringLiteral(
+        "QGroupBox { margin-top: 7px; }"
+        "QGroupBox::title { subcontrol-origin: margin; left: 7px; padding: 0 2px; }"
+        "QCheckBox, QRadioButton, QLabel { min-height: 17px; }"
+        "QListWidget::item { height: 16px; padding: 0 2px; }"));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,20 +163,55 @@ QWidget* PreferenceDlg::makePage_General()
 {
     QWidget* w = new QWidget();
     QVBoxLayout* lay = new QVBoxLayout(w);
+    lay->setContentsMargins(10, 8, 8, 6);
+    lay->setSpacing(4);
+
+    QHBoxLayout* localization = new QHBoxLayout();
+    QLabel* localizationLabel = new QLabel(tr("Localization:"), w);
+    localizationLabel->setObjectName("lblLocalization");
+    localization->addWidget(localizationLabel);
+    _languageCombo = new QComboBox(w);
+    _languageCombo->setObjectName("comboInterfaceLanguage");
+    _languageCombo->addItem(tr("English"), "en");
+    _languageCombo->addItem(tr("Chinese Simplified"), "zh_CN");
+    _languageCombo->setFixedWidth(145);
+    localization->addWidget(_languageCombo);
+    localization->addStretch();
+    lay->addLayout(localization);
+
+    QHBoxLayout* upper = new QHBoxLayout();
+    upper->setSpacing(8);
 
     // Toolbar
     QGroupBox* tbGroup = new QGroupBox(tr("Tool Bar"));
     tbGroup->setObjectName("grpToolBar");
     QVBoxLayout* tbLay = new QVBoxLayout(tbGroup);
+    tbLay->setContentsMargins(8, 8, 8, 5);
+    tbLay->setSpacing(0);
     _hideToolbarCB = new QCheckBox(tr("Hide"));
     _hideToolbarCB->setObjectName("chkHideToolbar");
     tbLay->addWidget(_hideToolbarCB);
-    lay->addWidget(tbGroup);
+    const QStringList toolbarModes = {
+        tr("Standard icons: small"), tr("Standard icons: large"),
+        tr("Fluent UI icons: small"), tr("Fluent UI icons: large"),
+        tr("Fluent UI icons: small (dark mode)")
+    };
+    for (int i = 0; i < toolbarModes.size(); ++i) {
+        QRadioButton* mode = new QRadioButton(toolbarModes.at(i), tbGroup);
+        mode->setObjectName(QStringLiteral("rbToolbarMode%1").arg(i));
+        mode->setProperty("toolbarIconSet", i);
+        mode->setChecked(i == 0);
+        tbLay->addWidget(mode);
+    }
+    tbGroup->setFixedWidth(220);
+    upper->addWidget(tbGroup);
 
     // Tab Bar
     QGroupBox* tabGroup = new QGroupBox(tr("Tab Bar"));
     tabGroup->setObjectName("grpTabBar");
     QGridLayout* tabLay = new QGridLayout(tabGroup);
+    tabLay->setContentsMargins(8, 8, 8, 5);
+    tabLay->setVerticalSpacing(0);
     _tabHideCB          = new QCheckBox(tr("Hide"));
     _tabHideCB->setObjectName("chkTabHide");
     _tabDragDropCB      = new QCheckBox(tr("Enable drag and drop"));
@@ -153,49 +231,54 @@ QWidget* PreferenceDlg::makePage_General()
     _tabQuitOnEmptyCB   = new QCheckBox(tr("Exit program when last tab is closed"));
     _tabQuitOnEmptyCB->setObjectName("chkTabQuitOnEmpty");
 
+    QCheckBox* reduceTabBar = new QCheckBox(tr("Reduce"));
+    QCheckBox* alternateIcons = new QCheckBox(tr("Use alternate icons"));
+    QCheckBox* lockTabBar = new QCheckBox(tr("Lock (no drag and drop)"));
+    reduceTabBar->setObjectName("chkTabReduce");
+    alternateIcons->setObjectName("chkTabAlternateIcons");
+    lockTabBar->setObjectName("chkTabLock");
     tabLay->addWidget(_tabHideCB,          0, 0);
-    tabLay->addWidget(_tabDragDropCB,      1, 0);
-    tabLay->addWidget(_tabTopBarCB,        2, 0);
-    tabLay->addWidget(_tabInactiveTabCB,   3, 0);
-    tabLay->addWidget(_tabCloseBtnCB,      0, 1);
-    tabLay->addWidget(_tabDblClickCloseCB, 1, 1);
-    tabLay->addWidget(_tabVerticalCB,      2, 1);
-    tabLay->addWidget(_tabMultiLineCB,     3, 1);
-    tabLay->addWidget(_tabQuitOnEmptyCB,   4, 0, 1, 2);
-    lay->addWidget(tabGroup);
+    tabLay->addWidget(_tabMultiLineCB,     1, 0);
+    tabLay->addWidget(_tabVerticalCB,      2, 0);
+    tabLay->addWidget(reduceTabBar,        3, 0);
+    tabLay->addWidget(alternateIcons,      4, 0);
+    tabLay->addWidget(lockTabBar,          5, 0);
+    tabLay->addWidget(_tabInactiveTabCB,   0, 1);
+    tabLay->addWidget(_tabTopBarCB,        1, 1);
+    tabLay->addWidget(_tabCloseBtnCB,      2, 1);
+    tabLay->addWidget(_tabDblClickCloseCB, 3, 1);
+    tabLay->addWidget(_tabQuitOnEmptyCB,   4, 1);
+    _tabDragDropCB->hide();
+    connect(lockTabBar, &QCheckBox::toggled, this,
+            [this](bool locked) { _tabDragDropCB->setChecked(!locked); });
+    upper->addWidget(tabGroup, 1);
+    lay->addLayout(upper);
 
     connect(_tabHideCB, &QCheckBox::toggled,
             this, &PreferenceDlg::onTabHideToggled);
 
     // Status / Menu bar
-    QGroupBox* barGroup = new QGroupBox(tr("Status Bar / Menu Bar"));
+    QGroupBox* barGroup = new QGroupBox(tr("Menu"));
     barGroup->setObjectName("grpBarGroup");
     QVBoxLayout* barLay = new QVBoxLayout(barGroup);
     _showStatusBarCB = new QCheckBox(tr("Show status bar"));
     _showStatusBarCB->setObjectName("chkShowStatusBar");
     _showMenuBarCB   = new QCheckBox(tr("Show menu bar"));
     _showMenuBarCB->setObjectName("chkShowMenuBar");
-    barLay->addWidget(_showStatusBarCB);
     barLay->addWidget(_showMenuBarCB);
-    lay->addWidget(barGroup);
+    QHBoxLayout* bottom = new QHBoxLayout();
+    bottom->addWidget(_showStatusBarCB);
+    bottom->addWidget(barGroup, 1);
+    barGroup->setFixedHeight(58);
+    lay->addStretch();
+    lay->addLayout(bottom);
+
+    _fontCombo = new QFontComboBox(w);
+    _fontSizeSB = new QSpinBox(w);
+    _fontCombo->hide();
+    _fontSizeSB->hide();
 
     // Editor Font（原版在 Style Configurator，此处简化）
-    QGroupBox* fontGroup = new QGroupBox(tr("Editor Font"));
-    fontGroup->setObjectName("grpEditorFont");
-    QHBoxLayout* fontLay = new QHBoxLayout(fontGroup);
-    _fontCombo = new QFontComboBox();
-    _fontCombo->setFontFilters(QFontComboBox::MonospacedFonts);
-    _fontSizeSB = new QSpinBox();
-    _fontSizeSB->setRange(6, 72);
-    _fontSizeSB->setSuffix(" pt");
-    QLabel* lblFontSize = new QLabel(tr("Size:"));
-    lblFontSize->setObjectName("lblFontSize");
-    fontLay->addWidget(_fontCombo, 1);
-    fontLay->addWidget(lblFontSize);
-    fontLay->addWidget(_fontSizeSB);
-    lay->addWidget(fontGroup);
-
-    lay->addStretch();
     return wrapScroll(w);
 }
 
@@ -205,7 +288,9 @@ QWidget* PreferenceDlg::makePage_General()
 QWidget* PreferenceDlg::makePage_Editing()
 {
     QWidget* w = new QWidget();
-    QVBoxLayout* lay = new QVBoxLayout(w);
+    QGridLayout* lay = new QGridLayout(w);
+    lay->setContentsMargins(10, 8, 8, 8);
+    lay->setSpacing(8);
 
     // Caret / Cursor behaviour
     QGroupBox* editGroup = new QGroupBox(tr("Caret & Scrolling"));
@@ -217,7 +302,7 @@ QWidget* PreferenceDlg::makePage_Editing()
     _scrollBeyondLastLineCB->setObjectName("chkScrollBeyondLastLine");
     editLay->addWidget(_autoIndentCB);
     editLay->addWidget(_scrollBeyondLastLineCB);
-    lay->addWidget(editGroup);
+    lay->addWidget(editGroup, 0, 2);
 
     // Line Wrap
     QGroupBox* wrapGroup = new QGroupBox(tr("Line Wrap"));
@@ -238,7 +323,7 @@ QWidget* PreferenceDlg::makePage_Editing()
     wrapLay->addWidget(_lwDefaultRB);
     wrapLay->addWidget(_lwAlignRB);
     wrapLay->addWidget(_lwIndentRB);
-    lay->addWidget(wrapGroup);
+    lay->addWidget(wrapGroup, 0, 1);
 
     // Display
     QGroupBox* dispGroup = new QGroupBox(tr("Display"));
@@ -250,9 +335,24 @@ QWidget* PreferenceDlg::makePage_Editing()
     _showEolCB->setObjectName("chkShowEol");
     dispLay->addWidget(_showWhitespaceCB);
     dispLay->addWidget(_showEolCB);
-    lay->addWidget(dispGroup);
-
-    lay->addStretch();
+    lay->addWidget(dispGroup, 0, 0);
+    QGroupBox* options = new QGroupBox(tr("Editing options"), w);
+    options->setObjectName("grpEditingOptions");
+    QGridLayout* optionLayout = new QGridLayout(options);
+    QCheckBox* smoothFont = new QCheckBox(tr("Enable smooth font"), options);
+    smoothFont->setObjectName("chkSmoothFont");
+    QCheckBox* virtualSpace = new QCheckBox(tr("Enable virtual space"), options);
+    virtualSpace->setObjectName("chkVirtualSpace");
+    QCheckBox* multiEditing = new QCheckBox(tr("Enable multi-editing"), options);
+    multiEditing->setObjectName("chkMultiEditing");
+    QCheckBox* rightClickKeeps = new QCheckBox(tr("Right click keeps selection"), options);
+    rightClickKeeps->setObjectName("chkRightClickKeepsSelection");
+    optionLayout->addWidget(smoothFont, 0, 0);
+    optionLayout->addWidget(virtualSpace, 1, 0);
+    optionLayout->addWidget(multiEditing, 0, 1);
+    optionLayout->addWidget(rightClickKeeps, 1, 1);
+    lay->addWidget(options, 1, 0, 1, 3);
+    lay->setRowStretch(2, 1);
     return wrapScroll(w);
 }
 
@@ -261,52 +361,86 @@ QWidget* PreferenceDlg::makePage_Editing()
 // ─────────────────────────────────────────────────────────────────────────────
 QWidget* PreferenceDlg::makePage_MarginsBorderEdge()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* lay = new QVBoxLayout(w);
+    QWidget* w = preferenceCanvas();
+    QGroupBox* fold = placePreferenceControl(
+        new QGroupBox(tr("Fold Margin Style"), w), 22, 21, 83, 89);
+    const QStringList foldStyles = {
+        tr("Simple"), tr("Arrow"), tr("Circle tree"), tr("Box tree"), tr("None")
+    };
+    for (int i = 0; i < foldStyles.size(); ++i) {
+        QRadioButton* radio = placePreferenceControl(
+            new QRadioButton(foldStyles.at(i), fold), 9, 12 + i * 14, 68, 12);
+        if (i == 3) radio->setChecked(true);
+        if (i == 4) connect(radio, &QRadioButton::toggled, this,
+                            [this](bool none) { _foldMarginCB->setChecked(!none); });
+    }
+    Q_UNUSED(fold);
 
-    // Margins
-    QGroupBox* marginGroup = new QGroupBox(tr("Margins"));
-    marginGroup->setObjectName("grpMargins");
-    QVBoxLayout* marginLay = new QVBoxLayout(marginGroup);
-    _lineNumberMarginCB     = new QCheckBox(tr("Show line number margin"));
-    _lineNumberMarginCB->setObjectName("chkLineNumbers");
-    _bookMarkMarginCB       = new QCheckBox(tr("Show bookmark margin"));
-    _bookMarkMarginCB->setObjectName("chkBookmarkMargin");
-    _foldMarginCB           = new QCheckBox(tr("Show fold margin"));
-    _foldMarginCB->setObjectName("chkFoldMargin");
-    _indentGuideLineCB      = new QCheckBox(tr("Show indent guide line"));
-    _indentGuideLineCB->setObjectName("chkIndentGuideLine");
-    _currentLineHighlightCB = new QCheckBox(tr("Highlight current line"));
-    _currentLineHighlightCB->setObjectName("chkCurrentLineHighlight");
-    _wrapSymbolShowCB       = new QCheckBox(tr("Show wrap symbol at line end"));
-    _wrapSymbolShowCB->setObjectName("chkWrapSymbolShow");
-    marginLay->addWidget(_lineNumberMarginCB);
-    marginLay->addWidget(_bookMarkMarginCB);
-    marginLay->addWidget(_foldMarginCB);
-    marginLay->addWidget(_indentGuideLineCB);
-    marginLay->addWidget(_currentLineHighlightCB);
-    marginLay->addWidget(_wrapSymbolShowCB);
-    lay->addWidget(marginGroup);
-
-    // Vertical Edge Line
-    QGroupBox* edgeGroup = new QGroupBox(tr("Vertical Edge Line"));
-    edgeGroup->setObjectName("grpEdgeLine");
-    QHBoxLayout* edgeLay = new QHBoxLayout(edgeGroup);
-    _edgeShowCB     = new QCheckBox(tr("Show vertical edge at column:"));
+    QGroupBox* edgeGroup = placePreferenceControl(
+        new QGroupBox(tr("Vertical Edge Settings"), w), 116, 21, 148, 136);
+    QLabel* edgeHelp = placePreferenceControl(new QLabel(
+        tr("Add column markers with decimal numbers.\n"
+           "Separate several markers with spaces."), edgeGroup),
+        8, 12, 134, 47);
+    edgeHelp->setWordWrap(true);
+    _edgeShowCB = placePreferenceControl(
+        new QCheckBox(tr("Display"), edgeGroup), 10, 63, 60, 12);
     _edgeShowCB->setObjectName("chkEdgeShow");
-    _edgeColumnLabel = new QLabel(tr("Column:"));
+    _edgeColumnLabel = placePreferenceControl(
+        new QLabel(tr("Column:"), edgeGroup), 10, 79, 55, 12);
     _edgeColumnLabel->setObjectName("lblEdgeColumn");
-    _edgeColumnSB   = new QSpinBox();
+    _edgeColumnSB = placePreferenceControl(new QSpinBox(edgeGroup), 65, 76, 68, 16);
     _edgeColumnSB->setRange(1, 500);
-    edgeLay->addWidget(_edgeShowCB);
-    edgeLay->addWidget(_edgeColumnSB);
-    edgeLay->addStretch();
+    placePreferenceControl(new QCheckBox(tr("Background mode"), edgeGroup),
+                           10, 105, 125, 12);
 
+    QGroupBox* border = placePreferenceControl(
+        new QGroupBox(tr("Border Width"), w), 22, 112, 83, 45);
+    QSlider* borderWidth = placePreferenceControl(
+        new QSlider(Qt::Horizontal, border), 7, 13, 60, 14);
+    borderWidth->setRange(0, 4);
+    placePreferenceControl(new QCheckBox(tr("No edge"), border), 7, 28, 65, 12);
+
+    QGroupBox* lineNumber = placePreferenceControl(
+        new QGroupBox(tr("Line Number"), w), 274, 21, 135, 66);
+    _lineNumberMarginCB = placePreferenceControl(
+        new QCheckBox(tr("Display"), lineNumber), 7, 12, 85, 12);
+    _lineNumberMarginCB->setObjectName("chkLineNumbers");
+    QRadioButton* dynamicWidth = placePreferenceControl(
+        new QRadioButton(tr("Dynamic width"), lineNumber), 18, 28, 110, 12);
+    placePreferenceControl(new QRadioButton(tr("Constant width"), lineNumber),
+                           18, 43, 110, 12);
+    dynamicWidth->setChecked(true);
+
+    QGroupBox* padding = placePreferenceControl(
+        new QGroupBox(tr("Padding"), w), 274, 94, 135, 63);
+    placePreferenceControl(new QLabel(tr("Left"), padding), 8, 13, 35, 12);
+    placePreferenceControl(new QSlider(Qt::Horizontal, padding), 45, 10, 78, 14);
+    placePreferenceControl(new QLabel(tr("Right"), padding), 8, 29, 35, 12);
+    placePreferenceControl(new QSlider(Qt::Horizontal, padding), 45, 26, 78, 14);
+    placePreferenceControl(new QLabel(tr("Distraction Free"), padding), 8, 45, 72, 12);
+    placePreferenceControl(new QSlider(Qt::Horizontal, padding), 82, 42, 41, 14);
+
+    _bookMarkMarginCB = placePreferenceControl(
+        new QCheckBox(tr("Display bookmark"), w), 281, 163, 145, 12);
+    _bookMarkMarginCB->setObjectName("chkBookmarkMargin");
+    placePreferenceControl(new QCheckBox(tr("Display Change History"), w),
+                           120, 163, 150, 12);
+
+    _foldMarginCB = new QCheckBox(w);
+    _foldMarginCB->setObjectName("chkFoldMargin");
+    _foldMarginCB->hide();
+    _indentGuideLineCB = new QCheckBox(w);
+    _indentGuideLineCB->setObjectName("chkIndentGuideLine");
+    _indentGuideLineCB->hide();
+    _currentLineHighlightCB = new QCheckBox(w);
+    _currentLineHighlightCB->setObjectName("chkCurrentLineHighlight");
+    _currentLineHighlightCB->hide();
+    _wrapSymbolShowCB = new QCheckBox(w);
+    _wrapSymbolShowCB->setObjectName("chkWrapSymbolShow");
+    _wrapSymbolShowCB->hide();
     connect(_edgeShowCB, &QCheckBox::toggled, _edgeColumnSB, &QSpinBox::setEnabled);
-
-    lay->addWidget(edgeGroup);
-    lay->addStretch();
-    return wrapScroll(w);
+    return w;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -314,44 +448,53 @@ QWidget* PreferenceDlg::makePage_MarginsBorderEdge()
 // ─────────────────────────────────────────────────────────────────────────────
 QWidget* PreferenceDlg::makePage_NewDocument()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* lay = new QVBoxLayout(w);
-
-    // Format (line ending)
-    QGroupBox* fmtGroup = new QGroupBox(tr("Format (line ending)"));
+    QWidget* w = preferenceCanvas();
+    placePreferenceControl(new QGroupBox(tr("New Document"), w), 15, 8, 424, 161);
+    QGroupBox* fmtGroup = placePreferenceControl(
+        new QGroupBox(tr("Format (Line ending)"), w), 58, 29, 129, 79);
     fmtGroup->setObjectName("grpFormat");
-    QVBoxLayout* fmtLay = new QVBoxLayout(fmtGroup);
-    _fmtWindowsRB = new QRadioButton(tr("Windows (CR LF)"));
+    _fmtWindowsRB = placePreferenceControl(
+        new QRadioButton(tr("Windows (CR LF)"), fmtGroup), 7, 16, 105, 12);
     _fmtWindowsRB->setObjectName("rbFmtWindows");
-    _fmtUnixRB    = new QRadioButton(tr("Unix (LF)"));
+    _fmtUnixRB = placePreferenceControl(
+        new QRadioButton(tr("Unix (LF)"), fmtGroup), 7, 32, 105, 12);
     _fmtUnixRB->setObjectName("rbFmtUnix");
-    _fmtMacRB     = new QRadioButton(tr("Macintosh (CR)"));
+    _fmtMacRB = placePreferenceControl(
+        new QRadioButton(tr("Macintosh (CR)"), fmtGroup), 7, 48, 105, 12);
     _fmtMacRB->setObjectName("rbFmtMac");
-    fmtLay->addWidget(_fmtWindowsRB);
-    fmtLay->addWidget(_fmtUnixRB);
-    fmtLay->addWidget(_fmtMacRB);
-    lay->addWidget(fmtGroup);
 
-    // Encoding
-    QGroupBox* encGroup = new QGroupBox(tr("Encoding"));
+    QGroupBox* encGroup = placePreferenceControl(
+        new QGroupBox(tr("Encoding"), w), 232, 28, 175, 122);
     encGroup->setObjectName("grpEncoding");
-    QHBoxLayout* encLay = new QHBoxLayout(encGroup);
-    _encodingCombo = new QComboBox();
+    _encodingCombo = new QComboBox(encGroup);
     _encodingCombo->setObjectName("comboDefaultEncoding");
-    _encodingCombo->addItem(tr("ANSI"),              0);  // uni8Bit
-    _encodingCombo->addItem(tr("UTF-8"),             1);  // uniUTF8
-    _encodingCombo->addItem(tr("UTF-8 with BOM"),    4);  // uniCookie
-    _encodingCombo->addItem(tr("UCS-2 Big Endian"),  2);  // uni16BE
-    _encodingCombo->addItem(tr("UCS-2 Little Endian"), 3); // uni16LE
-    QLabel* lblDefaultEncoding = new QLabel(tr("Default encoding:"));
-    lblDefaultEncoding->setObjectName("lblDefaultEncoding");
-    encLay->addWidget(lblDefaultEncoding);
-    encLay->addWidget(_encodingCombo);
-    encLay->addStretch();
-    lay->addWidget(encGroup);
-
-    lay->addStretch();
-    return wrapScroll(w);
+    const QList<QPair<QString, int>> encodings = {
+        {tr("ANSI"), 0}, {tr("UTF-8"), 1}, {tr("UTF-8 with BOM"), 4},
+        {tr("UTF-16 Big Endian with BOM"), 2},
+        {tr("UTF-16 Little Endian with BOM"), 3}
+    };
+    for (int i = 0; i < encodings.size(); ++i) {
+        _encodingCombo->addItem(encodings.at(i).first, encodings.at(i).second);
+        QRadioButton* radio = placePreferenceControl(
+            new QRadioButton(encodings.at(i).first, encGroup),
+            10, 10 + i * 18 + (i > 1 ? 14 : 0), 155, 14);
+        connect(radio, &QRadioButton::toggled, this, [this, i](bool checked) {
+            if (checked) _encodingCombo->setCurrentIndex(i);
+        });
+        connect(_encodingCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                radio, [radio, i](int index) { radio->setChecked(index == i); });
+    }
+    _encodingCombo->hide();
+    _openAnsiAsUtf8CB = placePreferenceControl(
+        new QCheckBox(tr("Apply to opened ANSI files"), encGroup), 20, 41, 145, 14);
+    _openAnsiAsUtf8CB->setObjectName("chkOpenAnsiAsUtf8");
+    QLabel* languageLabel = placePreferenceControl(
+        new QLabel(tr("Default language:"), w), 16, 130, 77, 14);
+    languageLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    QComboBox* defaultLanguage = placePreferenceControl(
+        new QComboBox(w), 98, 128, 100, 17);
+    defaultLanguage->addItems({tr("Normal Text"), tr("C++"), tr("HTML"), tr("Python")});
+    return w;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -359,25 +502,32 @@ QWidget* PreferenceDlg::makePage_NewDocument()
 // ─────────────────────────────────────────────────────────────────────────────
 QWidget* PreferenceDlg::makePage_RecentFilesHistory()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* lay = new QVBoxLayout(w);
-
-    QGroupBox* grp = new QGroupBox(tr("Recent Files History"));
+    QWidget* w = preferenceCanvas();
+    QGroupBox* grp = placePreferenceControl(
+        new QGroupBox(tr("Recent Files History"), w), 104, 25, 260, 126);
     grp->setObjectName("grpRecentFiles");
-    QGridLayout* g = new QGridLayout(grp);
-    QLabel* lblMaxRecentFiles = new QLabel(tr("Max number of entries:"));
+    _checkHistoryFilesCB = placePreferenceControl(
+        new QCheckBox(tr("Don't check at launch time"), grp), 17, 12, 180, 13);
+    _checkHistoryFilesCB->setObjectName("chkDontCheckHistory");
+    QLabel* lblMaxRecentFiles = placePreferenceControl(
+        new QLabel(tr("Max. number of entries:"), grp), 8, 29, 112, 14);
     lblMaxRecentFiles->setObjectName("lblMaxRecentFiles");
-    g->addWidget(lblMaxRecentFiles, 0, 0);
-    _maxRecentFilesSB = new QSpinBox();
+    lblMaxRecentFiles->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    _maxRecentFilesSB = placePreferenceControl(new QSpinBox(grp), 124, 27, 45, 17);
     _maxRecentFilesSB->setRange(0, 30);
-    g->addWidget(_maxRecentFilesSB, 0, 1);
-    _recentInSubMenuCB = new QCheckBox(tr("In sub-menu"));
+    QGroupBox* display = placePreferenceControl(
+        new QGroupBox(tr("Display"), grp), 17, 40, 225, 73);
+    _recentInSubMenuCB = placePreferenceControl(
+        new QCheckBox(tr("In Submenu"), display), 11, 10, 100, 13);
     _recentInSubMenuCB->setObjectName("chkRecentInSubMenu");
-    g->addWidget(_recentInSubMenuCB, 1, 0, 1, 2);
-    lay->addWidget(grp);
-
-    lay->addStretch();
-    return wrapScroll(w);
+    placePreferenceControl(new QRadioButton(tr("Only File Name"), display),
+                           11, 27, 170, 13);
+    QRadioButton* full = placePreferenceControl(
+        new QRadioButton(tr("Full File Name Path"), display), 11, 42, 170, 13);
+    full->setChecked(true);
+    placePreferenceControl(new QRadioButton(tr("Customize Maximum Length:"), display),
+                           11, 57, 190, 13);
+    return w;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -386,26 +536,61 @@ QWidget* PreferenceDlg::makePage_RecentFilesHistory()
 QWidget* PreferenceDlg::makePage_Language()
 {
     QWidget* w = new QWidget();
-    QVBoxLayout* lay = new QVBoxLayout(w);
+    QHBoxLayout* lay = new QHBoxLayout(w);
+    lay->setContentsMargins(10, 18, 10, 12);
+    lay->setSpacing(8);
 
-    QGroupBox* grp = new QGroupBox(tr("Interface Language"));
-    grp->setObjectName("grpInterfaceLang");
-    QVBoxLayout* grpLay = new QVBoxLayout(grp);
+    QGroupBox* menuGroup = new QGroupBox(tr("Language Menu"), w);
+    menuGroup->setObjectName("grpLanguageMenu");
+    QGridLayout* menuLayout = new QGridLayout(menuGroup);
+    QListWidget* available = new QListWidget(menuGroup);
+    QListWidget* excluded = new QListWidget(menuGroup);
+    available->addItems({"Normal Text", "PHP", "C", "C++", "C#", "Java",
+                         "HTML", "XML", "JavaScript", "Python", "JSON"});
+    QPushButton* exclude = new QPushButton(">", menuGroup);
+    QPushButton* include = new QPushButton("<", menuGroup);
+    exclude->setFixedWidth(28);
+    include->setFixedWidth(28);
+    QLabel* availableLabel = new QLabel(tr("Available items:"), menuGroup);
+    availableLabel->setObjectName("lblAvailableLanguages");
+    QLabel* disabledLabel = new QLabel(tr("Disabled items:"), menuGroup);
+    disabledLabel->setObjectName("lblDisabledLanguages");
+    menuLayout->addWidget(availableLabel, 0, 0);
+    menuLayout->addWidget(disabledLabel, 0, 2);
+    menuLayout->addWidget(available, 1, 0, 3, 1);
+    menuLayout->addWidget(exclude, 1, 1);
+    menuLayout->addWidget(include, 2, 1);
+    menuLayout->addWidget(excluded, 1, 2, 3, 1);
+    connect(exclude, &QPushButton::clicked, this, [available, excluded]() {
+        if (QListWidgetItem* item = available->takeItem(available->currentRow()))
+            excluded->addItem(item);
+    });
+    connect(include, &QPushButton::clicked, this, [available, excluded]() {
+        if (QListWidgetItem* item = excluded->takeItem(excluded->currentRow()))
+            available->addItem(item);
+    });
+    lay->addWidget(menuGroup, 3);
 
-    QHBoxLayout* row = new QHBoxLayout();
-    QLabel* lblLanguage = new QLabel(tr("Language:"));
-    lblLanguage->setObjectName("lblLanguage");
-    row->addWidget(lblLanguage);
-    _languageCombo = new QComboBox();
-    _languageCombo->setObjectName("comboInterfaceLanguage");
-    _languageCombo->addItem(tr("English"),            "en");
-    _languageCombo->addItem(tr("Chinese Simplified"), "zh_CN");
-    row->addWidget(_languageCombo);
-    row->addStretch();
-
-    grpLay->addLayout(row);
-    lay->addWidget(grp);
-    lay->addStretch();
+    QGroupBox* tabGroup = new QGroupBox(tr("Tab Settings"), w);
+    tabGroup->setObjectName("grpLanguageTabSettings");
+    QVBoxLayout* tabLayout = new QVBoxLayout(tabGroup);
+    QListWidget* languages = new QListWidget(tabGroup);
+    languages->addItems({"Default", "Normal", "PHP", "C", "C++", "Java",
+                         "HTML", "XML", "JavaScript", "Python"});
+    tabLayout->addWidget(languages);
+    QHBoxLayout* tabSize = new QHBoxLayout();
+    QLabel* tabSizeLabel = new QLabel(tr("Tab size:"), tabGroup);
+    tabSizeLabel->setObjectName("lblLanguageTabSize");
+    tabSize->addWidget(tabSizeLabel);
+    QSpinBox* size = new QSpinBox(tabGroup);
+    size->setRange(1, 16);
+    size->setValue(4);
+    tabSize->addWidget(size);
+    tabLayout->addLayout(tabSize);
+    QCheckBox* replaceBySpace = new QCheckBox(tr("Replace by space"), tabGroup);
+    replaceBySpace->setObjectName("chkLanguageReplaceBySpace");
+    tabLayout->addWidget(replaceBySpace);
+    lay->addWidget(tabGroup, 2);
     return wrapScroll(w);
 }
 
@@ -414,33 +599,63 @@ QWidget* PreferenceDlg::makePage_Language()
 // ─────────────────────────────────────────────────────────────────────────────
 QWidget* PreferenceDlg::makePage_Backup()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* lay = new QVBoxLayout(w);
+    QWidget* w = preferenceCanvas();
+    QGroupBox* snapGroup = placePreferenceControl(
+        new QGroupBox(tr("Session snapshot and periodic backup"), w),
+        79, 1, 289, 75);
+    snapGroup->setObjectName("grpSnapshot");
+    _restoreSessionCB = placePreferenceControl(
+        new QCheckBox(tr("Remember current session for next launch"), snapGroup),
+        11, 8, 270, 13);
+    _restoreSessionCB->setObjectName("chkRestoreSession");
+    _snapshotModeCB = placePreferenceControl(
+        new QCheckBox(tr("Enable session snapshot and periodic backup"), snapGroup),
+        11, 24, 270, 13);
+    _snapshotModeCB->setObjectName("chkSnapshotMode");
+    QLabel* every = placePreferenceControl(
+        new QLabel(tr("Backup in every"), snapGroup), 3, 41, 78, 13);
+    every->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    _snapshotTimingSB = placePreferenceControl(
+        new QSpinBox(snapGroup), 85, 38, 48, 17);
+    _snapshotTimingSB->setObjectName("spinSnapshotTiming");
+    _snapshotTimingSB->setRange(1, 600);
+    _snapshotTimingLabel = placePreferenceControl(
+        new QLabel(tr("seconds"), snapGroup), 137, 41, 66, 13);
+    QLabel* pathLabel = placePreferenceControl(
+        new QLabel(tr("Backup path:"), snapGroup), 6, 58, 61, 13);
+    pathLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    QLineEdit* snapshotPath = placePreferenceControl(
+        new QLineEdit(snapGroup), 74, 55, 208, 17);
+    snapshotPath->setReadOnly(true);
+    snapshotPath->setText(QDir::toNativeSeparators(
+        NppParameters::getInstance().backupDirPath()));
+    snapshotPath->setCursorPosition(0);
 
-    // Backup mode
-    QGroupBox* modeGroup = new QGroupBox(tr("Backup on save"));
+    QGroupBox* modeGroup = placePreferenceControl(
+        new QGroupBox(tr("Backup on save"), w), 79, 81, 289, 101);
     modeGroup->setObjectName("grpBackupSave");
-    QVBoxLayout* modeLay = new QVBoxLayout(modeGroup);
-    _backupNoneRB    = new QRadioButton(tr("None"));
+    _backupNoneRB = placePreferenceControl(
+        new QRadioButton(tr("None"), modeGroup), 25, 8, 120, 13);
     _backupNoneRB->setObjectName("rbBackupNone");
-    _backupSimpleRB  = new QRadioButton(tr("Simple backup"));
+    _backupSimpleRB = placePreferenceControl(
+        new QRadioButton(tr("Simple backup"), modeGroup), 25, 23, 150, 13);
     _backupSimpleRB->setObjectName("rbBackupSimple");
-    _backupVerboseRB = new QRadioButton(tr("Verbose backup (suffix with timestamp)"));
+    _backupVerboseRB = placePreferenceControl(
+        new QRadioButton(tr("Verbose backup"), modeGroup), 25, 38, 150, 13);
     _backupVerboseRB->setObjectName("rbBackupVerbose");
-    modeLay->addWidget(_backupNoneRB);
-    modeLay->addWidget(_backupSimpleRB);
-    modeLay->addWidget(_backupVerboseRB);
-    _backupCustomDirCB = new QCheckBox(tr("Use custom backup directory"));
+    QGroupBox* custom = placePreferenceControl(
+        new QGroupBox(tr("Custom Backup Directory"), modeGroup), 16, 52, 260, 40);
+    _backupCustomDirCB = placePreferenceControl(
+        new QCheckBox(custom), -4, -1, 14, 14);
     _backupCustomDirCB->setObjectName("chkBackupCustomDir");
-    _backupDirEdit = new QLineEdit();
-    QPushButton* browseBackupDir = new QPushButton(tr("..."));
+    QLabel* directory = placePreferenceControl(
+        new QLabel(tr("Directory:"), custom), 4, 15, 50, 13);
+    directory->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    _backupDirEdit = placePreferenceControl(
+        new QLineEdit(custom), 56, 12, 179, 17);
+    QPushButton* browseBackupDir = placePreferenceControl(
+        new QPushButton(QStringLiteral("..."), custom), 238, 11, 18, 18);
     browseBackupDir->setObjectName("btnBackupDirBrowse");
-    browseBackupDir->setFixedWidth(32);
-    QHBoxLayout* backupDirRow = new QHBoxLayout();
-    backupDirRow->addWidget(_backupDirEdit, 1);
-    backupDirRow->addWidget(browseBackupDir);
-    modeLay->addWidget(_backupCustomDirCB);
-    modeLay->addLayout(backupDirRow);
     connect(_backupCustomDirCB, &QCheckBox::toggled,
             _backupDirEdit, &QWidget::setEnabled);
     connect(_backupCustomDirCB, &QCheckBox::toggled,
@@ -451,32 +666,9 @@ QWidget* PreferenceDlg::makePage_Backup()
         if (!directory.isEmpty())
             _backupDirEdit->setText(QDir::toNativeSeparators(directory));
     });
-    lay->addWidget(modeGroup);
-
-    // Snapshot
-    QGroupBox* snapGroup = new QGroupBox(tr("Session Snapshot and Periodic Backup"));
-    snapGroup->setObjectName("grpSnapshot");
-    QGridLayout* snapLay = new QGridLayout(snapGroup);
-    _snapshotModeCB    = new QCheckBox(tr("Enable session snapshot and periodic backup every"));
-    _snapshotModeCB->setObjectName("chkSnapshotMode");
-    _snapshotTimingSB  = new QSpinBox();
-    _snapshotTimingSB->setObjectName("spinSnapshotTiming");
-    _snapshotTimingSB->setRange(1, 600);
-    _snapshotTimingSB->setSuffix(tr(" seconds"));
-    _snapshotTimingLabel = new QLabel(tr("seconds"));
-
-    snapLay->addWidget(_snapshotModeCB,   0, 0, 1, 2);
-    QLabel* backupIntervalLabel = new QLabel(tr("Backup interval:"));
-    backupIntervalLabel->setObjectName("lblBackupInterval");
-    snapLay->addWidget(backupIntervalLabel, 1, 0);
-    snapLay->addWidget(_snapshotTimingSB, 1, 1);
-
     connect(_snapshotModeCB, &QCheckBox::toggled,
             this, &PreferenceDlg::onSnapshotModeToggled);
-
-    lay->addWidget(snapGroup);
-    lay->addStretch();
-    return wrapScroll(w);
+    return w;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -484,79 +676,83 @@ QWidget* PreferenceDlg::makePage_Backup()
 // ─────────────────────────────────────────────────────────────────────────────
 QWidget* PreferenceDlg::makePage_AutoCompletion()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* lay = new QVBoxLayout(w);
-
-    // Enable
-    QGroupBox* acGroup = new QGroupBox(tr("Auto-Completion"));
+    QWidget* w = preferenceCanvas();
+    QCheckBox* autoIndent = placePreferenceControl(
+        new QCheckBox(tr("Auto-indent"), w), 347, 15, 100, 13);
+    connect(autoIndent, &QCheckBox::toggled, _autoIndentCB, &QCheckBox::setChecked);
+    connect(_autoIndentCB, &QCheckBox::toggled, autoIndent, &QCheckBox::setChecked);
+    QGroupBox* acGroup = placePreferenceControl(
+        new QGroupBox(tr("Auto-Completion"), w), 33, 4, 289, 90);
     acGroup->setObjectName("grpAutoCompletion");
-    QGridLayout* acLay = new QGridLayout(acGroup);
-    _acEnableCB    = new QCheckBox(tr("Enable auto-completion on each input"));
+    _acEnableCB = placePreferenceControl(
+        new QCheckBox(tr("Enable auto-completion on each input"), acGroup),
+        5, 9, 150, 13);
     _acEnableCB->setObjectName("chkAcEnable");
-    _acNoneRB      = new QRadioButton(tr("None"));
+    _acNoneRB = new QRadioButton(acGroup);
+    _acNoneRB->hide();
     _acNoneRB->setObjectName("rbAcNone");
-    _acFunctionRB  = new QRadioButton(tr("Function completion"));
+    _acFunctionRB = placePreferenceControl(
+        new QRadioButton(tr("Function completion"), acGroup), 27, 22, 145, 13);
     _acFunctionRB->setObjectName("rbAcFunction");
-    _acWordRB      = new QRadioButton(tr("Word completion"));
+    _acWordRB = placePreferenceControl(
+        new QRadioButton(tr("Word completion"), acGroup), 27, 37, 145, 13);
     _acWordRB->setObjectName("rbAcWord");
-    _acBothRB      = new QRadioButton(tr("Function and word completion"));
+    _acBothRB = placePreferenceControl(
+        new QRadioButton(tr("Function and word completion"), acGroup), 27, 52, 145, 13);
     _acBothRB->setObjectName("rbAcBoth");
-    _acFromNbCharLabel = new QLabel(tr("Trigger from"));
+    _acFromNbCharLabel = placePreferenceControl(
+        new QLabel(tr("From"), acGroup), 160, 7, 42, 13);
     _acFromNbCharLabel->setObjectName("lblAcFromNbChar");
-    _acFromNbCharSB = new QSpinBox();
+    _acFromNbCharSB = placePreferenceControl(new QSpinBox(acGroup), 205, 4, 42, 17);
     _acFromNbCharSB->setObjectName("spinAcFromNbChar");
     _acFromNbCharSB->setRange(1, 9);
-    _acFromNbCharSB->setSuffix(tr(" characters"));
-    _acIgnoreNumbersCB = new QCheckBox(tr("Ignore numbers"));
+    placePreferenceControl(new QLabel(tr("th character"), acGroup), 250, 7, 55, 13);
+    _acIgnoreNumbersCB = placePreferenceControl(
+        new QCheckBox(tr("Ignore numbers"), acGroup), 181, 67, 100, 13);
     _acIgnoreNumbersCB->setObjectName("chkAcIgnoreNumbers");
 
-    acLay->addWidget(_acEnableCB,         0, 0, 1, 3);
-    acLay->addWidget(_acNoneRB,           1, 0);
-    acLay->addWidget(_acFunctionRB,       2, 0);
-    acLay->addWidget(_acWordRB,           3, 0);
-    acLay->addWidget(_acBothRB,           4, 0);
-    acLay->addWidget(_acFromNbCharLabel,  5, 0);
-    acLay->addWidget(_acFromNbCharSB,     5, 1);
-    acLay->addWidget(_acIgnoreNumbersCB,  6, 0, 1, 2);
-    lay->addWidget(acGroup);
-
-    // Function parameters hint
-    QGroupBox* fpGroup = new QGroupBox(tr("Function Parameters Hint"));
-    fpGroup->setObjectName("grpFuncParams");
-    QVBoxLayout* fpLay = new QVBoxLayout(fpGroup);
-    _funcParamsCB = new QCheckBox(tr("Enable function parameters hint on input"));
+    QGroupBox* insertSelection = placePreferenceControl(
+        new QGroupBox(tr("Insert Selection"), acGroup), 180, 31, 96, 38);
+    placePreferenceControl(new QCheckBox(tr("TAB"), insertSelection), 12, 10, 54, 13);
+    placePreferenceControl(new QCheckBox(tr("ENTER"), insertSelection), 12, 23, 55, 13);
+    _funcParamsCB = placePreferenceControl(
+        new QCheckBox(tr("Function parameters hint on input"), acGroup),
+        5, 67, 160, 13);
     _funcParamsCB->setObjectName("chkFuncParams");
-    fpLay->addWidget(_funcParamsCB);
-    lay->addWidget(fpGroup);
-
-    QGroupBox* pairGroup = new QGroupBox(tr("Auto-insert"));
+    QGroupBox* pairGroup = placePreferenceControl(
+        new QGroupBox(tr("Auto-Insert"), w), 33, 99, 289, 84);
     pairGroup->setObjectName("grpAutoInsert");
-    QGridLayout* pairLayout = new QGridLayout(pairGroup);
-    _pairParenthesesCB = new QCheckBox(tr("Parentheses ()"));
+    _pairParenthesesCB = placePreferenceControl(
+        new QCheckBox(QStringLiteral("("), pairGroup), 15, 17, 35, 13);
     _pairParenthesesCB->setObjectName("chkPairParentheses");
-    _pairBracketsCB = new QCheckBox(tr("Brackets []"));
+    _pairBracketsCB = placePreferenceControl(
+        new QCheckBox(QStringLiteral("["), pairGroup), 15, 35, 35, 13);
     _pairBracketsCB->setObjectName("chkPairBrackets");
-    _pairCurlyCB = new QCheckBox(tr("Curly brackets {}"));
+    _pairCurlyCB = placePreferenceControl(
+        new QCheckBox(QStringLiteral("{"), pairGroup), 15, 54, 35, 13);
     _pairCurlyCB->setObjectName("chkPairCurly");
-    _pairQuotesCB = new QCheckBox(tr("Single quotes ''"));
+    _pairQuotesCB = placePreferenceControl(
+        new QCheckBox(QStringLiteral("'"), pairGroup), 59, 35, 35, 13);
     _pairQuotesCB->setObjectName("chkPairQuotes");
-    _pairDoubleQuotesCB = new QCheckBox(tr("Double quotes \"\""));
+    _pairDoubleQuotesCB = placePreferenceControl(
+        new QCheckBox(QStringLiteral("\""), pairGroup), 59, 17, 35, 13);
     _pairDoubleQuotesCB->setObjectName("chkPairDoubleQuotes");
-    _pairTagsCB = new QCheckBox(tr("HTML/XML close tag"));
+    _pairTagsCB = placePreferenceControl(
+        new QCheckBox(tr("html/xml close tag"), pairGroup), 59, 54, 100, 13);
     _pairTagsCB->setObjectName("chkPairTags");
-    pairLayout->addWidget(_pairParenthesesCB, 0, 0);
-    pairLayout->addWidget(_pairBracketsCB, 0, 1);
-    pairLayout->addWidget(_pairCurlyCB, 1, 0);
-    pairLayout->addWidget(_pairQuotesCB, 1, 1);
-    pairLayout->addWidget(_pairDoubleQuotesCB, 2, 0);
-    pairLayout->addWidget(_pairTagsCB, 2, 1);
-    lay->addWidget(pairGroup);
+    placePreferenceControl(new QLabel(tr("Open"), pairGroup), 220, 7, 30, 13);
+    placePreferenceControl(new QLabel(tr("Close"), pairGroup), 258, 7, 30, 13);
+    for (int i = 0; i < 3; ++i) {
+        placePreferenceControl(new QLabel(tr("Matched pair %1:").arg(i + 1), pairGroup),
+                               160, 20 + i * 20, 70, 13);
+        placePreferenceControl(new QLineEdit(pairGroup), 232, 18 + i * 20, 20, 17);
+        placePreferenceControl(new QLineEdit(pairGroup), 258, 18 + i * 20, 20, 17);
+    }
 
     connect(_acEnableCB, &QCheckBox::toggled,
             this, &PreferenceDlg::onAcEnableToggled);
 
-    lay->addStretch();
-    return wrapScroll(w);
+    return w;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -564,38 +760,49 @@ QWidget* PreferenceDlg::makePage_AutoCompletion()
 // ─────────────────────────────────────────────────────────────────────────────
 QWidget* PreferenceDlg::makePage_Misc()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* lay = new QVBoxLayout(w);
-
-    // File auto-detection
-    QGroupBox* detGroup = new QGroupBox(tr("File Status Auto-Detection"));
+    QWidget* w = preferenceCanvas();
+    QGroupBox* detGroup = placePreferenceControl(
+        new QGroupBox(tr("File Status Auto-Detection"), w), 36, 4, 155, 60);
     detGroup->setObjectName("grpFileAutoDetect");
-    QGridLayout* detLay = new QGridLayout(detGroup);
-    _fileAutoDetectCombo = new QComboBox();
+    _fileAutoDetectCombo = placePreferenceControl(
+        new QComboBox(detGroup), 8, 10, 140, 17);
     _fileAutoDetectCombo->setObjectName("comboFileAutoDetect");
     _fileAutoDetectCombo->addItem(tr("Disable"),                 0);
     _fileAutoDetectCombo->addItem(tr("Enable"),                  1);
     _fileAutoDetectCombo->addItem(tr("Enable for all opened files"), 2);
-    QLabel* lblFileAutoDetectStatus = new QLabel(tr("Status:"));
-    lblFileAutoDetectStatus->setObjectName("lblFileAutoDetectStatus");
-    detLay->addWidget(lblFileAutoDetectStatus, 0, 0);
-    detLay->addWidget(_fileAutoDetectCombo, 0, 1);
-    _checkHistoryFilesCB = new QCheckBox(tr("Update silently (don't prompt to reload)"));
-    _checkHistoryFilesCB->setObjectName("chkCheckHistoryFiles");
-    detLay->addWidget(_checkHistoryFilesCB, 1, 0, 1, 2);
-    lay->addWidget(detGroup);
+    placePreferenceControl(new QCheckBox(tr("Update silently"), detGroup), 8, 28, 140, 13);
+    placePreferenceControl(new QCheckBox(tr("Scroll to the last line after update"), detGroup),
+                           8, 43, 145, 13);
 
-    // Session
-    QGroupBox* sessGroup = new QGroupBox(tr("Session"));
-    sessGroup->setObjectName("grpSession");
-    QVBoxLayout* sessLay = new QVBoxLayout(sessGroup);
-    _restoreSessionCB = new QCheckBox(tr("Remember current session for next launch"));
-    _restoreSessionCB->setObjectName("chkRestoreSession");
-    sessLay->addWidget(_restoreSessionCB);
-    lay->addWidget(sessGroup);
+    QGroupBox* switcher = placePreferenceControl(
+        new QGroupBox(tr("Document Switcher (Ctrl+TAB)"), w), 261, 4, 155, 39);
+    placePreferenceControl(new QCheckBox(tr("Enable"), switcher), 8, 9, 140, 13);
+    placePreferenceControl(new QCheckBox(tr("Enable MRU behaviour"), switcher), 8, 24, 140, 13);
+    QGroupBox* peeker = placePreferenceControl(
+        new QGroupBox(tr("Document Peeker"), w), 261, 47, 155, 39);
+    placePreferenceControl(new QCheckBox(tr("Peek on tab"), peeker), 8, 9, 140, 13);
+    placePreferenceControl(new QCheckBox(tr("Peek on document map"), peeker), 8, 24, 140, 13);
 
-    lay->addStretch();
-    return wrapScroll(w);
+    const QStringList options = {
+        tr("Enable Notepad++ auto-updater"), tr("Mute all sounds"),
+        tr("Autodetect character encoding"), tr("Minimize to system tray"),
+        tr("Show only filename in title bar"),
+        tr("Use DirectWrite (need to restart Notepad++)"),
+        tr("Enable Save All confirm dialog")
+    };
+    for (int i = 0; i < options.size(); ++i) {
+        QCheckBox* option = placePreferenceControl(
+            new QCheckBox(options.at(i), w), 37, 94 + i * 15, 380, 13);
+        if (i == 2) {
+            _detectEncodingCB = option;
+            _detectEncodingCB->setObjectName("chkDetectEncoding");
+        }
+    }
+    placePreferenceControl(new QLabel(tr("Session file ext.:"), w), 270, 130, 108, 13);
+    placePreferenceControl(new QLineEdit(QStringLiteral("session"), w), 380, 127, 50, 17);
+    placePreferenceControl(new QLabel(tr("Workspace file ext.:"), w), 270, 147, 108, 13);
+    placePreferenceControl(new QLineEdit(QStringLiteral("workspace"), w), 380, 144, 50, 17);
+    return w;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -604,47 +811,81 @@ QWidget* PreferenceDlg::makePage_Misc()
 // ─────────────────────────────────────────────────────────────────────────────
 QWidget* PreferenceDlg::makePage_DarkMode()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* lay = new QVBoxLayout(w);
-
-    QGroupBox* grp = new QGroupBox(tr("Dark Mode"));
-    grp->setObjectName("grpDarkMode");
-    QVBoxLayout* grpLay = new QVBoxLayout(grp);
-    _darkModeEnableCB = new QCheckBox(tr("Enable dark mode"));
+    QWidget* w = preferenceCanvas();
+    _darkModeEnableCB = placePreferenceControl(
+        new QCheckBox(tr("Enable dark mode"), w), 15, 12, 150, 13);
     _darkModeEnableCB->setObjectName("chkDarkModeEnable");
-    grpLay->addWidget(_darkModeEnableCB);
-    lay->addWidget(grp);
-    lay->addStretch();
-    return wrapScroll(w);
+    QGroupBox* tones = placePreferenceControl(
+        new QGroupBox(tr("Tones"), w), 10, 25, 440, 154);
+    tones->setObjectName("grpDarkModeTones");
+    const QStringList names = {
+        tr("Black"), tr("Red"), tr("Green"), tr("Blue"),
+        tr("Purple"), tr("Cyan"), tr("Olive")
+    };
+    for (int i = 0; i < names.size(); ++i) {
+        QRadioButton* tone = placePreferenceControl(
+            new QRadioButton(names.at(i), tones), 5, 8 + i * 15, 80, 13);
+        tone->setObjectName(QStringLiteral("rbDarkTone%1").arg(i));
+        if (i == 0) tone->setChecked(true);
+    }
+    placePreferenceControl(new QRadioButton(tr("Customized"), tones),
+                           90, 8, 120, 13);
+    const QStringList swatches = {
+        tr("Top"), tr("Menu hot track"), tr("Active"), tr("Main"), tr("Error"),
+        tr("Text"), tr("Darker text"), tr("Disabled text"), tr("Link"),
+        tr("Edge"), tr("Edge highlight"), tr("Edge disabled")
+    };
+    for (int i = 0; i < swatches.size(); ++i) {
+        const int column = i < 5 ? 0 : i < 9 ? 1 : 2;
+        const int row = column == 0 ? i : column == 1 ? i - 5 : i - 9;
+        const int x = 115 + column * 115;
+        placePreferenceControl(new QLabel(swatches.at(i), tones),
+                               x, 27 + row * 20, 92, 13);
+        QPushButton* colour = placePreferenceControl(
+            new QPushButton(tones), x - 18, 26 + row * 20, 14, 14);
+        colour->setObjectName(QStringLiteral("btnDarkColour%1").arg(i));
+    }
+    placePreferenceControl(new QPushButton(tr("Reset"), tones), 242, 126, 45, 16);
+    return w;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 QWidget* PreferenceDlg::makePage_DefaultDirectory()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(w);
-    QGroupBox* group = new QGroupBox(tr("Open/Save Directory"), w);
+    QWidget* w = preferenceCanvas();
+    QGroupBox* group = placePreferenceControl(
+        new QGroupBox(tr("Default Open/Save file Directory"), w),
+        110, 29, 232, 101);
     group->setObjectName("grpDefaultDirectory");
-    QFormLayout* form = new QFormLayout(group);
     _defaultDirModeCombo = new QComboBox(group);
     _defaultDirModeCombo->setObjectName("comboDefaultDirMode");
     _defaultDirModeCombo->addItem(tr("Follow current document"), 0);
     _defaultDirModeCombo->addItem(tr("Remember last used directory"), 1);
     _defaultDirModeCombo->addItem(tr("Use custom directory"), 2);
-    QLabel* behaviorLabel = new QLabel(tr("Behavior:"), group);
-    behaviorLabel->setObjectName("lblDefaultDirBehavior");
-    form->addRow(behaviorLabel, _defaultDirModeCombo);
-    QWidget* pathRow = new QWidget(group);
-    QHBoxLayout* pathLayout = new QHBoxLayout(pathRow);
-    pathLayout->setContentsMargins(0, 0, 0, 0);
-    _defaultDirEdit = new QLineEdit(pathRow);
-    QPushButton* browse = new QPushButton(tr("Browse..."), pathRow);
+    _defaultDirModeCombo->hide();
+    QRadioButton* follow = placePreferenceControl(
+        new QRadioButton(tr("Follow current document"), group), 8, 24, 200, 13);
+    QRadioButton* remember = placePreferenceControl(
+        new QRadioButton(tr("Remember last used directory"), group), 8, 40, 217, 13);
+    QRadioButton* custom = placePreferenceControl(
+        new QRadioButton(group), 8, 56, 12, 13);
+    _defaultDirEdit = placePreferenceControl(
+        new QLineEdit(group), 24, 54, 179, 17);
+    QPushButton* browse = placePreferenceControl(
+        new QPushButton(QStringLiteral("..."), group), 208, 53, 18, 18);
     browse->setObjectName("btnDefaultDirBrowse");
-    pathLayout->addWidget(_defaultDirEdit, 1);
-    pathLayout->addWidget(browse);
-    QLabel* directoryLabel = new QLabel(tr("Directory:"), group);
-    directoryLabel->setObjectName("lblDefaultDirectory");
-    form->addRow(directoryLabel, pathRow);
+    const QList<QRadioButton*> modes = {follow, remember, custom};
+    for (int i = 0; i < modes.size(); ++i) {
+        connect(modes.at(i), &QRadioButton::toggled, this,
+                [this, i](bool checked) {
+            if (checked) _defaultDirModeCombo->setCurrentIndex(i);
+        });
+        connect(_defaultDirModeCombo,
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
+                modes.at(i), [radio = modes.at(i), i](int index) {
+            radio->setChecked(index == i);
+        });
+    }
     connect(browse, &QPushButton::clicked, this, [this]() {
         QString path = QFileDialog::getExistingDirectory(
             this, tr("Default Directory"), _defaultDirEdit->text());
@@ -656,8 +897,9 @@ QWidget* PreferenceDlg::makePage_DefaultDirectory()
             [this](int) {
         _defaultDirEdit->setEnabled(_defaultDirModeCombo->currentData().toInt() == 2);
     });
-    layout->addWidget(group);
-    layout->addStretch();
+    placePreferenceControl(new QCheckBox(
+        tr("Open all files of folder instead of launching Folder as Workspace on folder dropping"), w),
+        110, 145, 342, 13);
     return w;
 }
 
@@ -848,231 +1090,329 @@ QWidget* PreferenceDlg::makePage_FileAssociation()
 
 QWidget* PreferenceDlg::makePage_Highlighting()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(w);
-    QGroupBox* group = new QGroupBox(tr("Smart Highlighting"), w);
+    QWidget* w = preferenceCanvas();
+    QGroupBox* occurrences = placePreferenceControl(
+        new QGroupBox(tr("Style All Occurrences of Token"), w), 62, 29, 155, 45);
+    placePreferenceControl(new QCheckBox(tr("Match case"), occurrences),
+                           8, 12, 142, 13);
+    placePreferenceControl(new QCheckBox(tr("Match whole word only"), occurrences),
+                           8, 27, 142, 13);
+
+    QGroupBox* group = placePreferenceControl(
+        new QGroupBox(tr("Smart Highlighting"), w), 226, 29, 172, 108);
     group->setObjectName("grpSmartHighlighting");
-    QVBoxLayout* options = new QVBoxLayout(group);
-    _smartHighlightCB = new QCheckBox(tr("Enable"), group);
+    _smartHighlightCB = placePreferenceControl(
+        new QCheckBox(tr("Enable"), group), 8, 10, 142, 13);
     _smartHighlightCB->setObjectName("chkSmartHighlight");
-    _smartMatchCaseCB = new QCheckBox(tr("Match case"), group);
-    _smartMatchCaseCB->setObjectName("chkSmartMatchCase");
-    _smartWholeWordCB = new QCheckBox(tr("Whole word only"), group);
-    _smartWholeWordCB->setObjectName("chkSmartWholeWord");
-    _smartUseFindSettingsCB = new QCheckBox(tr("Use Find dialog settings"), group);
-    _smartUseFindSettingsCB->setObjectName("chkSmartUseFindSettings");
-    _smartAnotherViewCB = new QCheckBox(tr("Highlight in another view"), group);
+    _smartAnotherViewCB = placePreferenceControl(
+        new QCheckBox(tr("Highlight another view"), group), 8, 26, 142, 13);
     _smartAnotherViewCB->setObjectName("chkSmartAnotherView");
-    options->addWidget(_smartHighlightCB);
-    options->addWidget(_smartMatchCaseCB);
-    options->addWidget(_smartWholeWordCB);
-    options->addWidget(_smartUseFindSettingsCB);
-    options->addWidget(_smartAnotherViewCB);
-    layout->addWidget(group);
-    QGroupBox* tagGroup = new QGroupBox(tr("HTML/XML Tag Matching"), w);
+    QGroupBox* matching = placePreferenceControl(
+        new QGroupBox(tr("Matching"), group), 7, 43, 155, 55);
+    _smartMatchCaseCB = placePreferenceControl(
+        new QCheckBox(tr("Match case"), matching), 8, 10, 142, 13);
+    _smartMatchCaseCB->setObjectName("chkSmartMatchCase");
+    _smartWholeWordCB = placePreferenceControl(
+        new QCheckBox(tr("Match whole word only"), matching), 8, 25, 142, 13);
+    _smartWholeWordCB->setObjectName("chkSmartWholeWord");
+    _smartUseFindSettingsCB = placePreferenceControl(
+        new QCheckBox(tr("Use Find dialog settings"), matching), 8, 40, 142, 13);
+    _smartUseFindSettingsCB->setObjectName("chkSmartUseFindSettings");
+
+    QGroupBox* tagGroup = placePreferenceControl(
+        new QGroupBox(tr("Highlight Matching Tags"), w), 62, 82, 155, 55);
     tagGroup->setObjectName("grpTagMatching");
-    QVBoxLayout* tagOptions = new QVBoxLayout(tagGroup);
-    _tagMatchCB = new QCheckBox(tr("Highlight matching tags"), tagGroup);
+    _tagMatchCB = placePreferenceControl(
+        new QCheckBox(tr("Enable"), tagGroup), 8, 10, 140, 13);
     _tagMatchCB->setObjectName("chkTagMatch");
-    _tagAttributesCB =
-        new QCheckBox(tr("Highlight tag attributes"), tagGroup);
+    _tagAttributesCB = placePreferenceControl(
+        new QCheckBox(tr("Highlight tag attributes"), tagGroup), 8, 25, 140, 13);
     _tagAttributesCB->setObjectName("chkTagAttributes");
-    tagOptions->addWidget(_tagMatchCB);
-    tagOptions->addWidget(_tagAttributesCB);
-    layout->addWidget(tagGroup);
-    layout->addStretch();
+    _tagNonHtmlCB = placePreferenceControl(
+        new QCheckBox(tr("Highlight comment/php/asp zone"), tagGroup),
+        8, 40, 140, 13);
+    _tagNonHtmlCB->setObjectName("chkTagNonHtml");
     return w;
 }
 
 QWidget* PreferenceDlg::makePage_Print()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(w);
-    QGroupBox* optionsGroup = new QGroupBox(tr("Print Options"), w);
-    optionsGroup->setObjectName("grpPrintOptions");
-    QFormLayout* options = new QFormLayout(optionsGroup);
-    _printLineNumberCB = new QCheckBox(tr("Print line numbers"), optionsGroup);
+    QWidget* w = preferenceCanvas();
+    _printLineNumberCB = placePreferenceControl(
+        new QCheckBox(tr("Print line number"), w), 6, 6, 133, 13);
     _printLineNumberCB->setObjectName("chkPrintLineNumbers");
+    QGroupBox* optionsGroup = placePreferenceControl(
+        new QGroupBox(tr("Colour Options"), w), 6, 20, 133, 73);
+    optionsGroup->setObjectName("grpPrintOptions");
     _printOptionCombo = new QComboBox(optionsGroup);
     _printOptionCombo->setObjectName("comboPrintColorMode");
     _printOptionCombo->addItem(tr("WYSIWYG"), 0);
     _printOptionCombo->addItem(tr("Invert colors"), 1);
     _printOptionCombo->addItem(tr("Black on white"), 2);
     _printOptionCombo->addItem(tr("Color on white"), 3);
-    options->addRow(_printLineNumberCB);
-    QLabel* colorModeLabel = new QLabel(tr("Color mode:"), optionsGroup);
-    colorModeLabel->setObjectName("lblPrintColorMode");
-    options->addRow(colorModeLabel, _printOptionCombo);
-    layout->addWidget(optionsGroup);
+    _printOptionCombo->hide();
+    const QStringList colourModes = {
+        tr("WYSIWYG"), tr("Invert"), tr("Black on white"),
+        tr("No background colour")
+    };
+    for (int i = 0; i < colourModes.size(); ++i) {
+        QRadioButton* radio = placePreferenceControl(
+            new QRadioButton(colourModes.at(i), optionsGroup),
+            6, 8 + i * 15, 123, 13);
+        connect(radio, &QRadioButton::toggled, this, [this, i](bool checked) {
+            if (checked) _printOptionCombo->setCurrentIndex(i);
+        });
+        connect(_printOptionCombo,
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
+                radio, [radio, i](int index) { radio->setChecked(index == i); });
+    }
+    QGroupBox* margins = placePreferenceControl(
+        new QGroupBox(tr("Margin Setting (Unit:mm)"), w), 6, 98, 133, 82);
+    const QStringList marginLabels = {tr("Left"), tr("Top"), tr("Right"), tr("Bottom")};
+    const QList<QPoint> labelPoints = {{8, 36}, {37, 15}, {72, 36}, {34, 57}};
+    const QList<QPoint> valuePoints = {{30, 33}, {66, 12}, {100, 33}, {66, 54}};
+    for (int i = 0; i < marginLabels.size(); ++i) {
+        const QPoint labelPoint = labelPoints.at(i);
+        placePreferenceControl(new QLabel(marginLabels.at(i), margins),
+                               labelPoint.x(), labelPoint.y(), 34, 13);
+        const QPoint valuePoint = valuePoints.at(i);
+        QSpinBox* value = placePreferenceControl(
+            new QSpinBox(margins), valuePoint.x(), valuePoint.y(), 32, 17);
+        value->setRange(0, 99);
+    }
 
-    QGroupBox* headerFooter = new QGroupBox(tr("Header and Footer"), w);
+    QGroupBox* headerFooter = placePreferenceControl(
+        new QGroupBox(tr("Header and Footer"), w), 150, 7, 296, 172);
     headerFooter->setObjectName("grpPrintHeaderFooter");
-    QGridLayout* grid = new QGridLayout(headerFooter);
-    _headerLeftEdit = new QLineEdit(headerFooter);
-    _headerMiddleEdit = new QLineEdit(headerFooter);
-    _headerRightEdit = new QLineEdit(headerFooter);
-    _footerLeftEdit = new QLineEdit(headerFooter);
-    _footerMiddleEdit = new QLineEdit(headerFooter);
-    _footerRightEdit = new QLineEdit(headerFooter);
-    QLabel* headerLabel = new QLabel(tr("Header:"), headerFooter);
-    headerLabel->setObjectName("lblPrintHeader");
-    grid->addWidget(headerLabel, 0, 0);
-    grid->addWidget(_headerLeftEdit, 0, 1);
-    grid->addWidget(_headerMiddleEdit, 0, 2);
-    grid->addWidget(_headerRightEdit, 0, 3);
-    QLabel* footerLabel = new QLabel(tr("Footer:"), headerFooter);
-    footerLabel->setObjectName("lblPrintFooter");
-    grid->addWidget(footerLabel, 1, 0);
-    grid->addWidget(_footerLeftEdit, 1, 1);
-    grid->addWidget(_footerMiddleEdit, 1, 2);
-    grid->addWidget(_footerRightEdit, 1, 3);
-    layout->addWidget(headerFooter);
-    layout->addStretch();
-    return wrapScroll(w);
+    placePreferenceControl(new QLabel(tr("Variable:"), headerFooter), 48, 10, 58, 13);
+    QComboBox* variable = placePreferenceControl(new QComboBox(headerFooter), 108, 8, 94, 17);
+    variable->addItems({tr("Full file name path"), tr("File name"), tr("Date"), tr("Time")});
+    placePreferenceControl(new QPushButton(tr("Add"), headerFooter), 210, 8, 44, 17);
+    QGroupBox* header = placePreferenceControl(
+        new QGroupBox(tr("Header"), headerFooter), 8, 30, 279, 56);
+    QGroupBox* footer = placePreferenceControl(
+        new QGroupBox(tr("Footer"), headerFooter), 8, 88, 279, 58);
+    const QStringList parts = {tr("Left part"), tr("Middle part"), tr("Right part")};
+    QLineEdit** headerEdits[] = {&_headerLeftEdit, &_headerMiddleEdit, &_headerRightEdit};
+    QLineEdit** footerEdits[] = {&_footerLeftEdit, &_footerMiddleEdit, &_footerRightEdit};
+    for (int i = 0; i < 3; ++i) {
+        placePreferenceControl(new QLabel(parts.at(i), header), 10 + i * 90, 8, 80, 13);
+        *headerEdits[i] = placePreferenceControl(new QLineEdit(header), 8 + i * 90, 21, 83, 17);
+        placePreferenceControl(new QLabel(parts.at(i), footer), 10 + i * 90, 8, 80, 13);
+        *footerEdits[i] = placePreferenceControl(new QLineEdit(footer), 8 + i * 90, 21, 83, 17);
+    }
+    return w;
 }
 
 QWidget* PreferenceDlg::makePage_Searching()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(w);
-    QGroupBox* group = new QGroupBox(tr("Default Search Options"), w);
-    group->setObjectName("grpDefaultSearch");
-    QVBoxLayout* options = new QVBoxLayout(group);
-    _searchMatchWordCB = new QCheckBox(tr("Match whole word only"), group);
-    _searchMatchWordCB->setObjectName("chkSearchWholeWord");
-    _searchMatchCaseCB = new QCheckBox(tr("Match case"), group);
-    _searchMatchCaseCB->setObjectName("chkSearchMatchCase");
-    _searchWrapCB = new QCheckBox(tr("Wrap around"), group);
-    _searchWrapCB->setObjectName("chkSearchWrap");
-    _searchRecursiveCB = new QCheckBox(tr("Search subfolders"), group);
-    _searchRecursiveCB->setObjectName("chkSearchRecursive");
-    _searchHiddenCB = new QCheckBox(tr("Search hidden folders"), group);
-    _searchHiddenCB->setObjectName("chkSearchHidden");
-    options->addWidget(_searchMatchWordCB);
-    options->addWidget(_searchMatchCaseCB);
-    options->addWidget(_searchWrapCB);
-    options->addWidget(_searchRecursiveCB);
-    options->addWidget(_searchHiddenCB);
-    layout->addWidget(group);
-    layout->addStretch();
+    QWidget* w = preferenceCanvas();
+    QGroupBox* group = placePreferenceControl(
+        new QGroupBox(tr("When Find Dialog is Invoked"), w), 31, 4, 323, 43);
+    group->setObjectName("grpFindInvocation");
+    _fillFindSelectedCB = placePreferenceControl(
+        new QCheckBox(tr("Fill Find Field with Selected Text"), group),
+        6, 10, 275, 13);
+    _fillFindSelectedCB->setObjectName("chkFillFindSelected");
+    _fillFindCaretCB = placePreferenceControl(
+        new QCheckBox(tr("Select Word Under Caret when Nothing Selected"), group),
+        21, 25, 275, 13);
+    _fillFindCaretCB->setObjectName("chkFillFindCaret");
+    const QList<QPair<QCheckBox**, QString>> rows = {
+        {&_findMonospacedCB, tr("Use Monospaced font in Find dialog (Need to restart Notepad++)")},
+        {&_findAlwaysVisibleCB, tr("Find dialog remains open after search that outputs to results window")},
+        {&_confirmReplaceOpenedCB, tr("Confirm Replace All in All Opened Documents")},
+        {&_replaceStopsCB, tr("Replace: Don't move to the following occurrence")},
+        {&_showOneEntryCB, tr("Search Result window: show only one entry per found line")}
+    };
+    for (int i = 0; i < rows.size(); ++i)
+        *rows.at(i).first = placePreferenceControl(
+            new QCheckBox(rows.at(i).second, w), 37, 52 + i * 15, 380, 13);
     return w;
 }
 
 QWidget* PreferenceDlg::makePage_MultiInstance()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(w);
-    QGroupBox* instanceGroup = new QGroupBox(tr("Multi-Instance"), w);
+    QWidget* w = preferenceCanvas();
+    QGroupBox* instanceGroup = placePreferenceControl(
+        new QGroupBox(tr("Multi-instance settings"), w), 89, 3, 268, 92);
     instanceGroup->setObjectName("grpMultiInstance");
-    QFormLayout* instanceForm = new QFormLayout(instanceGroup);
     _multiInstanceCombo = new QComboBox(instanceGroup);
     _multiInstanceCombo->setObjectName("comboMultiInstance");
     _multiInstanceCombo->addItem(tr("Open in existing instance"), 0);
     _multiInstanceCombo->addItem(tr("New instance for each session"), 1);
     _multiInstanceCombo->addItem(tr("Always open a new instance"), 2);
-    QLabel* instanceModeLabel = new QLabel(tr("Mode:"), instanceGroup);
-    instanceModeLabel->setObjectName("lblMultiInstanceMode");
-    instanceForm->addRow(instanceModeLabel, _multiInstanceCombo);
-    layout->addWidget(instanceGroup);
-    QGroupBox* dateGroup = new QGroupBox(tr("Date and Time"), w);
+    _multiInstanceCombo->hide();
+    const QStringList instanceModes = {
+        tr("Default (mono-instance)"),
+        tr("Open session in a new instance (and save session automatically on exit)"),
+        tr("Always in multi-instance mode")
+    };
+    const QList<int> ys = {52, 9, 35};
+    for (int i = 0; i < instanceModes.size(); ++i) {
+        QRadioButton* radio = placePreferenceControl(
+            new QRadioButton(instanceModes.at(i), instanceGroup),
+            18, ys.at(i), 235, i == 1 ? 24 : 13);
+        connect(radio, &QRadioButton::toggled, this, [this, i](bool checked) {
+            if (checked) _multiInstanceCombo->setCurrentIndex(i);
+        });
+        connect(_multiInstanceCombo,
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
+                radio, [radio, i](int index) { radio->setChecked(index == i); });
+    }
+    placePreferenceControl(new QLabel(
+        tr("* The modification of this setting needs to restart Notepad++"),
+        instanceGroup), 10, 70, 239, 20);
+
+    QGroupBox* dateGroup = placePreferenceControl(
+        new QGroupBox(tr("Customize insert Date Time"), w), 90, 100, 268, 82);
     dateGroup->setObjectName("grpDateTime");
-    QFormLayout* dateForm = new QFormLayout(dateGroup);
-    _dateTimeFormatEdit = new QLineEdit(dateGroup);
-    _dateReverseCB = new QCheckBox(tr("Reverse short and long command order"), dateGroup);
+    _dateReverseCB = placePreferenceControl(
+        new QCheckBox(tr("Reverse default date time order (short && long formats)"), dateGroup),
+        13, 10, 241, 13);
     _dateReverseCB->setObjectName("chkDateReverse");
-    QLabel* dateFormatLabel = new QLabel(tr("Customized format:"), dateGroup);
+    placePreferenceControl(new QLabel(
+        QStringLiteral("yyyy-MM-dd HH:mm:ss\nH:m d/M/yyyy\nMMM d, yyyy  tt h:m"),
+        dateGroup), 44, 27, 95, 40);
+    placePreferenceControl(new QLabel(
+        QStringLiteral("1985-10-26 16:24:42\n16:24 26/10/1985\nOct 26, 1985 PM 4:24"),
+        dateGroup), 144, 27, 110, 40);
+    QLabel* dateFormatLabel = placePreferenceControl(
+        new QLabel(tr("Custom format:"), dateGroup), 2, 66, 77, 13);
     dateFormatLabel->setObjectName("lblDateTimeFormat");
-    dateForm->addRow(dateFormatLabel, _dateTimeFormatEdit);
-    dateForm->addRow(_dateReverseCB);
-    layout->addWidget(dateGroup);
-    layout->addStretch();
+    _dateTimeFormatEdit = placePreferenceControl(
+        new QLineEdit(dateGroup), 80, 63, 182, 17);
     return w;
 }
 
 QWidget* PreferenceDlg::makePage_Delimiter()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(w);
-    QGroupBox* group = new QGroupBox(tr("Delimiter Selection"), w);
+    QWidget* w = preferenceCanvas();
+    QGroupBox* word = placePreferenceControl(
+        new QGroupBox(tr("Word character list"), w), 89, 2, 268, 93);
+    QRadioButton* defaults = placePreferenceControl(
+        new QRadioButton(tr("Use default Word character list as it is"), word),
+        11, 12, 250, 13);
+    defaults->setChecked(true);
+    QRadioButton* customWordCharacters = placePreferenceControl(new QRadioButton(
+        tr("Add your character as part of word\n(don't choose it unless you know what you're doing)"), word),
+        11, 27, 250, 25);
+    customWordCharacters->setObjectName("rbCustomWordCharacters");
+    placePreferenceControl(new QLineEdit(word), 22, 52, 180, 17);
+    placePreferenceControl(new QPushButton(QStringLiteral("?"), word), 214, 51, 18, 18);
+
+    QGroupBox* group = placePreferenceControl(
+        new QGroupBox(tr("Delimiter selection settings (Ctrl + Mouse double click)"), w),
+        89, 113, 268, 70);
     group->setObjectName("grpDelimiterSelection");
-    QFormLayout* form = new QFormLayout(group);
-    _leftDelimiterSB = new QSpinBox(group);
-    _rightDelimiterSB = new QSpinBox(group);
+    _leftDelimiterSB = placePreferenceControl(new QSpinBox(group), 67, 13, 34, 17);
+    _rightDelimiterSB = placePreferenceControl(new QSpinBox(group), 148, 13, 34, 17);
     _leftDelimiterSB->setRange(0, 0xFFFF);
     _rightDelimiterSB->setRange(0, 0xFFFF);
-    _delimiterWholeDocumentCB =
-        new QCheckBox(tr("Search delimiters in entire document"), group);
+    placePreferenceControl(new QLabel(tr("Open"), group), 28, 16, 34, 13);
+    placePreferenceControl(new QLabel(tr("bla bla bla bla"), group), 104, 16, 62, 13);
+    _rightDelimiterSB->setGeometry(prefGeometry(170, 13, 34, 17));
+    placePreferenceControl(new QLabel(tr("Close"), group), 207, 16, 47, 13);
+    _delimiterWholeDocumentCB = placePreferenceControl(
+        new QCheckBox(tr("Allow on several lines"), group), 29, 50, 160, 13);
     _delimiterWholeDocumentCB->setObjectName("chkDelimiterWholeDocument");
-    QLabel* leftDelimiterLabel =
-        new QLabel(tr("Left delimiter character code:"), group);
-    leftDelimiterLabel->setObjectName("lblLeftDelimiter");
-    QLabel* rightDelimiterLabel =
-        new QLabel(tr("Right delimiter character code:"), group);
-    rightDelimiterLabel->setObjectName("lblRightDelimiter");
-    form->addRow(leftDelimiterLabel, _leftDelimiterSB);
-    form->addRow(rightDelimiterLabel, _rightDelimiterSB);
-    form->addRow(_delimiterWholeDocumentCB);
-    layout->addWidget(group);
-    layout->addStretch();
     return w;
 }
 
 QWidget* PreferenceDlg::makePage_CloudLink()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(w);
-    QGroupBox* linkGroup = new QGroupBox(tr("Clickable Links"), w);
+    QWidget* w = preferenceCanvas();
+    QGroupBox* cloud = placePreferenceControl(
+        new QGroupBox(tr("Settings on cloud"), w), 89, 7, 268, 88);
+    QRadioButton* noCloud = placePreferenceControl(
+        new QRadioButton(tr("No Cloud"), cloud), 36, 10, 180, 13);
+    noCloud->setChecked(true);
+    placePreferenceControl(new QRadioButton(tr("Set your cloud location path here:"), cloud),
+                           36, 25, 180, 13);
+    placePreferenceControl(new QLineEdit(cloud), 45, 41, 179, 17);
+    placePreferenceControl(new QPushButton(QStringLiteral("..."), cloud), 229, 40, 18, 18);
+
+    QGroupBox* linkGroup = placePreferenceControl(
+        new QGroupBox(tr("Clickable Link Settings"), w), 89, 100, 268, 90);
     linkGroup->setObjectName("grpClickableLinks");
-    QFormLayout* form = new QFormLayout(linkGroup);
     _urlModeCombo = new QComboBox(linkGroup);
     _urlModeCombo->setObjectName("comboUrlMode");
     _urlModeCombo->addItem(tr("Disabled"), 0);
     _urlModeCombo->addItem(tr("Enabled without underline"), 1);
     _urlModeCombo->addItem(tr("Enabled with underline"), 2);
-    QLabel* linkStyleLabel = new QLabel(tr("Link style:"), linkGroup);
-    linkStyleLabel->setObjectName("lblLinkStyle");
-    form->addRow(linkStyleLabel, _urlModeCombo);
-    layout->addWidget(linkGroup);
-    QPushButton* openConfig = new QPushButton(tr("Open configuration directory"), w);
-    openConfig->setObjectName("btnOpenConfigDirectory");
-    connect(openConfig, &QPushButton::clicked, this, []() {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(
-            NppParameters::getInstance().getUserPath()));
+    _urlModeCombo->hide();
+    QCheckBox* enable = placePreferenceControl(
+        new QCheckBox(tr("Enable"), linkGroup), 34, 10, 83, 13);
+    QCheckBox* noUnderline = placePreferenceControl(
+        new QCheckBox(tr("No underline"), linkGroup), 120, 10, 140, 13);
+    placePreferenceControl(new QCheckBox(tr("Enable fullbox mode"), linkGroup),
+                           120, 25, 140, 13);
+    connect(enable, &QCheckBox::toggled, this, [this](bool checked) {
+        _urlModeCombo->setCurrentIndex(checked ? 2 : 0);
     });
-    layout->addWidget(openConfig);
-    layout->addStretch();
+    connect(noUnderline, &QCheckBox::toggled, this, [this](bool checked) {
+        if (_urlModeCombo->currentData().toInt() != 0)
+            _urlModeCombo->setCurrentIndex(checked ? 1 : 2);
+    });
+    connect(_urlModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this, enable, noUnderline](int) {
+        const int mode = _urlModeCombo->currentData().toInt();
+        enable->setChecked(mode != 0);
+        noUnderline->setChecked(mode == 1);
+    });
+    placePreferenceControl(new QLabel(tr("URI customized schemes:"), linkGroup),
+                           18, 40, 120, 13);
+    _uriSchemesEdit = placePreferenceControl(new QLineEdit(linkGroup), 17, 53, 238, 24);
     return w;
 }
 
 QWidget* PreferenceDlg::makePage_SearchEngine()
 {
-    QWidget* w = new QWidget();
-    QVBoxLayout* layout = new QVBoxLayout(w);
-    QGroupBox* group = new QGroupBox(tr("Search Engine"), w);
+    QWidget* w = preferenceCanvas();
+    QGroupBox* group = placePreferenceControl(
+        new QGroupBox(tr("Search Engine (for command \"Search on Internet\")"), w),
+        74, 24, 297, 145);
     group->setObjectName("grpSearchEngine");
-    QFormLayout* form = new QFormLayout(group);
     _searchEngineCombo = new QComboBox(group);
     _searchEngineCombo->setObjectName("comboSearchEngine");
-    _searchEngineCombo->addItem("DuckDuckGo", 0);
-    _searchEngineCombo->addItem("Bing", 1);
+    _searchEngineCombo->addItem(tr("Custom"), 0);
+    _searchEngineCombo->addItem("DuckDuckGo", 1);
     _searchEngineCombo->addItem("Google", 2);
-    _searchEngineCombo->addItem("Yahoo", 3);
-    _searchEngineCombo->addItem(tr("Custom"), 4);
-    _searchEngineCustomEdit = new QLineEdit(group);
-    QLabel* providerLabel = new QLabel(tr("Provider:"), group);
-    providerLabel->setObjectName("lblSearchProvider");
-    QLabel* customUrlLabel = new QLabel(tr("Custom URL:"), group);
-    customUrlLabel->setObjectName("lblSearchCustomUrl");
-    form->addRow(providerLabel, _searchEngineCombo);
-    form->addRow(customUrlLabel, _searchEngineCustomEdit);
+    _searchEngineCombo->addItem("Yahoo!", 4);
+    _searchEngineCombo->addItem("Stack Overflow", 5);
+    _searchEngineCombo->hide();
+    const QList<QPair<QString, int>> engines = {
+        {QStringLiteral("DuckDuckGo"), 1}, {QStringLiteral("Google"), 2},
+        {QStringLiteral("Yahoo!"), 4}, {QStringLiteral("Stack Overflow"), 5},
+        {tr("Set your search engine here:"), 0}
+    };
+    for (int i = 0; i < engines.size(); ++i) {
+        QRadioButton* radio = placePreferenceControl(
+            new QRadioButton(engines.at(i).first, group), 31, 14 + i * 15, 210, 13);
+        connect(radio, &QRadioButton::toggled, this,
+                [this, value = engines.at(i).second](bool checked) {
+            if (checked) {
+                const int index = _searchEngineCombo->findData(value);
+                _searchEngineCombo->setCurrentIndex(index);
+            }
+        });
+        connect(_searchEngineCombo,
+                QOverload<int>::of(&QComboBox::currentIndexChanged),
+                radio, [this, radio, value = engines.at(i).second](int) {
+            radio->setChecked(_searchEngineCombo->currentData().toInt() == value);
+        });
+    }
+    _searchEngineCustomEdit = placePreferenceControl(
+        new QLineEdit(group), 40, 92, 179, 17);
+    placePreferenceControl(new QLabel(
+        tr("Example: https://www.google.com/search?q=$(CURRENT_WORD)"), group),
+        40, 109, 245, 26);
     connect(_searchEngineCombo,
             QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             [this](int) {
         _searchEngineCustomEdit->setEnabled(
-            _searchEngineCombo->currentData().toInt() == 4);
+            _searchEngineCombo->currentData().toInt() == 0);
     });
-    layout->addWidget(group);
-    layout->addStretch();
     return w;
 }
 
@@ -1099,6 +1439,14 @@ void PreferenceDlg::loadSettings()
     _tabVerticalCB->setChecked(gui._tabVertical);
     _tabMultiLineCB->setChecked(gui._tabMultiLine);
     _tabQuitOnEmptyCB->setChecked(gui._tabQuitOnEmpty);
+    if (QCheckBox* lock = findChild<QCheckBox*>("chkTabLock"))
+        lock->setChecked(!gui._tabDragAndDrop);
+    const QList<QRadioButton*> toolbarModes = findChildren<QRadioButton*>();
+    for (QRadioButton* mode : toolbarModes) {
+        if (mode->property("toolbarIconSet").isValid())
+            mode->setChecked(mode->property("toolbarIconSet").toInt()
+                             == gui._tabIconSetNumber);
+    }
     onTabHideToggled(gui._tabHide);
 
     _fontCombo->setCurrentFont(QFont(gui._editorFontName));
@@ -1140,6 +1488,7 @@ void PreferenceDlg::loadSettings()
         int idx = _encodingCombo->findData(gui._newDocDefaultEncoding);
         _encodingCombo->setCurrentIndex(idx >= 0 ? idx : 0);
     }
+    _openAnsiAsUtf8CB->setChecked(gui._openAnsiAsUtf8);
 
     _defaultDirModeCombo->setCurrentIndex(qMax(
         0, _defaultDirModeCombo->findData(gui._openSaveDir)));
@@ -1153,6 +1502,7 @@ void PreferenceDlg::loadSettings()
     _smartAnotherViewCB->setChecked(gui._smartHighlightAnotherView);
     _tagMatchCB->setChecked(gui._enableTagsMatchHighlight);
     _tagAttributesCB->setChecked(gui._enableTagAttrsHighlight);
+    _tagNonHtmlCB->setChecked(gui._highlightNonHtmlZone);
 
     _printLineNumberCB->setChecked(gui._printLineNumber);
     _printOptionCombo->setCurrentIndex(qMax(
@@ -1164,12 +1514,13 @@ void PreferenceDlg::loadSettings()
     _footerMiddleEdit->setText(gui._printFooterMiddle);
     _footerRightEdit->setText(gui._printFooterRight);
 
-    const FindHistoryState& findHistory = params.getFindHistory();
-    _searchMatchWordCB->setChecked(findHistory.matchWord);
-    _searchMatchCaseCB->setChecked(findHistory.matchCase);
-    _searchWrapCB->setChecked(findHistory.wrap);
-    _searchRecursiveCB->setChecked(findHistory.fifRecursive);
-    _searchHiddenCB->setChecked(findHistory.fifInHiddenFolder);
+    _fillFindSelectedCB->setChecked(gui._fillFindFieldWithSelected);
+    _fillFindCaretCB->setChecked(gui._fillFindFieldSelectCaret);
+    _findMonospacedCB->setChecked(gui._monospacedFontFindDlg);
+    _findAlwaysVisibleCB->setChecked(gui._findDlgAlwaysVisible);
+    _confirmReplaceOpenedCB->setChecked(gui._confirmReplaceInAllOpenDocs);
+    _replaceStopsCB->setChecked(gui._replaceStopsWithoutFindingNext);
+    _showOneEntryCB->setChecked(gui._showOnlyOneEntryPerFoundLine);
 
     _multiInstanceCombo->setCurrentIndex(qMax(
         0, _multiInstanceCombo->findData(gui._multiInstSetting)));
@@ -1181,10 +1532,16 @@ void PreferenceDlg::loadSettings()
         gui._delimiterSelectionOnEntireDocument);
     _urlModeCombo->setCurrentIndex(qMax(
         0, _urlModeCombo->findData(gui._urlMode)));
-    _searchEngineCombo->setCurrentIndex(qMax(
-        0, _searchEngineCombo->findData(gui._searchEngineChoice)));
+    _uriSchemesEdit->setText(gui._uriCustomizedSchemes);
+    const int searchEngineChoice = gui._searchEngineChoice == 3
+        ? 1
+        : gui._searchEngineChoice;
+    int searchEngineIndex = _searchEngineCombo->findData(searchEngineChoice);
+    if (searchEngineIndex < 0)
+        searchEngineIndex = _searchEngineCombo->findData(2);
+    _searchEngineCombo->setCurrentIndex(searchEngineIndex);
     _searchEngineCustomEdit->setText(gui._searchEngineCustom);
-    _searchEngineCustomEdit->setEnabled(gui._searchEngineChoice == 4);
+    _searchEngineCustomEdit->setEnabled(searchEngineChoice == 0);
 
     // ── Recent Files History ─────────────────────────────────────────────────
     _maxRecentFilesSB->setValue(gui._nbMaxRecentFile);
@@ -1238,6 +1595,7 @@ void PreferenceDlg::loadSettings()
     }
     _checkHistoryFilesCB->setChecked(gui._checkHistoryFiles);
     _restoreSessionCB->setChecked(gui._rememberLastSession);
+    _detectEncodingCB->setChecked(gui._detectEncoding);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1263,6 +1621,11 @@ void PreferenceDlg::saveSettings()
     gui._tabVertical        = _tabVerticalCB->isChecked();
     gui._tabMultiLine       = _tabMultiLineCB->isChecked();
     gui._tabQuitOnEmpty     = _tabQuitOnEmptyCB->isChecked();
+    const QList<QRadioButton*> toolbarModes = findChildren<QRadioButton*>();
+    for (QRadioButton* mode : toolbarModes) {
+        if (mode->property("toolbarIconSet").isValid() && mode->isChecked())
+            gui._tabIconSetNumber = mode->property("toolbarIconSet").toInt();
+    }
 
     gui._editorFontName = _fontCombo->currentFont().family();
     gui._editorFontSize = _fontSizeSB->value();
@@ -1293,6 +1656,7 @@ void PreferenceDlg::saveSettings()
     else if (_fmtMacRB->isChecked())     gui._newDocDefaultFormat = 1;
     else                                  gui._newDocDefaultFormat = 2;
     gui._newDocDefaultEncoding = _encodingCombo->currentData().toInt();
+    gui._openAnsiAsUtf8 = _openAnsiAsUtf8CB->isChecked();
 
     gui._openSaveDir = _defaultDirModeCombo->currentData().toInt();
     gui._defaultDirPath = _defaultDirEdit->text();
@@ -1304,6 +1668,7 @@ void PreferenceDlg::saveSettings()
     gui._smartHighlightAnotherView = _smartAnotherViewCB->isChecked();
     gui._enableTagsMatchHighlight = _tagMatchCB->isChecked();
     gui._enableTagAttrsHighlight = _tagAttributesCB->isChecked();
+    gui._highlightNonHtmlZone = _tagNonHtmlCB->isChecked();
 
     gui._printLineNumber = _printLineNumberCB->isChecked();
     gui._printOption = _printOptionCombo->currentData().toInt();
@@ -1314,12 +1679,13 @@ void PreferenceDlg::saveSettings()
     gui._printFooterMiddle = _footerMiddleEdit->text();
     gui._printFooterRight = _footerRightEdit->text();
 
-    FindHistoryState& findHistory = params.getFindHistory();
-    findHistory.matchWord = _searchMatchWordCB->isChecked();
-    findHistory.matchCase = _searchMatchCaseCB->isChecked();
-    findHistory.wrap = _searchWrapCB->isChecked();
-    findHistory.fifRecursive = _searchRecursiveCB->isChecked();
-    findHistory.fifInHiddenFolder = _searchHiddenCB->isChecked();
+    gui._fillFindFieldWithSelected = _fillFindSelectedCB->isChecked();
+    gui._fillFindFieldSelectCaret = _fillFindCaretCB->isChecked();
+    gui._monospacedFontFindDlg = _findMonospacedCB->isChecked();
+    gui._findDlgAlwaysVisible = _findAlwaysVisibleCB->isChecked();
+    gui._confirmReplaceInAllOpenDocs = _confirmReplaceOpenedCB->isChecked();
+    gui._replaceStopsWithoutFindingNext = _replaceStopsCB->isChecked();
+    gui._showOnlyOneEntryPerFoundLine = _showOneEntryCB->isChecked();
 
     gui._multiInstSetting = _multiInstanceCombo->currentData().toInt();
     gui._dateTimeFormat = _dateTimeFormatEdit->text();
@@ -1329,6 +1695,7 @@ void PreferenceDlg::saveSettings()
     gui._delimiterSelectionOnEntireDocument =
         _delimiterWholeDocumentCB->isChecked();
     gui._urlMode = _urlModeCombo->currentData().toInt();
+    gui._uriCustomizedSchemes = _uriSchemesEdit->text();
     gui._searchEngineChoice = _searchEngineCombo->currentData().toInt();
     gui._searchEngineCustom = _searchEngineCustomEdit->text();
 
@@ -1378,6 +1745,7 @@ void PreferenceDlg::saveSettings()
     gui._fileAutoDetection  = _fileAutoDetectCombo->currentData().toInt();
     gui._checkHistoryFiles  = _checkHistoryFilesCB->isChecked();
     gui._rememberLastSession = _restoreSessionCB->isChecked();
+    gui._detectEncoding = _detectEncodingCB->isChecked();
 
     // 更新 Qt 扩展冗余副本
     gui._showWhitespace  = svp._whiteSpaceShow;
@@ -1386,7 +1754,6 @@ void PreferenceDlg::saveSettings()
     gui._restoreSession  = gui._rememberLastSession;
 
     params.writeNppGUI();
-    params.writeFindHistory();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

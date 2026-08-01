@@ -1,23 +1,13 @@
-#include "PluginArchiveExtractor.h"
+#include "PluginUpdateExecutor.h"
 #include "PluginUpdatePlan.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QElapsedTimer>
-#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
 #include <QProcess>
-#include <QSaveFile>
-#include <QTemporaryDir>
-#include <QTimer>
-#include <QUrl>
 
 #include <cstdio>
 
@@ -73,205 +63,59 @@ bool waitForProcess(qint64 pid, QString* error)
     return true;
 }
 
-bool copyFileChecked(const QString& source, const QString& destination,
-                     QString* error)
+#if defined(Q_OS_WIN)
+bool restartUnelevated(const QString& applicationPath, QString* error)
 {
-    const QFileInfo destinationInfo(destination);
-    if (!QDir().mkpath(destinationInfo.absolutePath())) {
-        if (error)
-            *error = QStringLiteral("Could not create plugin directory.");
-        return false;
-    }
-    QFile::remove(destination);
-    if (!QFile::copy(source, destination)) {
-        if (error)
-            *error = QStringLiteral("Could not copy plugin file: %1")
-                         .arg(destination);
-        return false;
-    }
-    return true;
-}
-
-bool copyTree(const QString& source, const QString& destination,
-              QString* error)
-{
-    const QDir sourceDir(source);
-    if (!sourceDir.exists() || !QDir().mkpath(destination)) {
-        if (error)
-            *error = QStringLiteral("Could not prepare plugin destination.");
-        return false;
-    }
-    const QFileInfoList entries = sourceDir.entryInfoList(
-        QDir::AllEntries | QDir::NoDotAndDotDot,
-        QDir::Name | QDir::IgnoreCase);
-    for (const QFileInfo& entry : entries) {
-        if (entry.isSymLink()) {
-            if (error)
-                *error = QStringLiteral("Symbolic links are not allowed.");
-            return false;
-        }
-        const QString target =
-            QDir(destination).filePath(entry.fileName());
-        if (entry.isDir()) {
-            if (!copyTree(entry.absoluteFilePath(), target, error))
-                return false;
-        } else if (!copyFileChecked(entry.absoluteFilePath(), target, error)) {
-            return false;
+    const HWND shellWindow = GetShellWindow();
+    DWORD shellPid = 0;
+    if (shellWindow)
+        GetWindowThreadProcessId(shellWindow, &shellPid);
+    HANDLE shellProcess = shellPid
+        ? OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, shellPid)
+        : nullptr;
+    HANDLE shellToken = nullptr;
+    HANDLE primaryToken = nullptr;
+    bool started = false;
+    if (shellProcess &&
+        OpenProcessToken(shellProcess,
+                         TOKEN_QUERY | TOKEN_DUPLICATE |
+                             TOKEN_ASSIGN_PRIMARY,
+                         &shellToken) &&
+        DuplicateTokenEx(shellToken, MAXIMUM_ALLOWED, nullptr,
+                         SecurityImpersonation, TokenPrimary,
+                         &primaryToken)) {
+        std::wstring commandLine =
+            QStringLiteral("\"%1\"").arg(
+                QDir::toNativeSeparators(applicationPath)).toStdWString();
+        std::wstring workingDirectory =
+            QDir::toNativeSeparators(
+                QFileInfo(applicationPath).absolutePath()).toStdWString();
+        STARTUPINFOW startup = {};
+        startup.cb = sizeof(startup);
+        PROCESS_INFORMATION process = {};
+        started = CreateProcessWithTokenW(
+            primaryToken, LOGON_WITH_PROFILE,
+            reinterpret_cast<LPCWSTR>(applicationPath.utf16()),
+            commandLine.data(), 0, nullptr, workingDirectory.c_str(),
+            &startup, &process) != FALSE;
+        if (started) {
+            CloseHandle(process.hThread);
+            CloseHandle(process.hProcess);
         }
     }
-    return true;
+    if (primaryToken)
+        CloseHandle(primaryToken);
+    if (shellToken)
+        CloseHandle(shellToken);
+    if (shellProcess)
+        CloseHandle(shellProcess);
+    if (!started && error) {
+        *error = QStringLiteral(
+            "Could not restart Notepad++ with the desktop user token.");
+    }
+    return started;
 }
-
-bool downloadPackage(QNetworkAccessManager* manager, const QUrl& url,
-                     const QString& destination, QString* error)
-{
-    if (url.isLocalFile())
-        return copyFileChecked(url.toLocalFile(), destination, error);
-
-    QNetworkRequest request(url);
-    request.setAttribute(
-        QNetworkRequest::RedirectPolicyAttribute,
-        QNetworkRequest::NoLessSafeRedirectPolicy);
-    QNetworkReply* reply = manager->get(request);
-    QEventLoop loop;
-    QTimer timeout;
-    timeout.setSingleShot(true);
-    QObject::connect(&timeout, &QTimer::timeout, reply,
-                     &QNetworkReply::abort);
-    QObject::connect(reply, &QNetworkReply::finished, &loop,
-                     &QEventLoop::quit);
-    timeout.start(120000);
-    loop.exec();
-
-    const bool timedOut = !timeout.isActive();
-    timeout.stop();
-    if (reply->error() != QNetworkReply::NoError) {
-        if (error) {
-            *error = timedOut ? QStringLiteral("Plugin download timed out.")
-                             : reply->errorString();
-        }
-        reply->deleteLater();
-        return false;
-    }
-    const QByteArray content = reply->readAll();
-    reply->deleteLater();
-
-    QSaveFile file(destination);
-    if (!file.open(QFile::WriteOnly) ||
-        file.write(content) != content.size() || !file.commit()) {
-        if (error)
-            *error = file.errorString();
-        file.cancelWriting();
-        return false;
-    }
-    return true;
-}
-
-bool verifySha256(const QString& filePath, const QString& expected,
-                  QString* error)
-{
-    QFile file(filePath);
-    if (!file.open(QFile::ReadOnly)) {
-        if (error)
-            *error = file.errorString();
-        return false;
-    }
-    QCryptographicHash hash(QCryptographicHash::Sha256);
-    while (!file.atEnd()) {
-        const QByteArray data = file.read(1024 * 1024);
-        if (data.isEmpty() && file.error() != QFile::NoError) {
-            if (error)
-                *error = file.errorString();
-            return false;
-        }
-        hash.addData(data);
-    }
-    if (QString::fromLatin1(hash.result().toHex())
-            .compare(expected, Qt::CaseInsensitive) != 0) {
-        if (error)
-            *error = QStringLiteral("Plugin package SHA-256 does not match.");
-        return false;
-    }
-    return true;
-}
-
-bool writeReceipt(const QString& target, const PluginOperation& operation,
-                  QString* error)
-{
-    QJsonObject object;
-    object.insert(QStringLiteral("folder-name"), operation.folderName);
-    object.insert(QStringLiteral("version"), operation.version);
-    object.insert(QStringLiteral("sha256"),
-                  operation.packageSha256.toLower());
-    QSaveFile file(QDir(target).filePath(
-        QStringLiteral(".npp-package.json")));
-    if (!file.open(QFile::WriteOnly)) {
-        if (error)
-            *error = file.errorString();
-        return false;
-    }
-    const QByteArray content =
-        QJsonDocument(object).toJson(QJsonDocument::Indented);
-    if (file.write(content) != content.size() || !file.commit()) {
-        if (error)
-            *error = file.errorString();
-        file.cancelWriting();
-        return false;
-    }
-    return true;
-}
-
-bool applyOperation(const PluginUpdatePlan& plan,
-                    const PluginOperation& operation,
-                    QNetworkAccessManager* manager, QString* error)
-{
-    const QString target =
-        QDir(plan.pluginRoot).filePath(operation.folderName);
-    if (operation.type == PluginOperationType::Remove) {
-        QDir targetDir(target);
-        if (!targetDir.exists() || targetDir.removeRecursively())
-            return true;
-        if (error)
-            *error = QStringLiteral("Could not remove the plugin directory.");
-        return false;
-    }
-
-    QTemporaryDir temporary;
-    if (!temporary.isValid()) {
-        if (error)
-            *error = QStringLiteral("Could not create plugin staging directory.");
-        return false;
-    }
-    const QString packagePath =
-        QDir(temporary.path()).filePath(QStringLiteral("plugin.zip"));
-    if (!downloadPackage(manager, QUrl(operation.repository),
-                         packagePath, error) ||
-        !verifySha256(packagePath, operation.packageSha256, error)) {
-        return false;
-    }
-
-    const QString extracted =
-        QDir(temporary.path()).filePath(QStringLiteral("extracted"));
-    if (!PluginArchiveExtractor::extractZip(packagePath, extracted, error))
-        return false;
-
-    if (operation.type == PluginOperationType::Update) {
-        QDir targetDir(target);
-        if (targetDir.exists() && !targetDir.removeRecursively()) {
-            if (error)
-                *error = QStringLiteral("Could not clean old plugin files.");
-            return false;
-        }
-    } else if (QFileInfo::exists(target)) {
-        if (error)
-            *error = QStringLiteral("Plugin is already installed.");
-        return false;
-    }
-
-    if (!copyTree(extracted, target, error))
-        return false;
-    return writeReceipt(target, operation, error);
-}
+#endif
 
 } // namespace
 
@@ -281,8 +125,12 @@ int main(int argc, char** argv)
     const QStringList arguments = application.arguments();
     const int planIndex = arguments.indexOf(QStringLiteral("--plan"));
     const int waitIndex = arguments.indexOf(QStringLiteral("--wait-pid"));
+    const int hashIndex = arguments.indexOf(QStringLiteral("--plan-sha256"));
+    const bool restartWithoutElevation =
+        arguments.contains(QStringLiteral("--restart-unelevated"));
     if (planIndex < 0 || planIndex + 1 >= arguments.size()) {
         writeError(QStringLiteral("Usage: npp-plugin-updater --plan <file> "
+                                  "[--plan-sha256 <hash>] "
                                   "[--wait-pid <pid>]"));
         return 2;
     }
@@ -299,25 +147,54 @@ int main(int argc, char** argv)
     }
 
     const QString planPath = arguments.at(planIndex + 1);
-    const PluginUpdatePlan plan = PluginUpdatePlan::read(planPath, &error);
+    QFile planFile(planPath);
+    if (!planFile.open(QFile::ReadOnly)) {
+        writeError(planFile.errorString());
+        return 4;
+    }
+    const QByteArray planBytes = planFile.readAll();
+    if (hashIndex >= 0) {
+        if (hashIndex + 1 >= arguments.size()) {
+            writeError(QStringLiteral("Plugin update plan hash is missing."));
+            return 4;
+        }
+        const QByteArray actualHash =
+            QCryptographicHash::hash(planBytes,
+                                     QCryptographicHash::Sha256).toHex();
+        if (actualHash.compare(arguments.at(hashIndex + 1).toLatin1(),
+                               Qt::CaseInsensitive) != 0) {
+            writeError(QStringLiteral(
+                "Plugin update plan changed after it was scheduled."));
+            return 4;
+        }
+    }
+    const PluginUpdatePlan plan =
+        PluginUpdatePlan::fromJson(planBytes, &error);
     if (!error.isEmpty()) {
         writeError(error);
         return 4;
     }
 
-    QNetworkAccessManager manager;
-    for (const PluginOperation& operation : plan.operations) {
-        if (!applyOperation(plan, operation, &manager, &error)) {
-            writeError(QStringLiteral("%1: %2")
-                           .arg(operation.folderName, error));
-            return 5;
-        }
+    if (!PluginUpdateExecutor::apply(plan, &error)) {
+        writeError(error);
+        return 5;
     }
 
     QFile::remove(planPath);
-    if (!QProcess::startDetached(plan.applicationPath, QStringList())) {
+    bool restarted = false;
+#if defined(Q_OS_WIN)
+    if (restartWithoutElevation)
+        restarted = restartUnelevated(plan.applicationPath, &error);
+    else
+#else
+    Q_UNUSED(restartWithoutElevation)
+#endif
+        restarted = QProcess::startDetached(
+            plan.applicationPath, QStringList());
+    if (!restarted) {
         writeError(QStringLiteral("Plugin changes completed, but Notepad++ "
-                                  "could not be restarted."));
+                                  "could not be restarted. %1")
+                       .arg(error));
         return 6;
     }
     return 0;

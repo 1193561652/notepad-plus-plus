@@ -27,7 +27,7 @@
 | 128 KiB 流式加载 | `FileManager::loadBufferContent()` |
 | 流式保存和 gap 分段 | `FileManager::saveBufferCopy()` |
 | UTF-16 跨块代理项保护 | `takeIncompleteUtf16Tail()` |
-| 指针宽度消息接口 | `QsciScintillaBase::SendScintillaNpp()` |
+| 指针宽度消息接口 | `ScintillaEditView::execute()` / `sptr_t` |
 | 初次打开、reload、强制编码重解释 | `MainWindow::doOpenFile()`、`reloadFromDisk()`、`reinterpretAs()` |
 | 双视图和 Document Map | `cloneToOtherView()`、`DocumentMapPanel::syncWith()` |
 | Session 保存/恢复 | `MainWindow::saveSession()`、`restoreSession()` |
@@ -45,17 +45,15 @@
 - reload 可在普通文档和大文档之间切换；clone 继续共享同一文档。
 - 打开和保存不经过 `readAll -> QString -> setText` 或 `view->text()` 全文副本。
 
-当前 Qt 版尚未全局实现 URL Hotspot、XML 标签匹配、字符自动配对和保存时备份；
-因此这些路径没有额外的大文件运行时代码，现有大文件结果等同于原版的禁用状态。
-未来实现这些功能时必须先检查 `Buffer::isLargeFile()`。
+URL Hotspot、XML 标签匹配、字符自动配对和保存时备份均已实现；这些路径必须
+继续先检查 `Buffer::isLargeFile()`，保持 v8.4.6 的降级行为。
 
 ## 构建边界
 
-- QScintilla 的 Notepad++ 静态构建清单位于
-  `third_party/qscintilla/src/npp-qscintilla-static.pro`。
-- 该静态库启用 `SCI_OWNREGEX`，同时编入原版 Boost.Regex 适配层。
-- `QsciDocument(int options)` 保持 QsciDocument 引用计数和显示生命周期，
-  不直接从业务层操作 `SCI_SETDOCPOINTER`。
+- `npp-scintilla-qt` 直接编译 `third_party/scintilla/` 的官方 Qt 平台层，
+  并启用 `SCI_OWNREGEX` 与原版 Boost.Regex 适配层。
+- 文档由 Scintilla `CreateDocument` 创建并按消息引用计数；clone 通过
+  `SCI_GETDOCPOINTER` / `SCI_SETDOCPOINTER` 共享，不引入额外文档包装类型。
 - Windows 64 位位置、长度、搜索、替换、Session 选择区和结果导航使用
   `qintptr`/`quintptr`，不经过 32 位 `long`。
 

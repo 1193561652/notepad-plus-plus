@@ -15,7 +15,7 @@
 - `src/`：Qt 主程序、编辑器、配置、对话框和平台适配代码。
 - `resources/`：默认 XML、语言、图标和 Function List 资源。
 - `tests/`：纯逻辑、配置语料、编辑器行为和 UI 运行测试。
-- `third_party/qscintilla/`：QScintilla 2.13.3 与其 Scintilla 源码。
+- `third_party/scintilla/`：与 v8.4.6 对齐的 Scintilla 5.3.0 与 Qt 平台层。
 - `third_party/boostregex/`：Notepad++ Boost.Regex 适配层和精简 Boost。
 - `third_party/lexilla/`：独立静态 Lexilla、内建 lexer、lexlib 与原版
   v8.4.6 `LexUser.cxx`。
@@ -34,10 +34,10 @@ git show v8.4.6:PowerEditor/src/Parameters.cpp
 
 ## 技术栈
 
-- C++14
+- C++17
 - Qt 5 / Qt Widgets
 - CMake
-- 自建静态 QScintilla / Scintilla
+- 自建静态 Scintilla 5 Qt 平台层
 - Notepad++ Boost.Regex 后端
 
 ## 设计原则
@@ -72,9 +72,9 @@ git show v8.4.6:PowerEditor/src/Parameters.cpp
 
 ## 编辑器核心
 
-- 主线通过 `third_party/qscintilla/src/npp-qscintilla-static.pro` 构建静态
-  QScintilla。
-- QScintilla 静态库启用 `SCI_OWNREGEX` 并编入 Boost.Regex 适配层，但不内嵌
+- 主线通过 CMake 构建 `third_party/scintilla/` 中与 v8.4.6 对齐的
+  Scintilla 5.3.0 Qt 平台层 `npp-scintilla-qt`。
+- `npp-scintilla-qt` 启用 `SCI_OWNREGEX` 并编入 Boost.Regex 适配层，但不内嵌
   lexer。
 - Lexilla 由 CMake 独立构建为 `npp-lexilla` 静态库；应用调用
   `CreateLexer()`，通过 `SCI_SETILEXER` 将实例交给 Scintilla。

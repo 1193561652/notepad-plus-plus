@@ -1,5 +1,65 @@
 # 本地缓存：最新分析
 
+缓存日期：2026-08-01
+
+## 2026-08-01 插件管理事务闭环与索引清理
+
+- 当前编辑器基线统一为 Scintilla 5.3.0 Qt 平台层；活跃构建文档、功能索引和
+  UI 状态已清除迁移前组件与旧差异描述。
+- Plugin Admin 保持 v8.4.6 四页和退出后更新流程；更新器新增全批次预检、
+  平台二进制检查、同卷事务替换和失败回滚。
+- Windows PowerShell ZIP 参数传递已修复；程序目录不可写时支持 UAC 更新器和
+  普通桌面 token 重启。Linux/macOS 不可写目录会在退出前明确提示。
+- 新增 `plugin-updater-tests`，覆盖真实 ZIP 安装、更新、卸载、错误哈希、
+  缺失二进制、批次不部分提交和目录穿越。
+- 当前 UI 状态以 Preferences/Shortcut Mapper/Project Panel 最终收口记录为准。
+- `ENABLE_PLUGIN_SYSTEM=ON` 全量构建成功，CTest `30/30` 和隔离配置启动冒烟通过。
+
+## 2026-08-01 Preferences 与编辑器边栏最终收口
+
+- Preferences 19 个页面按 v8.4.6 资源结构完成固定 DLU 布局、简体中文补齐和浅色/深色截图验证。
+- `Searching` 与 `FinderConfig` 只更新原配置中已有节点，不为旧配置自动增加 XML 结构。
+- Scintilla 行号、书签、折叠边栏分别使用 Number、Colour、Symbol margin；书签点击使用通知中的实际行号。
+- 纯文本 `clearLexer()` 和字体变更后重新应用全局样式，防止 `SCI_STYLECLEARALL` 重置行号颜色。
+- 边栏回归覆盖颜色、鼠标指针、点击行书签，以及 v8.4.6 配置语料往返。
+- 记录：`codex/changes/2026-08-01-preferences-margin-ui-finalization.md`。
+
+## 2026-08-01 原版/Qt 最终 UI 对照
+
+- 完成原版 v8.4.6 浅色/深色与 Qt 浅色/深色 100%/150% UI 矩阵。
+- 修复新文档窗口标题，恢复 `new 1 - Notepad++`。
+- Preferences 改为原版单一 Close/关闭命令并补充中文自动断言。
+- 此处原始结论已被后续 UI 收口替代；Preferences、Shortcut Mapper 和
+  Project Panel 当前状态见本文件顶部和最终变更记录。
+- 构建成功，CTest `29/29`，四组 Qt UI 捕获均退出 `0`。
+- 报告：`codex/analysis/2026-08-01-final-ui-parity-audit.md`。
+
+## 2026-08-01 Lexilla 上层接入完成
+
+- 完整支持 v8.4.6 `langs.xml` 的 9 组关键词及 `stylers.xml` 用户关键词合并。
+- 简单语言 LIST 掩码、复杂语言专属槽位、嵌入 HTML 语言和语言 properties 已对齐。
+- 外部 `ILexer5` 工厂边界已实现，实际插件加载仍按既定计划延期。
+- Windows/MinGW 全量构建成功，CTest `29/29` 通过。
+- P1 隔离运行时捕获退出码 `0`；已修复 `SCI_GETSELTEXT` 选区末字节截断回归。
+- 记录：`codex/changes/2026-08-01-lexilla-integration-completion.md`。
+
+## Scintilla 5 Qt 迁移完成
+
+- 当前主线使用 Scintilla 5.3.0、Lexilla 5.1.9 和官方
+  `ScintillaEditBase`，版本与 Notepad++ v8.4.6 对齐。
+- `ScintillaEditView::execute/SendScintilla` 直接调用 `send()`。
+- lexer 使用真实 `ILexer5` 和 `CreateLexer -> SCI_SETILEXER`。
+- `npp-scintilla-qt` 含 Scintilla core、Qt 平台和 `SCI_OWNREGEX`；
+  `npp-lexilla` 含 catalogue、lexlib、内置 lexer 和 LexUser。
+- QScintilla 源码、类型、include 和 qmake 构建已经删除。
+- Windows/MinGW 全量构建成功，CTest `29/29` 通过。
+- 详细缓存：`codex/cache/2026-08-01-scintilla5-qt-migration.md`。
+
+---
+
+以下内容是按日期保留的历史缓存，组件名称和“尚未完成”描述只代表当时状态，
+不得用作当前实现判断。
+
 缓存日期：2026-07-30
 
 ## 2026-07-30 Scintilla 5 Qt 迁移决策

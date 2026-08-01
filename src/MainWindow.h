@@ -19,14 +19,13 @@
 
 class ScintillaEditView;
 class DocTabView;
-class QsciScintilla;
 class FindReplaceDlg;
 class PreferenceDlg;
 class DocumentMapPanel;
 class FunctionListPanel;
 class PluginManager;
 class PluginAdminDialog;
-class QsciMacro;
+class EditorMacro;
 class QSplitter;
 class QDockWidget;
 class QListWidget;
@@ -279,7 +278,7 @@ private:
     FunctionListPanel* _funcListPanel    = nullptr;
     QDockWidget*       _documentListDock = nullptr;
     QListWidget*       _documentList     = nullptr;
-    QDockWidget*       _projectPanelsDock = nullptr;
+    QDockWidget*       _projectPanelsDock[3] = {nullptr, nullptr, nullptr};
     ProjectPanel*      _projectPanels[3] = {nullptr, nullptr, nullptr};
     QDockWidget*       _clipboardDock    = nullptr;
     QListWidget*       _clipboardHistory = nullptr;
@@ -292,7 +291,7 @@ private:
     // 宏
     QString   _macroStr;
     bool      _isRecording = false;
-    QsciMacro* _recordingMacro = nullptr;
+    EditorMacro* _recordingMacro = nullptr;
     ScintillaEditView* _recordingView = nullptr;
 
     // 备份定时器（与原版 snapshot 模式一致，每 7 秒触发）

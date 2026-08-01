@@ -77,6 +77,13 @@ public static class UiCaptureNative {
         IntPtr hWnd, uint message, UIntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll")]
+    public static extern bool PostMessage(
+        IntPtr hWnd, uint message, UIntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetDlgItem(IntPtr hWnd, int controlId);
+
+    [DllImport("user32.dll")]
     public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr data);
 
     [DllImport("user32.dll")]
@@ -211,15 +218,18 @@ function Wait-ForMainWindow([System.Diagnostics.Process]$Process) {
 
 function Wait-ForProcessDialog(
     [System.Diagnostics.Process]$Process,
-    [IntPtr]$MainHandle
+    [IntPtr]$MainHandle,
+    [IntPtr[]]$ExcludedHandles = @()
 ) {
     for ($i = 0; $i -lt 60; ++$i) {
         $bestHandle = [IntPtr]::Zero
         $bestArea = 0
         foreach ($handle in [UiCaptureNative]::ProcessWindows($Process.Id)) {
+            $windowClass = [UiCaptureNative]::WindowClass($handle)
             if ($handle -eq $MainHandle -or
-                [UiCaptureNative]::WindowClass($handle) -eq
-                    "ConsoleWindowClass") {
+                $ExcludedHandles -contains $handle -or
+                $windowClass -eq "ConsoleWindowClass" -or
+                $windowClass -eq "#32768") {
                 continue
             }
             $rect = New-Object UiCaptureNative+RECT
@@ -240,14 +250,54 @@ function Wait-ForProcessDialog(
     throw "Application did not create the expected dialog window."
 }
 
+function Invoke-VisibleMenuItem(
+    [System.Diagnostics.Process]$Process,
+    [string]$NamePattern
+) {
+    foreach ($handle in [UiCaptureNative]::ProcessWindows($Process.Id)) {
+        try {
+            $root = [System.Windows.Automation.AutomationElement]::FromHandle(
+                $handle)
+            $condition = New-Object System.Windows.Automation.PropertyCondition(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::MenuItem)
+            $items = $root.FindAll(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                $condition)
+            for ($i = 0; $i -lt $items.Count; ++$i) {
+                $item = $items.Item($i)
+                if ($item.Current.Name -notmatch $NamePattern) {
+                    continue
+                }
+                $pattern = $null
+                if ($item.TryGetCurrentPattern(
+                    [System.Windows.Automation.InvokePattern]::Pattern,
+                    [ref]$pattern)) {
+                    $pattern.Invoke()
+                    return $true
+                }
+            }
+        }
+        catch {
+            # Menus may disappear while UI Automation walks their tree.
+        }
+    }
+    return $false
+}
+
 function Select-And-CaptureAutomationItems(
     [IntPtr]$WindowHandle,
     [System.Windows.Automation.ControlType]$ControlType,
     [string]$Prefix,
     [int]$MaximumItems = [int]::MaxValue
 ) {
-    $root = [System.Windows.Automation.AutomationElement]::FromHandle(
-        $WindowHandle)
+    try {
+        $root = [System.Windows.Automation.AutomationElement]::FromHandle(
+            $WindowHandle)
+    }
+    catch {
+        return 0
+    }
     $condition = New-Object System.Windows.Automation.PropertyCondition(
         [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
         $ControlType)
@@ -295,23 +345,25 @@ function Send-KeyChord(
     [byte]$Modifier,
     [byte]$Key
 ) {
-    $downMessage = if ($Modifier -eq 0x12) { 0x0104 } else { 0x0100 }
-    $upMessage = if ($Modifier -eq 0x12) { 0x0105 } else { 0x0101 }
-    [void][UiCaptureNative]::SendMessage(
-        $Handle, 0x0100, [UIntPtr]$Modifier, [IntPtr]::Zero)
-    [void][UiCaptureNative]::SendMessage(
-        $Handle, $downMessage, [UIntPtr]$Key, [IntPtr]::Zero)
-    [void][UiCaptureNative]::SendMessage(
-        $Handle, $upMessage, [UIntPtr]$Key, [IntPtr]::Zero)
-    [void][UiCaptureNative]::SendMessage(
-        $Handle, 0x0101, [UIntPtr]$Modifier, [IntPtr]::Zero)
+    [void][UiCaptureNative]::ForceForegroundWindow($Handle)
+    [UiCaptureNative]::keybd_event(
+        $Modifier, 0, 0, [UIntPtr]::Zero)
+    [UiCaptureNative]::keybd_event(
+        $Key, 0, 0, [UIntPtr]::Zero)
+    [UiCaptureNative]::keybd_event(
+        $Key, 0, 0x0002, [UIntPtr]::Zero)
+    [UiCaptureNative]::keybd_event(
+        $Modifier, 0, 0x0002, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 100
 }
 
 function Send-Key([IntPtr]$Handle, [byte]$Key) {
-    [void][UiCaptureNative]::SendMessage(
-        $Handle, 0x0100, [UIntPtr]$Key, [IntPtr]::Zero)
-    [void][UiCaptureNative]::SendMessage(
-        $Handle, 0x0101, [UIntPtr]$Key, [IntPtr]::Zero)
+    [void][UiCaptureNative]::ForceForegroundWindow($Handle)
+    [UiCaptureNative]::keybd_event(
+        $Key, 0, 0, [UIntPtr]::Zero)
+    [UiCaptureNative]::keybd_event(
+        $Key, 0, 0x0002, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 100
 }
 
 function Capture-FindTabsFallback([IntPtr]$Handle) {
@@ -332,8 +384,15 @@ function Capture-FindTabsFallback([IntPtr]$Handle) {
 }
 
 function Capture-OriginalPreferencePagesFallback([IntPtr]$Handle) {
+    $listHandle = [UiCaptureNative]::GetDlgItem($Handle, 6002)
+    if ($listHandle -eq [IntPtr]::Zero) {
+        throw "Cannot locate the original Preferences page list."
+    }
     for ($i = 0; $i -lt 19; ++$i) {
-        Click-WindowPoint $Handle 88 (55 + 15 * $i)
+        [void][UiCaptureNative]::SendMessage(
+            $listHandle, 0x0186, [UIntPtr]::new($i), [IntPtr]::Zero)
+        [void][UiCaptureNative]::SendMessage(
+            $Handle, 0x0111, [UIntPtr]::new(71538), $listHandle)
         Start-Sleep -Milliseconds 180
         Save-WindowImage $Handle (
             "preferences-page-{0:D2}" -f $i) | Out-Null
@@ -386,6 +445,30 @@ try {
 
     Save-WindowImage $mainHandle "main" | Out-Null
 
+    if ($ApplicationKind -eq "original") {
+        [IntPtr[]]$existingWindows =
+            [UiCaptureNative]::ProcessWindows($process.Id)
+        [void][UiCaptureNative]::PostMessage(
+            $mainHandle, 0x0111, [UIntPtr]::new(48009), [IntPtr]::Zero)
+        $shortcutHandle = Wait-ForProcessDialog `
+            $process $mainHandle $existingWindows
+        Start-Sleep -Milliseconds 1800
+        Save-WindowImage $shortcutHandle "shortcut-mapper" | Out-Null
+        [void](Select-And-CaptureAutomationItems $shortcutHandle `
+            ([System.Windows.Automation.ControlType]::TabItem) `
+            "shortcut-mapper-tab")
+        Send-Key $shortcutHandle 0x1B
+        Start-Sleep -Milliseconds 200
+
+        [void][UiCaptureNative]::SendMessage(
+            $mainHandle, 0x0111, [UIntPtr]::new(44081), [IntPtr]::Zero)
+        Start-Sleep -Milliseconds 350
+        Save-WindowImage $mainHandle "main-project-panels" | Out-Null
+        [void][UiCaptureNative]::SendMessage(
+            $mainHandle, 0x0111, [UIntPtr]::new(44081), [IntPtr]::Zero)
+        Start-Sleep -Milliseconds 200
+    }
+
     $shell = New-Object -ComObject WScript.Shell
     [void]$shell.AppActivate($process.Id)
     [void][UiCaptureNative]::ForceForegroundWindow($mainHandle)
@@ -407,11 +490,20 @@ try {
     [void][UiCaptureNative]::ForceForegroundWindow($mainHandle)
     Click-WindowPoint $mainHandle 500 400
     Start-Sleep -Milliseconds 150
-    Send-KeyChord $mainHandle 0x12 0x54
-    Start-Sleep -Milliseconds 150
-    Send-Key $mainHandle 0x50
+    if ($ApplicationKind -eq "original") {
+        [void][UiCaptureNative]::SendMessage(
+            $mainHandle, 0x0111, [UIntPtr]::new(48011), [IntPtr]::Zero)
+    }
+    else {
+        Send-KeyChord $mainHandle 0x12 0x54
+        Start-Sleep -Milliseconds 150
+        if (-not (Invoke-VisibleMenuItem $process "Preferences|首选项|偏好设置")) {
+            Send-Key $mainHandle 0x50
+        }
+    }
     $preferencesHandle = Wait-ForProcessDialog $process $mainHandle
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds $(
+        if ($ApplicationKind -eq "original") { 1800 } else { 500 })
     Save-WindowImage $preferencesHandle "preferences-dialog" | Out-Null
     $preferenceItemCount = Select-And-CaptureAutomationItems $preferencesHandle `
         ([System.Windows.Automation.ControlType]::ListItem) "preferences-page" 19

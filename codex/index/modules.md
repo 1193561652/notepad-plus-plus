@@ -14,7 +14,7 @@
 - `src/Parameters.*`：配置管理。
 - `src/NativeLangSpeaker.*`：本地化/语言切换。
 - `src/TinyXml/`：XML 配置解析。
-- `src/PluginSystem/`：插件接口和插件管理器，目前仅作为预留接口和后续扩展边界。
+- `src/PluginSystem/`：插件清单、管理 UI、事务更新器，以及隔离的运行 ABI 预留边界。
 
 ## 关键关系
 
@@ -22,12 +22,12 @@
 - `MainWindow` 通过 `DocTabView` 管理主/副视图。
 - `Buffer` 保存文件路径、脏状态、编码、BOM 和备份路径，并关联 `ScintillaEditView`。
 - `FileManager` 是单例，负责创建、加载、保存和关闭 `Buffer`。
-- `PluginManager` 使用 Qt 动态库能力承载插件接口，但近期不作为功能实现重点。
+- `PluginAdminModel` 与独立更新器负责包管理；`PluginManager` 的 Qt 动态库接口仍是未冻结的运行 ABI 预留。
 
 ## 待补充索引
 
 - `Parameters` 配置读写格式和原版 XML 对应关系。
-- `ScintillaEditView` 与 QScintilla/Scintilla 消息兼容层。
+- `ScintillaEditView` 与官方 Scintilla Qt 平台层的消息边界。
 - `DocTabView` 标签生命周期和 Buffer 映射。
 - 文件保存、另存为、关闭询问、备份恢复的完整调用链。
 - 插件接口是否应默认参与构建，以及 `ENABLE_PLUGIN_SYSTEM` 默认值是否符合近期目标。
@@ -138,6 +138,16 @@
   图标实际加载和路径越界保护。
 - UI 验证：`codex/validation/2026-07-28-ui-polish/README.md`。
 
+## 2026-08-01 最终 UI 对照索引
+
+- `tests/UiParityCapture.cpp`：Qt 主窗口、Project Panel、Shortcut Mapper、
+  Find 和 19 个 Preferences 页面自动捕获及标题/本地化断言。
+- `tests/ui/CaptureUiMatrix.ps1`：原版 v8.4.6 Win32 UI 捕获，使用原版命令 ID、
+  控件消息和 UI Automation 建立可重复基线。
+- `codex/analysis/2026-08-01-final-ui-parity-audit.md`：最终逐区域对照结论和
+  后续 UI 开发范围。
+- `codex/validation/2026-08-01-final-ui-parity/README.md`：验证矩阵与本地产物索引。
+
 ## 2026-07-25 索引增量
 
 - `src/MISC/TextFileCodec.*`：统一文本文件检测、显式代码页解码和可逆编码校验。
@@ -169,11 +179,11 @@
 - `FileBrowserPanel::selectedPath()` / `setSelectedPath()`：读写
   `FileBrowser latestSelectedItem`。
 
-## 2026-07-30 Scintilla 5 Qt 目标架构
+## 2026-08-01 Scintilla 5 Qt 当前架构
 
 - 目标版本固定为原版 v8.4.6 的 Scintilla 5.3.0 和 Lexilla 5.1.9。
-- `ScintillaEditView` 将从 QScintilla 切换到官方
-  `ScintillaEditBase`，继续以 `execute(SCI_*, ...)` 为主要业务边界。
+- `ScintillaEditView` 已切换到官方 `ScintillaEditBase`，继续以
+  `execute(SCI_*, ...)` 为主要业务边界。
 - 模块索引：`codex/modules/notepad-plus-plus/scintilla5-qt.md`。
-- 迁移尚未实施；详细阶段和验收门槛见
-  `codex/analysis/2026-07-30-scintilla5-qt-migration-plan.md`。
+- 迁移已完成；计划文件保留为历史设计依据，当前状态见
+  `codex/cache/2026-08-01-scintilla5-qt-migration.md`。

@@ -2,18 +2,18 @@
 
 #include "Parameters.h"
 
-#include <Qsci/qsciprinter.h>
+#include <QPrinter>
 
 class ScintillaEditView;
 
-class NotepadPlusPrinter : public QsciPrinter
+class NotepadPlusPrinter : public QPrinter
 {
 public:
     NotepadPlusPrinter(const NppGUI& gui, const QString& filePath);
 
     void printView(ScintillaEditView* view);
     void formatPage(QPainter& painter, bool drawing, QRect& area,
-                    int pageNumber) override;
+                    int pageNumber);
 
 private:
     QString expand(QString text, int pageNumber) const;

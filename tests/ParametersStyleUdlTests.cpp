@@ -45,6 +45,11 @@ int main(int argc, char** argv)
     NppParameters& parameters = NppParameters::getInstance();
     if (!parameters.setUserPathOverride(userPath) || !parameters.load())
         return 1;
+    const LangDesc* baan = parameters.getLangDescByName(
+        QStringLiteral("baanc"));
+    if (!expect(baan && !baan->keywords[8].isEmpty(),
+                "langs.xml type7 keyword group"))
+        return 1;
     QVector<LexerStyler>& lexers = parameters.getLexerStylers();
     if (!expect(!lexers.isEmpty() && !lexers.first().styles.isEmpty(),
                 "loaded lexer styles"))

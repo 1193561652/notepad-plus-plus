@@ -5,15 +5,13 @@
 - CMake 3.20 or newer for the documented commands
 - Qt 5.12 or newer with Core, Gui, Widgets, Network, PrintSupport, and Xml
 - A compiler supported by that Qt installation
-- qmake and the matching native build tool
-- GNU Make on Linux and macOS, including when CMake itself uses Ninja
 
-QScintilla, Scintilla, Lexilla, Boost.Regex integration, and LexUser are
+Scintilla, Lexilla, Boost.Regex integration, and LexUser are
 bundled under `third_party/`; no sibling source directories are required.
 
-The Qt libraries, `qmake`, compiler, and build tool must belong to one compatible
+The Qt libraries, compiler, and build tool must belong to one compatible
 toolchain. In particular, do not mix a distribution Qt build with an unrelated
-compiler or a `qmake` from another Qt installation.
+compiler.
 
 ## Platform Status
 
@@ -54,7 +52,7 @@ The build creates two editor-core archives:
 
 - `npp-lexilla`: built-in lexers, lexlib, the Lexilla catalogue, and the
   v8.4.6 LexUser lexer;
-- `npp-qscintilla`: the Qt/Scintilla editor widget and the Notepad++
+- `npp-scintilla-qt`: the official Scintilla 5 Qt platform widget and Notepad++
   Boost.Regex backend, without embedded lexers.
 
 The application links both archives and installs Lexilla instances through
@@ -90,7 +88,7 @@ For Debian and Ubuntu, install the basic Qt 5 development toolchain:
 
 ```bash
 sudo apt update
-sudo apt install build-essential cmake qtbase5-dev qtbase5-dev-tools qt5-qmake
+sudo apt install build-essential cmake qtbase5-dev qtbase5-dev-tools unzip
 ```
 
 Configure a separate Linux build directory:
@@ -118,18 +116,12 @@ cmake -S . -B build-linux \
   -DCMAKE_PREFIX_PATH="$HOME/Qt/5.15.2/gcc_64"
 ```
 
-Before diagnosing a QScintilla build failure, verify that CMake and qmake found
-the same Qt installation:
+Before diagnosing an editor-core build failure, verify that CMake found the
+intended Qt installation and compiler:
 
 ```bash
-qmake -qt=5 -query QT_VERSION
-qmake -qt=5 -query QT_INSTALL_PREFIX
 cmake -S . -B build-linux -LA | grep -E "Qt5_DIR|CMAKE_(CXX_)?COMPILER"
 ```
-
-On Debian or Ubuntu, `qmake` may be managed by `qtchooser` without a default
-selection. In that case use `qmake -qt=5` for manual diagnostics. CMake obtains
-the matching executable from the imported `Qt5::qmake` target.
 
 The UI tests set `QT_QPA_PLATFORM=offscreen` through CTest on non-Windows
 platforms, so the automated suite should run in a headless shell. Interactive
@@ -138,14 +130,14 @@ application and screenshot validation still require a graphical session.
 The first Linux validation should record:
 
 - distribution, architecture, desktop environment, and display backend;
-- Qt, CMake, compiler, qmake, and GNU Make versions;
+- Qt, CMake, compiler, and native build-tool versions;
 - configure and compile results from a clean build directory;
 - complete CTest results;
 - startup, configuration path, localization, fonts, clipboard, printing, file
   dialogs, and high-DPI behavior.
 
 The Ubuntu 22.04 validation completed on 2026-07-30 covers a clean Debug build,
-the bundled static QScintilla/Boost.Regex editor core, all 22 CTest entries,
+the former bundled static editor baseline and the then-current 22 CTest entries,
 offscreen light/dark UI tests at 100% and 150%, isolated configuration creation,
 and a headless startup smoke test. See
 `codex/changes/2026-07-30-ubuntu-build-adaptation.md`.
@@ -176,6 +168,7 @@ Useful targeted groups:
 ctest --test-dir build -R "localization|ui-" --output-on-failure
 ctest --test-dir build -R "config|session|shortcuts|langs|stylers|context|udl" --output-on-failure
 ctest --test-dir build -R "large-file|boost-regex|core-behavior" --output-on-failure
+ctest --test-dir build -R "plugin-(admin|updater)" --output-on-failure
 ```
 
 The UI localization matrix runs simplified Chinese in light and dark themes at
@@ -186,8 +179,9 @@ these commands with the platform-specific build directory when applicable.
 
 - Remove or choose a new build directory after changing the Qt installation,
   compiler, architecture, or generator.
-- Check `qmake -query` when the static QScintilla configuration fails.
-- Ensure `make` or `gmake` is installed on Unix even if CMake uses Ninja.
+- Verify `third_party/scintilla/` and `third_party/lexilla/` are present when
+  editor-core targets cannot be configured.
+- Ensure `unzip` is installed on Linux and macOS for plugin package management.
 - Use `ctest --test-dir <build-dir> --output-on-failure -V` for full test
   commands and environment details.
 - On Linux, set `QT_DEBUG_PLUGINS=1` to diagnose platform plugin loading.

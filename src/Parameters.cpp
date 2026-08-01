@@ -1028,10 +1028,21 @@ bool NppParameters::loadLangs()
             QString kwName = txAttr(ke, L"name");
             TiXmlNode* tc = ke->FirstChild();
             QString text = tc ? QString::fromWCharArray(tc->Value()).trimmed() : QString();
-            if      (kwName == "instre1") cur.keywords[0] = text;
-            else if (kwName == "instre2") cur.keywords[1] = text;
-            else if (kwName == "type1")   cur.keywords[2] = text;
-            else if (kwName == "type2")   cur.keywords[3] = text;
+            int keywordIndex = -1;
+            if (kwName == QStringLiteral("instre1")) {
+                keywordIndex = 0;
+            } else if (kwName == QStringLiteral("instre2")) {
+                keywordIndex = 1;
+            } else {
+                const QRegularExpressionMatch typeMatch =
+                    QRegularExpression(QStringLiteral("^type([1-7])$"))
+                        .match(kwName);
+                if (typeMatch.hasMatch())
+                    keywordIndex = typeMatch.captured(1).toInt() + 1;
+            }
+            if (keywordIndex >= 0 &&
+                keywordIndex < LangDesc::KeywordSetCount)
+                cur.keywords[keywordIndex] = text;
         }
         if (!cur.name.isEmpty())
             _langDescs.append(cur);
@@ -1759,6 +1770,10 @@ void NppParameters::feedGUIConfig(const TiXmlElement* el)
     else if (name == "CheckHistoryFiles") {
         _nppGUI._checkHistoryFiles = (content == "yes");
     }
+    else if (name == "MISC") {
+        _nppGUI._backSlashIsEscapeCharacterForSql =
+            parseBool(attr(L"backSlashIsEscapeCharacterForSql"), true);
+    }
     else if (name == "ScintillaViewsSplitter") {
         _nppGUI._isVerticalSplit = (content == "vertical");
     }
@@ -1865,6 +1880,24 @@ void NppParameters::feedGUIConfig(const TiXmlElement* el)
     else if (name == "searchEngine") {
         _nppGUI._searchEngineChoice = parseInt(attr(L"searchEngineChoice"), 2);
         _nppGUI._searchEngineCustom = attr(L"searchEngineCustom");
+    }
+    else if (name == "Searching") {
+        _nppGUI._monospacedFontFindDlg =
+            parseBool(attr(L"monospacedFontFindDlg"), false);
+        _nppGUI._fillFindFieldWithSelected =
+            parseBool(attr(L"fillFindFieldWithSelected"), true);
+        _nppGUI._fillFindFieldSelectCaret =
+            parseBool(attr(L"fillFindFieldSelectCaret"), true);
+        _nppGUI._findDlgAlwaysVisible =
+            parseBool(attr(L"findDlgAlwaysVisible"), false);
+        _nppGUI._confirmReplaceInAllOpenDocs =
+            parseBool(attr(L"confirmReplaceInAllOpenDocs"), true);
+        _nppGUI._replaceStopsWithoutFindingNext =
+            parseBool(attr(L"replaceStopsWithoutFindingNext"), false);
+    }
+    else if (name == "FinderConfig") {
+        _nppGUI._showOnlyOneEntryPerFoundLine =
+            parseBool(attr(L"showOnlyOneEntryPerFoundLine"), true);
     }
     // ── Qt 移植扩展配置 ────────────────────────────────────────────────────────
     else if (name == "EditorFont") {
@@ -2521,6 +2554,24 @@ bool NppParameters::writeConfigXml(const QString& filePath)
         el->SetAttribute(L"searchEngineChoice", _nppGUI._searchEngineChoice);
         el->SetAttribute(L"searchEngineCustom",
                          _nppGUI._searchEngineCustom.toStdWString().c_str());
+    }
+    if (TiXmlElement* el = findCfgEl(guiConfigs, L"Searching")) {
+        el->SetAttribute(L"monospacedFontFindDlg",
+                         bw(_nppGUI._monospacedFontFindDlg));
+        el->SetAttribute(L"fillFindFieldWithSelected",
+                         bw(_nppGUI._fillFindFieldWithSelected));
+        el->SetAttribute(L"fillFindFieldSelectCaret",
+                         bw(_nppGUI._fillFindFieldSelectCaret));
+        el->SetAttribute(L"findDlgAlwaysVisible",
+                         bw(_nppGUI._findDlgAlwaysVisible));
+        el->SetAttribute(L"confirmReplaceInAllOpenDocs",
+                         bw(_nppGUI._confirmReplaceInAllOpenDocs));
+        el->SetAttribute(L"replaceStopsWithoutFindingNext",
+                         bw(_nppGUI._replaceStopsWithoutFindingNext));
+    }
+    if (TiXmlElement* el = findCfgEl(guiConfigs, L"FinderConfig")) {
+        el->SetAttribute(L"showOnlyOneEntryPerFoundLine",
+                         bw(_nppGUI._showOnlyOneEntryPerFoundLine));
     }
     // MenuBar
     {

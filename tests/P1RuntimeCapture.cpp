@@ -151,10 +151,10 @@ int main(int argc, char* argv[])
 
     view->setText(QStringLiteral("alpha beta"));
     view->SendScintilla(
-        QsciScintilla::SCI_SETINDICATORCURRENT,
+        SCI_SETINDICATORCURRENT,
         ScintillaEditView::FIND_MARK_INDICATOR);
-    view->SendScintilla(QsciScintilla::SCI_INDICATORFILLRANGE, 0, 5);
-    view->SendScintilla(QsciScintilla::SCI_INDICATORFILLRANGE, 6, 4);
+    view->SendScintilla(SCI_INDICATORFILLRANGE, 0, 5);
+    view->SendScintilla(SCI_INDICATORFILLRANGE, 6, 4);
     if (!QMetaObject::invokeMethod(
             findDialog, "onCopyMarkedText", Qt::DirectConnection)
         || QApplication::clipboard()->text()
@@ -162,14 +162,35 @@ int main(int argc, char* argv[])
         return 14;
 
     view->setText(QStringLiteral("zero needle one"));
-    if (!findDialog->executeSavedMacroAction(1700, 0, QString())
-        || !findDialog->executeSavedMacroAction(
-            1601, 0, QStringLiteral("needle"))
-        || !findDialog->executeSavedMacroAction(1625, 0, QString())
-        || !findDialog->executeSavedMacroAction(1702, 256, QString())
-        || !findDialog->executeSavedMacroAction(1701, 1723, QString())
-        || view->selectedText() != QStringLiteral("needle"))
+    const bool macroInit =
+        findDialog->executeSavedMacroAction(1700, 0, QString());
+    const bool macroText = findDialog->executeSavedMacroAction(
+        1601, 0, QStringLiteral("needle"));
+    const bool macroMode =
+        findDialog->executeSavedMacroAction(1625, 0, QString());
+    const bool macroFlags =
+        findDialog->executeSavedMacroAction(1702, 256, QString());
+    const bool macroExecute =
+        findDialog->executeSavedMacroAction(1701, 1723, QString());
+    if (!macroInit || !macroText || !macroMode || !macroFlags ||
+        !macroExecute || view->selectedText() != QStringLiteral("needle")) {
+        QFile diagnostic(output + QStringLiteral("/saved-search-macro.txt"));
+        if (diagnostic.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream stream(&diagnostic);
+            stream << "init=" << macroInit << " text=" << macroText
+                   << " mode=" << macroMode << " flags=" << macroFlags
+                   << " execute=" << macroExecute << " selected="
+                   << view->selectedText() << " cursor="
+                   << view->currentPositionNpp() << " document="
+                   << view->text() << '\n';
+        }
+        qCritical("Saved search macro: init=%d text=%d mode=%d flags=%d "
+                  "execute=%d selected='%s' cursor=%lld",
+                  macroInit, macroText, macroMode, macroFlags, macroExecute,
+                  qPrintable(view->selectedText()),
+                  static_cast<long long>(view->currentPositionNpp()));
         return 15;
+    }
 
     view->setText(QStringLiteral("10\n2\n1\n"));
     view->setSelection(0, 0, 0, 0);
@@ -198,10 +219,10 @@ int main(int argc, char* argv[])
     view->setText(QStringLiteral("x020z\nx003z\nx100z\n"));
     const int anchor = view->positionFromLineIndex(0, 1);
     const int caret = view->positionFromLineIndex(2, 4);
-    view->SendScintilla(QsciScintilla::SCI_SETSELECTIONMODE,
-        QsciScintilla::SC_SEL_RECTANGLE);
-    view->SendScintilla(QsciScintilla::SCI_SETANCHOR, anchor);
-    view->SendScintilla(QsciScintilla::SCI_SETCURRENTPOS, caret);
+    view->SendScintilla(SCI_SETSELECTIONMODE,
+        SC_SEL_RECTANGLE);
+    view->SendScintilla(SCI_SETANCHOR, anchor);
+    view->SendScintilla(SCI_SETCURRENTPOS, caret);
     if (!trigger(window, "sortIntegerAscendingAction")
         || normalizedEols(view->text())
             != QStringLiteral("x003z\nx020z\nx100z\n")) {
@@ -210,8 +231,8 @@ int main(int argc, char* argv[])
                                       .replace('\n', QStringLiteral("\\n"))));
         return 18;
     }
-    view->SendScintilla(QsciScintilla::SCI_SETSELECTIONMODE,
-                        QsciScintilla::SC_SEL_STREAM);
+    view->SendScintilla(SCI_SETSELECTIONMODE,
+                        SC_SEL_STREAM);
 
     view->setText(QStringLiteral("a\na\na\n"));
     view->setCursorPosition(0, 1);

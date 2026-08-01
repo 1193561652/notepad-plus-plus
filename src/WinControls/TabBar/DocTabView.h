@@ -19,7 +19,7 @@ public:
     void addBuffer(Buffer* buf);
     void addBufferView(Buffer* buf, ScintillaEditView* view);
 
-    // 添加克隆标签页（cloneView 与原 view 共享同一 QsciDocument）
+    // 添加克隆标签页（cloneView 与原 view 共享同一 Scintilla document）
     void addClone(Buffer* buf, ScintillaEditView* cloneView);
 
     // 关闭并移除标签页（不销毁 buffer，由调用方决定）

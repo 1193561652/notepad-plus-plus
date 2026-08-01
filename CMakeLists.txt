@@ -3,7 +3,7 @@ project(NotepadPlusPlusQt VERSION 8.4.6 LANGUAGES CXX)
 
 include(CTest)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOMOC_COMPILER_PREDEFINES OFF)
@@ -18,111 +18,95 @@ find_package(Qt5 REQUIRED COMPONENTS Core Gui Widgets Network PrintSupport Xml)
 # Qt 路径（如果 CMake 找不到 Qt，取消注释下面这行）
 # set(CMAKE_PREFIX_PATH "F:/Qt/Qt5.12.12/5.12.12/mingw73_32")
 
-# Bundled QScintilla source used by the Notepad++ static editor core.
-set(QSCINTILLA_ROOT "${CMAKE_SOURCE_DIR}/third_party/qscintilla")
-set(QSCINTILLA_INCLUDE_DIR "${QSCINTILLA_ROOT}/src")
+# Keep the editor stack aligned with the Notepad++ 8.4.6 baseline:
+# Scintilla 5.3.0, Lexilla 5.1.9, and the original Boost.Regex adapter.
+set(SCINTILLA_ROOT "${CMAKE_SOURCE_DIR}/third_party/scintilla")
+set(SCINTILLA_QT_ROOT "${SCINTILLA_ROOT}/qt/ScintillaEditBase")
 set(LEXILLA_ROOT "${CMAKE_SOURCE_DIR}/third_party/lexilla")
+set(BOOSTREGEX_ROOT "${CMAKE_SOURCE_DIR}/third_party/boostregex")
 
 file(GLOB NPP_LEXILLA_LEXER_SOURCES CONFIGURE_DEPENDS
-    "${LEXILLA_ROOT}/lexers/*.cpp")
-list(REMOVE_ITEM NPP_LEXILLA_LEXER_SOURCES
-    "${LEXILLA_ROOT}/lexers/LexLPeg.cpp")
+    "${LEXILLA_ROOT}/lexers/*.cxx")
 file(GLOB NPP_LEXILLA_LEXLIB_SOURCES CONFIGURE_DEPENDS
-    "${LEXILLA_ROOT}/lexlib/*.cpp")
+    "${LEXILLA_ROOT}/lexlib/*.cxx")
 
 add_library(npp-lexilla STATIC
     ${NPP_LEXILLA_LEXER_SOURCES}
     ${NPP_LEXILLA_LEXLIB_SOURCES}
-    "${LEXILLA_ROOT}/src/Catalogue.cpp"
-    "${LEXILLA_ROOT}/src/Lexilla.cpp"
-    "${LEXILLA_ROOT}/LexUser.cxx"
+    "${LEXILLA_ROOT}/src/Lexilla.cxx"
 )
-target_compile_definitions(npp-lexilla PRIVATE SCINTILLA_QT)
+target_compile_definitions(npp-lexilla PRIVATE SCI_LEXER)
 target_include_directories(npp-lexilla
     PUBLIC
         "${LEXILLA_ROOT}/include"
-        "${QSCINTILLA_ROOT}/scintilla/include"
+        "${SCINTILLA_ROOT}/include"
     PRIVATE
         "${LEXILLA_ROOT}/lexlib"
         "${LEXILLA_ROOT}/src"
 )
 
+set(NPP_SCINTILLA_SOURCES
+    ${SCINTILLA_QT_ROOT}/PlatQt.cpp
+    ${SCINTILLA_QT_ROOT}/ScintillaQt.cpp
+    ${SCINTILLA_QT_ROOT}/ScintillaEditBase.cpp
+    ${SCINTILLA_ROOT}/src/AutoComplete.cxx
+    ${SCINTILLA_ROOT}/src/CallTip.cxx
+    ${SCINTILLA_ROOT}/src/CaseConvert.cxx
+    ${SCINTILLA_ROOT}/src/CaseFolder.cxx
+    ${SCINTILLA_ROOT}/src/CellBuffer.cxx
+    ${SCINTILLA_ROOT}/src/ChangeHistory.cxx
+    ${SCINTILLA_ROOT}/src/CharacterCategoryMap.cxx
+    ${SCINTILLA_ROOT}/src/CharacterType.cxx
+    ${SCINTILLA_ROOT}/src/CharClassify.cxx
+    ${SCINTILLA_ROOT}/src/ContractionState.cxx
+    ${SCINTILLA_ROOT}/src/DBCS.cxx
+    ${SCINTILLA_ROOT}/src/Decoration.cxx
+    ${SCINTILLA_ROOT}/src/Document.cxx
+    ${SCINTILLA_ROOT}/src/EditModel.cxx
+    ${SCINTILLA_ROOT}/src/Editor.cxx
+    ${SCINTILLA_ROOT}/src/EditView.cxx
+    ${SCINTILLA_ROOT}/src/Geometry.cxx
+    ${SCINTILLA_ROOT}/src/Indicator.cxx
+    ${SCINTILLA_ROOT}/src/KeyMap.cxx
+    ${SCINTILLA_ROOT}/src/LineMarker.cxx
+    ${SCINTILLA_ROOT}/src/MarginView.cxx
+    ${SCINTILLA_ROOT}/src/PerLine.cxx
+    ${SCINTILLA_ROOT}/src/PositionCache.cxx
+    ${SCINTILLA_ROOT}/src/RESearch.cxx
+    ${SCINTILLA_ROOT}/src/RunStyles.cxx
+    ${SCINTILLA_ROOT}/src/ScintillaBase.cxx
+    ${SCINTILLA_ROOT}/src/Selection.cxx
+    ${SCINTILLA_ROOT}/src/Style.cxx
+    ${SCINTILLA_ROOT}/src/UniConversion.cxx
+    ${SCINTILLA_ROOT}/src/UniqueString.cxx
+    ${SCINTILLA_ROOT}/src/ViewStyle.cxx
+    ${SCINTILLA_ROOT}/src/XPM.cxx
+    ${BOOSTREGEX_ROOT}/BoostRegExSearch.cxx
+    ${BOOSTREGEX_ROOT}/UTF8DocumentIterator.cxx
+)
+
+add_library(npp-scintilla-qt STATIC ${NPP_SCINTILLA_SOURCES})
+target_compile_definitions(npp-scintilla-qt
+    PUBLIC SCINTILLA_QT MAKING_LIBRARY
+    PRIVATE SCI_OWNREGEX SCI_NAMESPACE _CRT_SECURE_NO_DEPRECATE)
+target_include_directories(npp-scintilla-qt
+    PUBLIC
+        "${SCINTILLA_ROOT}/include"
+        "${SCINTILLA_QT_ROOT}"
+        "${SCINTILLA_ROOT}/src"
+    PRIVATE
+        "${BOOSTREGEX_ROOT}"
+)
+target_link_libraries(npp-scintilla-qt PUBLIC Qt5::Core Qt5::Gui Qt5::Widgets)
+
 get_target_property(NPP_QMAKE_EXECUTABLE Qt5::qmake IMPORTED_LOCATION)
-if(NOT NPP_QMAKE_EXECUTABLE)
-    find_program(NPP_QMAKE_EXECUTABLE NAMES qmake qmake-qt5 REQUIRED)
-endif()
-
-if(MINGW)
-    get_filename_component(_qt_bin_dir "${NPP_QMAKE_EXECUTABLE}" DIRECTORY)
-    get_filename_component(_qt_prefix_dir "${_qt_bin_dir}/../../.." ABSOLUTE)
-    find_program(NPP_QMAKE_BUILD_TOOL NAMES mingw32-make
-        HINTS "${_qt_prefix_dir}/Tools/mingw730_64/bin")
-elseif(MSVC)
-    find_program(NPP_QMAKE_BUILD_TOOL NAMES nmake jom REQUIRED)
-else()
-    find_program(NPP_QMAKE_BUILD_TOOL NAMES make gmake REQUIRED)
-endif()
-if(NOT NPP_QMAKE_BUILD_TOOL)
-    message(FATAL_ERROR "Could not find the build tool required by qmake")
-endif()
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(NPP_QSCINTILLA_CONFIG debug)
-else()
-    set(NPP_QSCINTILLA_CONFIG release)
-endif()
-
-set(NPP_QSCINTILLA_BUILD_DIR
-    "${CMAKE_BINARY_DIR}/qscintilla-npp-local-${NPP_QSCINTILLA_CONFIG}")
-set(NPP_QSCINTILLA_ARCHIVE
-    "${NPP_QSCINTILLA_BUILD_DIR}/stage/${CMAKE_STATIC_LIBRARY_PREFIX}qscintilla2_qt5_npp${CMAKE_STATIC_LIBRARY_SUFFIX}")
-get_filename_component(NPP_COMPILER_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)
-
-add_custom_command(
-    OUTPUT "${NPP_QSCINTILLA_ARCHIVE}"
-    COMMAND "${CMAKE_COMMAND}"
-        "-DNPP_QMAKE_EXECUTABLE=${NPP_QMAKE_EXECUTABLE}"
-        "-DNPP_QMAKE_BUILD_TOOL=${NPP_QMAKE_BUILD_TOOL}"
-        "-DNPP_COMPILER_BIN=${NPP_COMPILER_BIN}"
-        "-DNPP_QSCINTILLA_PROJECT=${QSCINTILLA_ROOT}/src/npp-qscintilla-static.pro"
-        "-DNPP_QSCINTILLA_ROOT=${QSCINTILLA_ROOT}"
-        "-DNPP_BOOSTREGEX_ROOT=${CMAKE_SOURCE_DIR}/third_party/boostregex"
-        "-DNPP_LEXILLA_ROOT=${LEXILLA_ROOT}"
-        "-DNPP_QSCINTILLA_BUILD_DIR=${NPP_QSCINTILLA_BUILD_DIR}"
-        "-DNPP_QSCINTILLA_CONFIG=${NPP_QSCINTILLA_CONFIG}"
-        "-DNPP_QSCINTILLA_OUTPUT=${NPP_QSCINTILLA_ARCHIVE}"
-        "-DNPP_QT_MAJOR_VERSION=5"
-        "-DNPP_STATIC_LIBRARY_SUFFIX=${CMAKE_STATIC_LIBRARY_SUFFIX}"
-        -P "${CMAKE_SOURCE_DIR}/cmake/BuildNppQScintilla.cmake"
-    DEPENDS
-        "${QSCINTILLA_ROOT}/src/npp-qscintilla-static.pro"
-        "${QSCINTILLA_ROOT}/scintilla/include/SciLexer.h"
-        "${QSCINTILLA_ROOT}/scintilla/include/Scintilla.h"
-        "${QSCINTILLA_ROOT}/scintilla/include/Scintilla.iface"
-        "${LEXILLA_ROOT}/lexlib/PropSetSimple.h"
-        "${LEXILLA_ROOT}/lexlib/CharacterCategory.h"
-        "${CMAKE_SOURCE_DIR}/third_party/boostregex/BoostRegExSearch.cxx"
-        "${CMAKE_SOURCE_DIR}/third_party/boostregex/UTF8DocumentIterator.cxx"
-        "${QSCINTILLA_ROOT}/src/qscintilla.pro"
-        "${QSCINTILLA_ROOT}/src/qscidocument.cpp"
-        "${QSCINTILLA_ROOT}/src/qsciscintillabase.cpp"
-        "${QSCINTILLA_ROOT}/src/Qsci/qscidocument.h"
-        "${QSCINTILLA_ROOT}/src/Qsci/qsciscintillabase.h"
-    VERBATIM
-)
-add_custom_target(npp-qscintilla-build DEPENDS "${NPP_QSCINTILLA_ARCHIVE}")
-add_library(npp-qscintilla STATIC IMPORTED GLOBAL)
-set_target_properties(npp-qscintilla PROPERTIES
-    IMPORTED_LOCATION "${NPP_QSCINTILLA_ARCHIVE}"
-    INTERFACE_INCLUDE_DIRECTORIES "${QSCINTILLA_INCLUDE_DIR}"
-    INTERFACE_LINK_LIBRARIES npp-lexilla
-)
-add_dependencies(npp-qscintilla npp-qscintilla-build)
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/uchardet
-    ${QSCINTILLA_INCLUDE_DIR}
+    ${SCINTILLA_ROOT}/include
+    ${SCINTILLA_QT_ROOT}
+    ${LEXILLA_ROOT}/include
 )
 
 # TinyXml 使用 STL wstring (generic_string = std::wstring)
@@ -154,6 +138,7 @@ set(SOURCES
     src/ScintillaComponent/FindReplaceDlg.cpp
     src/ScintillaComponent/ScintillaTextSearch.cpp
     src/ScintillaComponent/UserDefinedLexer.cpp
+    src/ScintillaComponent/EditorMacro.cpp
     src/MISC/FileManager.cpp
     src/MISC/EncodingMapper.cpp
     src/MISC/TextFileCodec.cpp
@@ -170,6 +155,7 @@ set(SOURCES
     src/Preferences/PreferenceDlg.cpp
     src/WinControls/DockingWnd/DocumentMapPanel.cpp
     src/WinControls/DockingWnd/FunctionListPanel.cpp
+    src/WinControls/Grid/ShortcutMapper.cpp
     src/WinControls/ProjectPanel/WorkspaceDocument.cpp
     src/WinControls/ProjectPanel/ProjectPanel.cpp
     src/PluginSystem/PluginArtifactResolver.cpp
@@ -191,6 +177,7 @@ set(HEADERS
     src/ScintillaComponent/FindReplaceDlg.h
     src/ScintillaComponent/ScintillaTextSearch.h
     src/ScintillaComponent/UserDefinedLexer.h
+    src/ScintillaComponent/EditorMacro.h
     src/MISC/FileManager.h
     src/MISC/EncodingMapper.h
     src/MISC/TextFileCodec.h
@@ -207,6 +194,7 @@ set(HEADERS
     src/Preferences/PreferenceDlg.h
     src/WinControls/DockingWnd/DocumentMapPanel.h
     src/WinControls/DockingWnd/FunctionListPanel.h
+    src/WinControls/Grid/ShortcutMapper.h
     src/WinControls/ProjectPanel/WorkspaceDocument.h
     src/WinControls/ProjectPanel/ProjectPanel.h
     src/PluginSystem/PluginArtifactResolver.h
@@ -227,7 +215,8 @@ add_executable(notepadpp-qt WIN32
     ${SOURCES} ${HEADERS} ${RESOURCES} ${UCHARDET_SOURCES})
 
 target_link_libraries(notepadpp-qt
-    npp-qscintilla
+    npp-scintilla-qt
+    npp-lexilla
     Qt5::Core
     Qt5::Gui
     Qt5::Widgets
@@ -283,9 +272,14 @@ endif()
 add_executable(npp-plugin-updater
     src/PluginSystem/PluginUpdaterMain.cpp
     src/PluginSystem/PluginArchiveExtractor.cpp
+    src/PluginSystem/PluginArtifactResolver.cpp
+    src/PluginSystem/PluginUpdateExecutor.cpp
     src/PluginSystem/PluginUpdatePlan.cpp
 )
 target_link_libraries(npp-plugin-updater Qt5::Core Qt5::Network)
+if(WIN32)
+    target_link_libraries(npp-plugin-updater advapi32)
+endif()
 add_dependencies(notepadpp-qt npp-plugin-updater)
 add_custom_command(TARGET notepadpp-qt POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -365,6 +359,19 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME plugin-admin-tests COMMAND plugin-admin-tests)
 
+    add_executable(plugin-updater-tests
+        tests/PluginUpdaterTests.cpp
+        src/PluginSystem/PluginArchiveExtractor.cpp
+        src/PluginSystem/PluginArtifactResolver.cpp
+        src/PluginSystem/PluginUpdateExecutor.cpp
+        src/PluginSystem/PluginUpdatePlan.cpp
+    )
+    target_link_libraries(plugin-updater-tests Qt5::Core Qt5::Network)
+    target_compile_definitions(plugin-updater-tests PRIVATE
+        NPP_PLUGIN_UPDATER_PATH="$<TARGET_FILE:npp-plugin-updater>")
+    add_dependencies(plugin-updater-tests npp-plugin-updater)
+    add_test(NAME plugin-updater-tests COMMAND plugin-updater-tests)
+
     add_executable(config-path-resolver-tests
         tests/ConfigPathResolverTests.cpp
         src/MISC/ConfigPathResolver.cpp
@@ -441,7 +448,8 @@ if(BUILD_TESTING)
         ${UCHARDET_SOURCES}
     )
     target_link_libraries(ui-parity-capture
-        npp-qscintilla
+        npp-scintilla-qt
+        npp-lexilla
         Qt5::Core
         Qt5::Gui
         Qt5::Widgets
@@ -492,7 +500,8 @@ if(BUILD_TESTING)
         ${UCHARDET_SOURCES}
     )
     target_link_libraries(p1-runtime-capture
-        npp-qscintilla
+        npp-scintilla-qt
+        npp-lexilla
         Qt5::Core
         Qt5::Gui
         Qt5::Widgets
@@ -542,17 +551,19 @@ if(BUILD_TESTING)
         src/MISC/EncodingMapper.cpp
         src/MISC/TextFileCodec.cpp
         src/MISC/AutoCompletionParser.cpp
+        resources/resources.qrc
         ${UCHARDET_SOURCES}
     )
     target_link_libraries(large-file-mode-tests
-        npp-qscintilla
+        npp-scintilla-qt
+        npp-lexilla
         Qt5::Core
         Qt5::Gui
         Qt5::Widgets
         Qt5::PrintSupport
     )
     target_include_directories(large-file-mode-tests PRIVATE
-        "${QSCINTILLA_ROOT}/scintilla/include")
+        "${SCINTILLA_ROOT}/include")
     add_test(NAME large-file-mode-tests COMMAND large-file-mode-tests)
     if(WIN32)
         set_tests_properties(large-file-mode-tests PROPERTIES
@@ -567,7 +578,8 @@ if(BUILD_TESTING)
         src/ScintillaComponent/ScintillaTextSearch.cpp
     )
     target_link_libraries(boost-regex-tests
-        npp-qscintilla
+        npp-scintilla-qt
+        npp-lexilla
         Qt5::Widgets
         Qt5::PrintSupport
     )

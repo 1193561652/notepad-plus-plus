@@ -20,12 +20,13 @@
 // ── 语言描述符（对应原版 langs.xml <Language> 元素） ─────────────────────────
 
 struct LangDesc {
+    static constexpr int KeywordSetCount = 9;
     QString     name;           // 语言名，如 "cpp"、"python"
     QStringList exts;           // 文件扩展名列表（小写，不含点）
     QString     commentLine;    // 行注释，如 "//"
     QString     commentStart;   // 块注释起，如 "/*"
     QString     commentEnd;     // 块注释止，如 "*/"
-    QString     keywords[4];    // instre1/instre2/type1/type2 关键字
+    QString     keywords[KeywordSetCount];
 };
 
 // ── 样式描述符（对应原版 stylers.xml <WordsStyle> 元素） ─────────────────────
@@ -288,6 +289,7 @@ struct NppGUI {
     int  _autocFromNbChar    = 3;
     bool _autocIgnoreNumbers = true;
     bool _funcParams         = true;
+    bool _backSlashIsEscapeCharacterForSql = true;
 
     // 分割视图方向（GUIConfig name="ScintillaViewsSplitter"）
     bool _isVerticalSplit = false;
@@ -346,6 +348,13 @@ struct NppGUI {
     bool _enableTagsMatchHighlight = true;
     bool _enableTagAttrsHighlight = true;
     bool _highlightNonHtmlZone = false;
+    bool _fillFindFieldWithSelected = true;
+    bool _fillFindFieldSelectCaret = true;
+    bool _monospacedFontFindDlg = false;
+    bool _findDlgAlwaysVisible = false;
+    bool _confirmReplaceInAllOpenDocs = true;
+    bool _replaceStopsWithoutFindingNext = false;
+    bool _showOnlyOneEntryPerFoundLine = true;
     bool _autoInsertParentheses = false;
     bool _autoInsertBrackets = false;
     bool _autoInsertCurlyBrackets = false;

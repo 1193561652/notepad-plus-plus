@@ -2,7 +2,8 @@
 
 ## 功能定位
 
-编辑器层使用 QScintilla 承载文本编辑能力，并通过 `ScintillaEditView` 保留部分 Notepad++ / Scintilla 风格接口。
+编辑器层直接使用官方 Scintilla 5.3.0 Qt 平台实现，并通过 `ScintillaEditView`
+保持 Notepad++ 的 `execute(SCI_*, ...)` 消息调用边界。
 
 ## 当前实现入口
 
@@ -13,7 +14,7 @@
 
 ## 当前能力
 
-- `execute()`：保留 Scintilla 消息调用风格，内部转发到 `SendScintilla()`。
+- `execute()`：保留 Scintilla 消息调用风格，内部转发到 Scintilla direct-call 接口。
 - 基础文本操作：设置、获取、追加、插入文本。
 - 光标和选择：当前位置、设置位置、获取选区。
 - 语法高亮：按文件路径或扩展名设置 lexer。
@@ -27,12 +28,12 @@
 
 - `NppParameters::getLangDescByExt()` / `getLangDescByName()` 用于语言识别。
 - `NppParameters::getLexerStyler()` / `getGlobalStyles()` 用于样式。
-- QScintilla 的 `SendScintilla()` 是兼容层核心。
+- `ScintillaEditBase::WndProc()` 与 Scintilla direct function 是兼容层核心。
 
 ## 风险点
 
-- QScintilla API 和原版 Scintilla 消息语义不总是完全一致。
-- indicator、marker、margin 编号需要避免和 QScintilla 默认行为冲突。
+- Qt 平台事件与原版 Win32 平台事件不完全一致，鼠标、IME、DPI 和焦点行为需要验证。
+- indicator、marker、margin 编号必须与原版 Scintilla 配置保持一致。
 - 样式 ID 映射必须对齐 Lexilla/Scintilla 语言规则。
 - 行/列、字节偏移和 Unicode 字符位置之间可能存在差异。
 
@@ -40,11 +41,11 @@
 
 - 建立 `SCI_*` 消息使用清单。
 - 对比原版 `ScintillaEditView` 的初始化、边距、样式和指示器设置。
-- 分析编码文本加载后 QScintilla 内部位置与原版字节位置的差异。
+- 分析编码文本加载后 UTF-8 字节位置与原版消息调用的差异。
 
 ## 2026-07-22 阶段二更新
 
-- 打开和 reload 文件时会设置 QScintilla 的 EOL mode，以保持 Windows/Unix/Mac 换行状态。
+- 打开和 reload 文件时会设置 Scintilla EOL mode，以保持 Windows/Unix/Mac 换行状态。
 - 会话保存使用当前标签实际 `ScintillaEditView`，避免 clone/sub view 的光标和滚动位置被原始 view 覆盖。
 - 会话恢复使用 `SCI_SETSEL`、`SCI_SETFIRSTVISIBLELINE`、`SCI_SETXOFFSET` 和 `SCI_SETSCROLLWIDTH` 恢复基础视图状态。
 

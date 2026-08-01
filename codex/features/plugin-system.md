@@ -1,102 +1,70 @@
-# 插件系统功能分析
+# 插件系统功能索引
 
-## 功能定位
+## 范围
 
-插件系统分为插件管理和插件加载运行。当前已接通插件管理首轮实现；原版插件兼容
-加载、新跨平台 ABI 和真实插件清单仍按移植指导分阶段推进。
+插件系统分为两个独立范围：
 
-完整的后续实施边界、ABI 分层、阶段计划和测试矩阵见
-`codex/guides/plugin-system-porting-guide.md`。
+- 插件包管理：清单、已安装状态、安装、更新、卸载和退出后更新器，当前已实现。
+- 插件加载运行：原版 Windows ABI 与未来跨平台 ABI，当前仍是隔离的预留接口。
 
-## 当前实现入口
+完整 ABI 决策和插件分级见 `codex/guides/plugin-system-porting-guide.md`。
 
-- `./src/PluginSystem/IPlugin.h`
-- `./src/PluginSystem/PluginManager.h`
-- `./src/PluginSystem/PluginManager.cpp`
-- `./src/PluginSystem/PluginArtifactResolver.h`
-- `./src/PluginSystem/PluginCatalog.h`
-- `./src/PluginSystem/PluginAdminModel.h`
-- `./src/PluginSystem/PluginAdminDialog.h`
-- `./src/PluginSystem/PluginUpdatePlan.h`
-- `./src/PluginSystem/PluginUpdaterMain.cpp`
-- `./src/PluginSystem/PluginArchiveExtractor.cpp`
-- `./src/MainWindow.h`
-- `./src/MainWindow.cpp`
-- `./CMakeLists.txt`
+## 管理入口
 
-## 当前接口
+- `src/PluginSystem/PluginCatalog.*`：解析 v8.4.6 插件清单、版本区间和旧版兼容映射。
+- `src/PluginSystem/PluginArtifactResolver.*`：统一管理器与加载器的平台动态库路径。
+- `src/PluginSystem/PluginAdminModel.*`：Available、Updates、Installed、Incompatible 分类。
+- `src/PluginSystem/PluginAdminDialog.*`：四页、搜索、描述、批量选择和退出确认。
+- `src/PluginSystem/PluginUpdatePlan.*`：持久化并验证退出后操作计划。
+- `src/PluginSystem/PluginArchiveExtractor.*`：ZIP 列表、目录穿越和符号链接防护。
+- `src/PluginSystem/PluginUpdateExecutor.*`：下载、SHA-256、平台二进制预检和事务提交/回滚。
+- `src/PluginSystem/PluginUpdaterMain.cpp`：等待主进程退出、执行计划并重启。
+- `MainWindow::showPluginAdmin()` / `schedulePluginOperations()` /
+  `launchPendingPluginUpdater()`：主程序协调入口。
 
-`IPluginHost` 提供：
+## 当前行为
 
-- 当前活动编辑视图。
-- 打开文件。
-- 当前文件路径。
-- 主窗口指针。
+- Windows 内置 `nppPluginList/v1.5.4` 的 x86、x64、ARM64 JSON，并按进程架构选择。
+- Linux/macOS 在没有本平台原生包清单前使用有效空清单，避免误装 Windows DLL。
+- 路径保持既定兼容规则：Windows `plugins/<name>/<name>.dll`，Linux
+  `plugins/<name>/linux/<name>.so`，macOS `plugins/<name>/macos/<name>.dylib`。
+- 安装、更新和卸载都在主程序正常退出后执行，完成后重启，与 v8.4.6 工作流一致。
+- 所有非卸载包先完成下载、SHA-256、ZIP 路径、符号链接和目标平台二进制检查；
+  全部预检成功后才修改插件目录。
+- 提交在插件根目录内使用 staging/backup 原子换位；批处理中途失败会逆序恢复旧目录。
+- 成功安装写入 `.npp-package.json`；Windows 手工安装 DLL 可回退读取文件版本。
+- Windows 程序目录不可写时使用 UAC 启动更新器，完成后使用桌面 shell 的普通用户
+  token 重启主程序，避免主程序继承管理员权限。
+- Linux/macOS 不自动调用系统提权工具；不可写目录会在退出前明确提示。
 
-`IPlugin` 提供：
+## 安全边界
 
-- 插件名称。
-- 插件版本。
-- 初始化。
-- 清理。
-- 插件贡献的菜单动作。
+- 更新计划拒绝空计划、重复/越界目录、`Config` 目录、非法 URL 和非法 SHA-256。
+- 主程序把计划内容 SHA-256 随更新器命令行传递；更新器一次读取并在解析前校验，
+  防止退出/UAC 交接期间替换计划文件。
+- 远程下载遵循 Qt 代理/TLS，限制为 HTTP(S)；自动化测试使用 `file:` 本地包。
+- ZIP 在解压前检查绝对路径与 `..`，解压后拒绝符号链接。
+- 包必须包含当前平台约定位置和名称的动态库，否则整个批次不提交。
+- 当前按已确认方案只校验包 SHA-256，不实现插件列表、更新器或动态库签名校验。
 
-动态库导出函数类型：
+## 构建边界
 
-- `createPlugin`
-- `destroyPlugin`
+- Plugin Admin 和 `npp-plugin-updater` 始终构建，不依赖 `ENABLE_PLUGIN_SYSTEM`。
+- `ENABLE_PLUGIN_SYSTEM` 默认关闭，只控制实验性 Qt/C++ `IPlugin` 运行接口。
+- 当前 `IPlugin` 不是冻结 ABI，也不等同于 Notepad++ 原版插件兼容。
 
-## 插件管理首轮实现（2026-07-30）
+## 验证
 
-- Plugins 菜单提供 Plugins Admin 和打开插件目录入口。
-- Plugin Admin 提供 Available、Updates、Installed、Incompatible 四页、搜索、
-  描述、批量选择以及安装/更新/卸载确认。
-- 内置清单解析保持 v8.4.6 字段与版本区间语义；已原样归档 GitHub
-  `nppPluginList/v1.5.4` 的 x86、x64、ARM64 JSON。Windows 按进程架构选择，
-  Linux/macOS 保持空清单以避免误装 Windows DLL。
-- Windows 插件文件为
-  `plugins/<name>/<name>.dll`；Linux 为
-  `plugins/<name>/linux/<name>.so`；macOS 为
-  `plugins/<name>/macos/<name>.dylib`。不增加 CPU 架构目录。
-- 管理器与加载器共用 `PluginArtifactResolver`，排除 `plugins/Config`。
-- 安装、更新和卸载写入结构化计划，主程序正常退出后由
-  `npp-plugin-updater` 执行；远程包只按已确认范围校验 SHA-256。
-- 更新器拒绝目录穿越和符号链接，更新前先完成下载、哈希和解压检查，完成后写入
-  `.npp-package.json` 安装收据并重启主程序。
-- Windows 可从 DLL 版本资源识别手工安装插件版本；Linux/macOS 的已管理版本从
-  安装收据取得，缺少收据时版本显示为 Unknown。
+- `plugin-admin-tests`：版本、清单条目、兼容区间、平台路径、发现、收据和计划验证。
+- `plugin-updater-tests`：真实 ZIP 安装/更新/卸载、错误哈希、缺失平台二进制、
+  批次预检不改旧插件和目录穿越拒绝。
+- 更新器子进程测试覆盖计划哈希不匹配时拒绝执行并保留诊断文件。
+- Windows 构建已验证 PowerShell ZIP 实际执行路径。
+- 真实公网下载、UAC 交互确认和非 Windows 原生插件包仍属于发布环境/人工矩阵，
+  不是代码逻辑缺口。
 
-当前 Ubuntu 已完成编译和管理核心针对性测试。Windows 构建、UAC/不可写目录、
-PowerShell ZIP、真实网络包和完整 UI 工作流尚待验证。
+## 仍延期的插件工作
 
-## 已知约束
-
-- Windows 清单尚未在 Windows 实机完成真实下载和安装验证；Linux/macOS 尚无
-  对应的原生插件包清单。
-- Unix 更新器当前依赖系统 `unzip` 命令；发布打包必须验证或明确提供该依赖。
-- 程序目录不可写时的权限提升启动与降权重启尚未实现；当前会明确失败，不能用于
-  需要管理员权限的系统级安装目录。
-- 当前 Qt/C++ `IPlugin` 仍只是原型接口，不是冻结的跨平台 ABI。
-
-## 当前构建策略
-
-- `ENABLE_PLUGIN_SYSTEM` 默认关闭，符合插件不属于近期目标的约束。
-- 显式使用 `-DENABLE_PLUGIN_SYSTEM=ON` 可构建并启用现有 Qt 插件接口。
-- Plugin Admin 和外部更新器不依赖 `ENABLE_PLUGIN_SYSTEM`，以便先完成管理工作。
-- 当前 `IPlugin` 是 Qt 化扩展边界，不等同于 Notepad++ 原生插件 ABI。
-
-## 与原版差异
-
-- 原版插件接口包含 `PluginInterface.h`、`Notepad_plus_msgs.h`、`NppData`、`FuncItem`、`ShortcutKey` 和大量 `NPPM_*` 消息。
-- 原版插件可获取 Notepad++ 和 Scintilla 的窗口句柄，发送消息控制菜单、状态栏、文档、编码、格式、dock 面板等。
-- 原版 `PluginsManager` 负责扫描、加载、菜单初始化、快捷键、通知、Plugin Admin 和 docking 恢复。
-- Qt 版 `IPlugin` 只提供 Qt 对象级接口：当前视图、打开文件、当前文件路径、主窗口和菜单动作。
-- 因此 Qt 版当前只能视为“插件接口预留”，不能视为“原版插件兼容”。
-
-## 后续索引任务
-
-- 原版 `PowerEditor/src/MISC/PluginsManager/` 的导出、加载顺序、消息、通知和
-  Dock 边界已经核验。
-- 后续按移植指导中的阶段 0 开始冻结契约；当前 Qt/C++ `IPlugin` 不作为稳定 ABI。
-- 跨平台稳定 C ABI 与 Windows 原版 ABI 适配器分别实施，不在 Linux/macOS
-  模拟 Win32 插件二进制环境。
+- Windows v8.4.6 原版插件 ABI 兼容层。
+- 跨平台稳定插件 ABI 及 SDK。
+- Linux/macOS 原生插件生态清单、签名、公证和发布策略。

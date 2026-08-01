@@ -87,7 +87,7 @@ QVector<AutoCompletionEntry> AutoCompletionParser::parseFile(
                     xml.skipCurrentElement();
                 }
             }
-            // QsciAPIs supports overloads as separate signatures.
+            // Keep overloads as separate completion signatures.
             const QString signature = entry.apiText();
             if (!entry.name.isEmpty() && !seen.contains(signature)) {
                 entries.append(entry);

@@ -2,7 +2,7 @@
 
 ## 定位
 
-仓库根目录是唯一主线，负责用 Qt Widgets、C++14、CMake 和 QScintilla
+仓库根目录是唯一主线，负责用 Qt Widgets、C++17、CMake 和官方 Scintilla 5 Qt 平台层
 实现 Notepad++ v8.4.6 的跨平台移植版本。
 
 ## 当前状态
@@ -17,18 +17,19 @@
 - 文档管理系统，包括 Buffer、FileManager、DocTabView。
 - 文件保存、另存为、脏标记、关闭询问等基础文档行为。
 
-插件系统和大文件方案 B 按当前决策延期。
+插件包管理已形成独立更新器闭环；原版插件 ABI 和大文件方案 B 按当前决策延期。
 
 ## 关键入口
 
 - `src/main.cpp`：应用程序入口。
 - `src/MainWindow.h|cpp`：主窗口和多数用户可见行为的协调入口。
-- `src/ScintillaComponent/ScintillaEditView.h|cpp`：QScintilla 适配层。
+- `src/ScintillaComponent/ScintillaEditView.h|cpp`：官方 Scintilla Qt 平台封装与消息边界。
 - `src/ScintillaComponent/Buffer.h|cpp`：文档缓冲区。
 - `src/MISC/FileManager.h|cpp`：文件和 Buffer 生命周期管理。
 - `src/WinControls/TabBar/DocTabView.h|cpp`：标签页管理。
 - `src/Parameters.h|cpp`：配置管理。
-- `src/PluginSystem/IPlugin.h`、`src/PluginSystem/PluginManager.h|cpp`：插件接口预留。
+- `src/PluginSystem/PluginAdmin*`、`PluginUpdate*`：插件清单、管理 UI 和退出后更新器。
+- `src/PluginSystem/IPlugin.h`、`PluginManager.h|cpp`：插件运行接口预留。
 
 ## 开发约束
 
@@ -45,4 +46,4 @@
 - `Buffer` 与 `ScintillaEditView` 的关系会影响文件保存、标签显示、脏状态和双视图。
 - 配置读写必须避免改变原版 XML 结构。
 - 插件相关代码应避免过早绑定某个平台的动态库细节。
-- `ENABLE_PLUGIN_SYSTEM` 当前默认开启，和“近期不实现插件功能”之间需要后续决策。
+- `ENABLE_PLUGIN_SYSTEM` 默认关闭，仅控制实验性运行 ABI；Plugin Admin 与包更新器始终构建。

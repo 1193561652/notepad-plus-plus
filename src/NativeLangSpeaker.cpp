@@ -20,6 +20,8 @@
 #include <QTabBar>
 #include <QComboBox>
 #include <QSpinBox>
+#include <QTableWidget>
+#include <QTreeWidget>
 #include <QFile>
 
 // ── 内部辅助：宽字符属性读取 ─────────────────────────────────────────────────
@@ -144,9 +146,12 @@ bool NativeLangSpeaker::init(const QString& xmlPath)
              item; item = item->NextSiblingElement(L"Item"))
         {
             QString oname = txAttr(item, L"objectName");
+            QString source = txAttr(item, L"source");
             QString name  = txAttr(item, L"name");
             if (!oname.isEmpty() && !name.isEmpty())
                 widgetMap[oname] = name;
+            if (!source.isEmpty() && !name.isEmpty())
+                widgetMap[QStringLiteral("@source:") + source] = name;
         }
         _dialogs[dlgName] = widgetMap;
     }
@@ -283,6 +288,27 @@ bool NativeLangSpeaker::changeDlgLang(QWidget* dlg, const QString& dlgTagName,
 
     const QMap<QString, QString>& widgetMap = it.value();
 
+    // Qt pages contain a few platform-created controls that have no original
+    // Win32 numeric ID.  Their source text is recorded explicitly in the local
+    // language file while objectName remains the primary compatibility key.
+    for (auto jt = widgetMap.begin(); jt != widgetMap.end(); ++jt) {
+        if (!jt.key().startsWith(QLatin1String("@source:")))
+            continue;
+        const QString source = jt.key().mid(8);
+        for (QLabel* label : dlg->findChildren<QLabel*>())
+            if (label->text() == source) label->setText(jt.value());
+        for (QGroupBox* group : dlg->findChildren<QGroupBox*>())
+            if (group->title() == source) group->setTitle(jt.value());
+        for (QAbstractButton* button : dlg->findChildren<QAbstractButton*>())
+            if (button->text() == source) button->setText(jt.value());
+        for (QComboBox* comboBox : dlg->findChildren<QComboBox*>()) {
+            for (int index = 0; index < comboBox->count(); ++index) {
+                if (comboBox->itemText(index) == source)
+                    comboBox->setItemText(index, jt.value());
+            }
+        }
+    }
+
     // 遍历所有带 objectName 的子控件，按类型调用对应的 setText
     auto apply = [&](const QString& on, const QString& text) {
         // QLabel
@@ -299,6 +325,9 @@ bool NativeLangSpeaker::changeDlgLang(QWidget* dlg, const QString& dlgTagName,
     for (auto jt = widgetMap.begin(); jt != widgetMap.end(); ++jt) {
         const QString& on   = jt.key();
         const QString& text = jt.value();
+
+        if (on.startsWith(QLatin1String("@source:")))
+            continue;
 
         if (on.endsWith(QLatin1String("_suffix"))) {
             const QString widgetName = on.left(on.size() - 7);
@@ -327,6 +356,17 @@ bool NativeLangSpeaker::changeDlgLang(QWidget* dlg, const QString& dlgTagName,
                 for (QComboBox* combo : dlg->findChildren<QComboBox*>(widgetName)) {
                     if (itemIdx >= 0 && itemIdx < combo->count())
                         combo->setItemText(itemIdx, text);
+                }
+                for (QTableWidget* table : dlg->findChildren<QTableWidget*>(widgetName)) {
+                    if (itemIdx >= 0 && itemIdx < table->columnCount()) {
+                        if (QTableWidgetItem* header =
+                                table->horizontalHeaderItem(itemIdx))
+                            header->setText(text);
+                    }
+                }
+                for (QTreeWidget* tree : dlg->findChildren<QTreeWidget*>(widgetName)) {
+                    if (itemIdx >= 0 && itemIdx < tree->topLevelItemCount())
+                        tree->topLevelItem(itemIdx)->setText(0, text);
                 }
             }
         }

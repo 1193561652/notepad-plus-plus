@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QUrl>
 
@@ -31,6 +32,33 @@ QString windowsErrorMessage(LONG error)
     if (buffer)
         LocalFree(buffer);
     return message;
+}
+
+QString quoteWindowsArgument(const QString& argument)
+{
+    if (!argument.isEmpty() &&
+        !argument.contains(QRegularExpression(QStringLiteral("[\\s\"]")))) {
+        return argument;
+    }
+    QString quoted = QStringLiteral("\"");
+    int backslashes = 0;
+    for (const QChar character : argument) {
+        if (character == QLatin1Char('\\')) {
+            ++backslashes;
+            continue;
+        }
+        if (character == QLatin1Char('"')) {
+            quoted += QString(backslashes * 2 + 1, QLatin1Char('\\'));
+            quoted += character;
+        } else {
+            quoted += QString(backslashes, QLatin1Char('\\'));
+            quoted += character;
+        }
+        backslashes = 0;
+    }
+    quoted += QString(backslashes * 2, QLatin1Char('\\'));
+    quoted += QLatin1Char('"');
+    return quoted;
 }
 
 QString readRegistryString(HKEY root, const QString& subKey, const wchar_t* valueName)
@@ -317,6 +345,48 @@ bool openDefaultApplicationsSettings()
 #else
     return QDesktopServices::openUrl(
         QUrl(QStringLiteral("settings://default-applications")));
+#endif
+}
+
+bool startElevated(const QString& program, const QStringList& arguments,
+                   const QString& workingDirectory, QString* errorMessage)
+{
+#ifdef Q_OS_WIN
+    QStringList quotedArguments;
+    for (const QString& argument : arguments)
+        quotedArguments.append(quoteWindowsArgument(argument));
+    const QString parameters = quotedArguments.join(QLatin1Char(' '));
+    const std::wstring nativeProgram =
+        QDir::toNativeSeparators(program).toStdWString();
+    const std::wstring nativeParameters = parameters.toStdWString();
+    const std::wstring nativeDirectory =
+        QDir::toNativeSeparators(workingDirectory).toStdWString();
+    SHELLEXECUTEINFOW executeInfo = {};
+    executeInfo.cbSize = sizeof(executeInfo);
+    executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
+    executeInfo.hwnd = nullptr;
+    executeInfo.lpVerb = L"runas";
+    executeInfo.lpFile = nativeProgram.c_str();
+    executeInfo.lpParameters = nativeParameters.c_str();
+    executeInfo.lpDirectory = nativeDirectory.c_str();
+    executeInfo.nShow = SW_SHOWNORMAL;
+    if (!ShellExecuteExW(&executeInfo)) {
+        if (errorMessage)
+            *errorMessage = windowsErrorMessage(GetLastError());
+        return false;
+    }
+    if (executeInfo.hProcess)
+        CloseHandle(executeInfo.hProcess);
+    return true;
+#else
+    Q_UNUSED(program)
+    Q_UNUSED(arguments)
+    Q_UNUSED(workingDirectory)
+    if (errorMessage) {
+        *errorMessage = QStringLiteral(
+            "Privilege elevation is only implemented on Windows.");
+    }
+    return false;
 #endif
 }
 }

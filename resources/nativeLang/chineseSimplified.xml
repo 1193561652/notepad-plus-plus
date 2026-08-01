@@ -190,7 +190,9 @@
                     <Item objectName="docMapAction"         name="文档地图(&amp;D)"/>
                     <Item objectName="funcListAction"       name="函数列表(&amp;F)"/>
                     <Item objectName="documentListAction" name="文档列表"/>
-                    <Item objectName="projectPanelsAction" name="项目面板"/>
+                    <Item objectName="projectPanelsAction" name="&#x5DE5;&#x7A0B; 1"/>
+                    <Item objectName="projectPanels2Action" name="&#x5DE5;&#x7A0B; 2"/>
+                    <Item objectName="projectPanels3Action" name="&#x5DE5;&#x7A0B; 3"/>
                     <Item objectName="clipboardHistoryAction" name="剪贴板历史"/>
                     <Item objectName="characterPanelAction" name="字符面板"/>
                     <Item objectName="foldCurrentLevelAction" name="折叠当前层级"/>
@@ -260,7 +262,9 @@
                     <Item objectName="FunctionListDock"         name="函数列表"/>
                     <Item objectName="FindResultDock"           name="查找结果"/>
                     <Item objectName="DocumentListDock"         name="文档列表"/>
-                    <Item objectName="ProjectPanelsDock"        name="项目面板"/>
+                    <Item objectName="ProjectPanelsDock"        name="&#x5DE5;&#x7A0B; 1"/>
+                    <Item objectName="ProjectPanelsDock2"       name="&#x5DE5;&#x7A0B; 2"/>
+                    <Item objectName="ProjectPanelsDock3"       name="&#x5DE5;&#x7A0B; 3"/>
                     <Item objectName="ClipboardHistoryDock"     name="剪贴板历史"/>
                     <Item objectName="CharacterPanelDock"       name="字符面板"/>
                     <Item objectName="StandardToolBar"          name="标准工具栏"/>
@@ -317,6 +321,12 @@
 
             <!-- 1. 通用页 -->
             <Item objectName="grpToolBar"           name="工具栏"/>
+            <Item objectName="lblLocalization"      name="&#x672C;&#x5730;&#x5316;&#xFF1A;"/>
+            <Item objectName="rbToolbarMode0"       name="&#x6807;&#x51C6;&#x56FE;&#x6807;&#xFF1A;&#x5C0F;"/>
+            <Item objectName="rbToolbarMode1"       name="&#x6807;&#x51C6;&#x56FE;&#x6807;&#xFF1A;&#x5927;"/>
+            <Item objectName="rbToolbarMode2"       name="Fluent UI &#x56FE;&#x6807;&#xFF1A;&#x5C0F;"/>
+            <Item objectName="rbToolbarMode3"       name="Fluent UI &#x56FE;&#x6807;&#xFF1A;&#x5927;"/>
+            <Item objectName="rbToolbarMode4"       name="Fluent UI &#x56FE;&#x6807;&#xFF1A;&#x6DF1;&#x8272;&#x5C0F;&#x56FE;&#x6807;"/>
             <Item objectName="chkHideToolbar"       name="隐藏"/>
             <Item objectName="grpTabBar"            name="标签栏"/>
             <Item objectName="chkTabHide"           name="隐藏标签栏"/>
@@ -328,6 +338,9 @@
             <Item objectName="chkTabVertical"       name="垂直（旋转 90°）"/>
             <Item objectName="chkTabMultiLine"      name="多行"/>
             <Item objectName="chkTabQuitOnEmpty"    name="关闭最后一个标签时退出程序"/>
+            <Item objectName="chkTabReduce"         name="&#x7F29;&#x5C0F;"/>
+            <Item objectName="chkTabAlternateIcons" name="&#x4F7F;&#x7528;&#x5907;&#x7528;&#x56FE;&#x6807;"/>
+            <Item objectName="chkTabLock"           name="&#x9501;&#x5B9A;&#xFF08;&#x7981;&#x6B62;&#x62D6;&#x653E;&#xFF09;"/>
             <Item objectName="grpBarGroup"          name="状态栏 / 菜单栏"/>
             <Item objectName="chkShowStatusBar"     name="显示状态栏"/>
             <Item objectName="chkShowMenuBar"       name="显示菜单栏"/>
@@ -347,6 +360,11 @@
             <Item objectName="grpDisplay"               name="显示"/>
             <Item objectName="chkShowWhitespace"        name="显示空白字符"/>
             <Item objectName="chkShowEol"               name="显示行尾字符"/>
+            <Item objectName="grpEditingOptions"        name="&#x7F16;&#x8F91;&#x9009;&#x9879;"/>
+            <Item objectName="chkSmoothFont"            name="&#x542F;&#x7528;&#x5E73;&#x6ED1;&#x5B57;&#x4F53;"/>
+            <Item objectName="chkVirtualSpace"          name="&#x542F;&#x7528;&#x865A;&#x62DF;&#x7A7A;&#x683C;"/>
+            <Item objectName="chkMultiEditing"          name="&#x542F;&#x7528;&#x591A;&#x91CD;&#x7F16;&#x8F91;"/>
+            <Item objectName="chkRightClickKeepsSelection" name="&#x53F3;&#x952E;&#x4FDD;&#x7559;&#x9009;&#x533A;"/>
 
             <!-- 4. 边距/边框/边缘页 -->
             <Item objectName="grpMargins"               name="边距"/>
@@ -383,6 +401,12 @@
             <Item objectName="lblLanguage"          name="语言："/>
             <Item objectName="comboInterfaceLanguage_0" name="英语"/>
             <Item objectName="comboInterfaceLanguage_1" name="简体中文"/>
+            <Item objectName="grpLanguageMenu"          name="&#x8BED;&#x8A00;&#x83DC;&#x5355;"/>
+            <Item objectName="lblAvailableLanguages"    name="&#x53EF;&#x7528;&#x9879;&#xFF1A;"/>
+            <Item objectName="lblDisabledLanguages"     name="&#x5DF2;&#x7981;&#x7528;&#x9879;&#xFF1A;"/>
+            <Item objectName="grpLanguageTabSettings"   name="&#x5236;&#x8868;&#x7B26;&#x8BBE;&#x7F6E;"/>
+            <Item objectName="lblLanguageTabSize"       name="&#x5236;&#x8868;&#x7B26;&#x5BBD;&#x5EA6;&#xFF1A;"/>
+            <Item objectName="chkLanguageReplaceBySpace" name="&#x66FF;&#x6362;&#x4E3A;&#x7A7A;&#x683C;"/>
 
             <!-- 13. 备份页 -->
             <Item objectName="grpBackupSave"        name="保存时备份"/>
@@ -520,13 +544,210 @@
             <Item objectName="lblSearchCustomUrl"        name="自定义 URL："/>
             <Item objectName="comboSearchEngine_4"       name="自定义"/>
 
+            <!-- v8.4.6 页面中由 Qt 平台控件承载的静态文本 -->
+            <Item source="Tones" name="色调"/>
+            <Item source="Black" name="黑色"/>
+            <Item source="Red" name="红色"/>
+            <Item source="Green" name="绿色"/>
+            <Item source="Blue" name="蓝色"/>
+            <Item source="Purple" name="紫色"/>
+            <Item source="Cyan" name="青色"/>
+            <Item source="Olive" name="橄榄色"/>
+            <Item source="Customized" name="自定义"/>
+            <Item source="Top" name="顶部"/>
+            <Item source="Menu hot track" name="菜单热跟踪"/>
+            <Item source="Active" name="活动项"/>
+            <Item source="Main" name="主色"/>
+            <Item source="Error" name="错误"/>
+            <Item source="Text" name="文本"/>
+            <Item source="Darker text" name="深色文本"/>
+            <Item source="Disabled text" name="禁用文本"/>
+            <Item source="Link" name="链接"/>
+            <Item source="Edge" name="边缘"/>
+            <Item source="Edge highlight" name="边缘高亮"/>
+            <Item source="Edge disabled" name="禁用边缘"/>
+            <Item source="Reset" name="重置"/>
+            <Item source="Fold Margin Style" name="折叠边距样式"/>
+            <Item source="Simple" name="简单"/>
+            <Item source="Arrow" name="箭头"/>
+            <Item source="Circle tree" name="圆形树"/>
+            <Item source="Box tree" name="方框树"/>
+            <Item source="None" name="无"/>
+            <Item source="Vertical Edge Settings" name="垂直边缘设置"/>
+            <Item source="Display" name="显示"/>
+            <Item source="Column:" name="列："/>
+            <Item source="Background mode" name="背景模式"/>
+            <Item source="Border Width" name="边框宽度"/>
+            <Item source="No edge" name="无边缘"/>
+            <Item source="Line Number" name="行号"/>
+            <Item source="Dynamic width" name="动态宽度"/>
+            <Item source="Constant width" name="固定宽度"/>
+            <Item source="Padding" name="内边距"/>
+            <Item source="Left" name="左"/>
+            <Item source="Right" name="右"/>
+            <Item source="Distraction Free" name="无干扰模式"/>
+            <Item source="Display Change History" name="显示更改历史"/>
+            <Item source="Display bookmark" name="显示书签"/>
+            <Item source="New Document" name="新建文档"/>
+            <Item source="Format (Line ending)" name="格式（行尾）"/>
+            <Item source="Apply to opened ANSI files" name="应用到已打开的 ANSI 文件"/>
+            <Item source="Default language:" name="默认语言："/>
+            <Item source="Default Open/Save file Directory" name="默认打开/保存文件目录"/>
+            <Item source="Follow current document" name="跟随当前文档"/>
+            <Item source="Remember last used directory" name="记住上次使用的目录"/>
+            <Item source="Recent Files History" name="最近文件历史"/>
+            <Item source="Don't check at launch time" name="启动时不检查"/>
+            <Item source="Max. number of entries:" name="最大条目数："/>
+            <Item source="In Submenu" name="显示在子菜单中"/>
+            <Item source="Only File Name" name="仅文件名"/>
+            <Item source="Full File Name Path" name="完整文件路径"/>
+            <Item source="Customize Maximum Length:" name="自定义最大长度："/>
+            <Item source="Style All Occurrences of Token" name="设置所有匹配词样式"/>
+            <Item source="Smart Highlighting" name="智能高亮"/>
+            <Item source="Matching" name="匹配"/>
+            <Item source="Highlight another view" name="在另一视图中高亮"/>
+            <Item source="Highlight Matching Tags" name="高亮匹配标签"/>
+            <Item source="Highlight comment/php/asp zone" name="高亮注释/PHP/ASP 区域"/>
+            <Item source="Print line number" name="打印行号"/>
+            <Item source="Colour Options" name="颜色选项"/>
+            <Item source="Invert" name="反转"/>
+            <Item source="Black on white" name="白底黑字"/>
+            <Item source="No background colour" name="不打印背景色"/>
+            <Item source="Margin Setting (Unit:mm)" name="页边距设置（单位：毫米）"/>
+            <Item source="Header and Footer" name="页眉和页脚"/>
+            <Item source="Variable:" name="变量："/>
+            <Item source="Add" name="添加"/>
+            <Item source="Header" name="页眉"/>
+            <Item source="Footer" name="页脚"/>
+            <Item source="Left part" name="左侧"/>
+            <Item source="Middle part" name="中间"/>
+            <Item source="Right part" name="右侧"/>
+            <Item source="When Find Dialog is Invoked" name="打开查找对话框时"/>
+            <Item source="Fill Find Field with Selected Text" name="使用选中文本填充查找内容"/>
+            <Item source="Select Word Under Caret when Nothing Selected" name="未选择文本时选取光标处单词"/>
+            <Item source="Use Monospaced font in Find dialog (Need to restart Notepad++)" name="查找对话框使用等宽字体（需重启）"/>
+            <Item source="Find dialog remains open after search that outputs to results window" name="输出到结果窗口后保持查找对话框打开"/>
+            <Item source="Confirm Replace All in All Opened Documents" name="在所有打开文档中全部替换时确认"/>
+            <Item source="Replace: Don't move to the following occurrence" name="替换后不移动到下一个匹配项"/>
+            <Item source="Search Result window: show only one entry per found line" name="搜索结果每个命中行仅显示一项"/>
+            <Item source="Session snapshot and periodic backup" name="会话快照和定期备份"/>
+            <Item source="Remember current session for next launch" name="下次启动时恢复当前会话"/>
+            <Item source="Enable session snapshot and periodic backup" name="启用会话快照和定期备份"/>
+            <Item source="Backup in every" name="备份间隔"/>
+            <Item source="seconds" name="秒"/>
+            <Item source="Backup path:" name="备份路径："/>
+            <Item source="Backup on save" name="保存时备份"/>
+            <Item source="Simple backup" name="简单备份"/>
+            <Item source="Verbose backup" name="详细备份"/>
+            <Item source="Custom Backup Directory" name="自定义备份目录"/>
+            <Item source="Directory:" name="目录："/>
+            <Item source="Auto-Completion" name="自动完成"/>
+            <Item source="Insert Selection" name="插入选择"/>
+            <Item source="Function parameters hint on input" name="输入时显示函数参数提示"/>
+            <Item source="Auto-Insert" name="自动插入"/>
+            <Item source="Open" name="打开"/>
+            <Item source="Close" name="关闭"/>
+            <Item source="Multi-instance settings" name="多实例设置"/>
+            <Item source="Default (mono-instance)" name="默认（单实例）"/>
+            <Item source="Always in multi-instance mode" name="始终使用多实例模式"/>
+            <Item source="Customize insert Date Time" name="自定义插入日期时间"/>
+            <Item source="Custom format:" name="自定义格式："/>
+            <Item source="Word character list" name="单词字符列表"/>
+            <Item source="Use default Word character list as it is" name="使用默认单词字符列表"/>
+            <Item source="Delimiter selection settings (Ctrl + Mouse double click)" name="分隔符选择设置（Ctrl + 鼠标双击）"/>
+            <Item source="Allow on several lines" name="允许跨多行"/>
+            <Item source="Settings on cloud" name="云端设置"/>
+            <Item source="No Cloud" name="不使用云端"/>
+            <Item source="Set your cloud location path here:" name="在此设置云端路径："/>
+            <Item source="Clickable Link Settings" name="可点击链接设置"/>
+            <Item source="No underline" name="无下划线"/>
+            <Item source="Enable fullbox mode" name="启用完整方框模式"/>
+            <Item source="URI customized schemes:" name="自定义 URI 协议："/>
+            <Item source="Search Engine (for command &quot;Search on Internet&quot;)" name="搜索引擎（用于“在互联网上搜索”）"/>
+            <Item source="Set your search engine here:" name="在此设置搜索引擎："/>
+            <Item source="File Status Auto-Detection" name="文件状态自动检测"/>
+            <Item source="Update silently" name="静默更新"/>
+            <Item source="Scroll to the last line after update" name="更新后滚动到最后一行"/>
+            <Item source="Document Switcher (Ctrl+TAB)" name="文档切换器（Ctrl+TAB）"/>
+            <Item source="Enable MRU behaviour" name="启用最近使用顺序"/>
+            <Item source="Document Peeker" name="文档预览"/>
+            <Item source="Peek on tab" name="在标签上预览"/>
+            <Item source="Peek on document map" name="在文档地图上预览"/>
+            <Item source="Autodetect character encoding" name="自动检测字符编码"/>
+            <Item source="Minimize to system tray" name="最小化到系统托盘"/>
+            <Item source="Show only filename in title bar" name="标题栏仅显示文件名"/>
+            <Item source="Enable Save All confirm dialog" name="启用全部保存确认对话框"/>
+            <Item source="Session file ext.:" name="会话文件扩展名："/>
+            <Item source="Workspace file ext.:" name="工作区文件扩展名："/>
+            <Item source="Standard icons: small" name="标准图标：小"/>
+            <Item source="Standard icons: large" name="标准图标：大"/>
+            <Item source="Fluent UI icons: small" name="Fluent UI 图标：小"/>
+            <Item source="Fluent UI icons: large" name="Fluent UI 图标：大"/>
+            <Item source="Fluent UI icons: small (dark mode)" name="Fluent UI 图标：深色小图标"/>
+            <Item source="Add column markers with decimal numbers. Separate several markers with spaces." name="用十进制数字添加列标记，多个标记以空格分隔。"/>
+            <Item source="Open all files of folder instead of launching Folder as Workspace on folder dropping" name="拖放文件夹时打开其中所有文件，而不是作为工作区打开"/>
+            <Item source="Full file name path" name="完整文件路径"/>
+            <Item source="Auto-indent" name="自动缩进"/>
+            <Item source="th character" name="个字符"/>
+            <Item source="Matched pair 1:" name="匹配对 1："/>
+            <Item source="Matched pair 2:" name="匹配对 2："/>
+            <Item source="Matched pair 3:" name="匹配对 3："/>
+            <Item source="Open session in a new instance (and save session automatically on exit)" name="在新实例中打开会话（退出时自动保存会话）"/>
+            <Item source="* The modification of this setting needs to restart Notepad++" name="* 修改此设置后需要重启 Notepad++"/>
+            <Item source="Enable" name="启用"/>
+            <Item source="Enable Notepad++ auto-updater" name="启用 Notepad++ 自动更新"/>
+            <Item source="Mute all sounds" name="关闭所有声音"/>
+            <Item source="Use DirectWrite (need to restart Notepad++)" name="使用 DirectWrite（需要重启 Notepad++）"/>
+            <Item source="Bottom" name="底部"/>
+            <Item source="Normal Text" name="普通文本"/>
+            <Item source="File name" name="文件名"/>
+            <Item source="Date" name="日期"/>
+            <Item source="Time" name="时间"/>
+            <Item objectName="rbCustomWordCharacters" name="将自定义字符视为单词的一部分（仅在明确需要时选择）"/>
+
             <!-- 对话框标准按钮 -->
             <Item objectName="btnPrefsOk"                name="确定"/>
             <Item objectName="btnPrefsApply"             name="应用"/>
             <Item objectName="btnPrefsCancel"            name="取消"/>
+            <Item objectName="btnPrefsClose"             name="关闭"/>
         </Dialog>
 
         <!-- ══ 查找/替换对话框 ══════════════════════════════════════════════ -->
+        <Dialog name="ProjectPanel">
+            <Item objectName="projectPanelTabs_0" name="&#x5DE5;&#x4F5C;&#x533A;"/>
+            <Item objectName="projectPanelTabs_1" name="&#x7F16;&#x8F91;"/>
+            <Item objectName="projectWorkspaceTree_0" name="&#x5DE5;&#x4F5C;&#x533A;"/>
+        </Dialog>
+
+        <Dialog name="ShortcutMapper" title="&#x5FEB;&#x6377;&#x952E;&#x7BA1;&#x7406;">
+            <Item objectName="shortcutMapperTabs_0" name="&#x4E3B;&#x83DC;&#x5355;"/>
+            <Item objectName="shortcutMapperTabs_1" name="&#x5B8F;"/>
+            <Item objectName="shortcutMapperTabs_2" name="&#x8FD0;&#x884C;&#x547D;&#x4EE4;"/>
+            <Item objectName="shortcutMapperTabs_3" name="&#x63D2;&#x4EF6;&#x547D;&#x4EE4;"/>
+            <Item objectName="shortcutMapperTabs_4" name="Scintilla&#x547D;&#x4EE4;"/>
+            <Item objectName="shortcutTable0_0" name="&#x540D;&#x79F0;"/>
+            <Item objectName="shortcutTable0_1" name="&#x5FEB;&#x6377;&#x952E;"/>
+            <Item objectName="shortcutTable0_2" name="&#x7C7B;&#x522B;"/>
+            <Item objectName="shortcutTable1_0" name="&#x540D;&#x79F0;"/>
+            <Item objectName="shortcutTable1_1" name="&#x5FEB;&#x6377;&#x952E;"/>
+            <Item objectName="shortcutTable1_2" name="&#x7C7B;&#x522B;"/>
+            <Item objectName="shortcutTable2_0" name="&#x540D;&#x79F0;"/>
+            <Item objectName="shortcutTable2_1" name="&#x5FEB;&#x6377;&#x952E;"/>
+            <Item objectName="shortcutTable2_2" name="&#x7C7B;&#x522B;"/>
+            <Item objectName="shortcutTable3_0" name="&#x540D;&#x79F0;"/>
+            <Item objectName="shortcutTable3_1" name="&#x5FEB;&#x6377;&#x952E;"/>
+            <Item objectName="shortcutTable3_2" name="&#x7C7B;&#x522B;"/>
+            <Item objectName="shortcutTable4_0" name="&#x540D;&#x79F0;"/>
+            <Item objectName="shortcutTable4_1" name="&#x5FEB;&#x6377;&#x952E;"/>
+            <Item objectName="shortcutTable4_2" name="&#x7C7B;&#x522B;"/>
+            <Item objectName="lblShortcutFilter" name="&#x8FC7;&#x6EE4;&#xFF1A;"/>
+            <Item objectName="shortcutConflictText" name="&#x6B64;&#x6761;&#x65E0;&#x5FEB;&#x6377;&#x952E;&#x51B2;&#x7A81;&#x3002;"/>
+            <Item objectName="btnShortcutModify" name="&#x4FEE;&#x6539;"/>
+            <Item objectName="btnShortcutClear" name="&#x6E05;&#x9664;"/>
+            <Item objectName="btnShortcutDelete" name="&#x5220;&#x9664;"/>
+            <Item objectName="btnShortcutClose" name="&#x5173;&#x95ED;"/>
+        </Dialog>
+
         <Dialog name="FindReplace" title="查找 / 替换">
             <!-- Tab 标签 -->
             <Item objectName="tabBar_0" name="查找"/>

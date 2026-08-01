@@ -173,9 +173,19 @@ PluginUpdatePlan PluginUpdatePlan::read(const QString& filePath,
         return plan;
     }
 
+    return fromJson(file.readAll(), error);
+}
+
+PluginUpdatePlan PluginUpdatePlan::fromJson(const QByteArray& bytes,
+                                            QString* error)
+{
+    if (error)
+        error->clear();
+    PluginUpdatePlan plan;
+
     QJsonParseError parseError;
     const QJsonDocument document =
-        QJsonDocument::fromJson(file.readAll(), &parseError);
+        QJsonDocument::fromJson(bytes, &parseError);
     if (parseError.error != QJsonParseError::NoError ||
         !document.isObject()) {
         if (error)

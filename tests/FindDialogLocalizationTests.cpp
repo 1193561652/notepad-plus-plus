@@ -128,7 +128,8 @@ int main()
         const int lastLine = qMin(i + 6, preferenceLines.size() - 1);
         const QString nearby =
             preferenceLines.mid(i, lastLine - i + 1).join(QLatin1Char('\n'));
-        require(nearby.contains(QStringLiteral("setObjectName(")),
+        require(nearby.contains(QStringLiteral("setObjectName("))
+                    || nearby.contains(QStringLiteral("placePreferenceControl(")),
                 qPrintable(QStringLiteral(
                     "localizable Preferences control lacks objectName near line %1")
                                .arg(i + 1)));

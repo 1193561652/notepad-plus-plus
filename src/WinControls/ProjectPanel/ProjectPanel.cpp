@@ -9,6 +9,8 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QStyle>
+#include <QTabWidget>
+#include <QTabBar>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -16,22 +18,43 @@
 
 enum ItemRole {
     NodeTypeRole = Qt::UserRole,
-    FilePathRole
+    FilePathRole,
+    SyntheticRootRole
 };
 
 ProjectPanel::ProjectPanel(int panelId, QWidget* parent)
     : QWidget(parent), _panelId(panelId)
 {
     QVBoxLayout* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(2, 2, 2, 2);
-    layout->setSpacing(2);
-    QHBoxLayout* tools = new QHBoxLayout();
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    QTabWidget* pages = new QTabWidget(this);
+    pages->setObjectName(QStringLiteral("projectPanelPages"));
+
+    QWidget* workspacePage = new QWidget(pages);
+    QVBoxLayout* workspaceLayout = new QVBoxLayout(workspacePage);
+    workspaceLayout->setContentsMargins(1, 1, 1, 1);
+    _tree = new QTreeWidget(workspacePage);
+    _tree->setObjectName(QStringLiteral("projectWorkspaceTree"));
+    _tree->setHeaderHidden(true);
+    _tree->setContextMenuPolicy(Qt::CustomContextMenu);
+    _tree->setEditTriggers(QAbstractItemView::EditKeyPressed |
+                           QAbstractItemView::SelectedClicked);
+    workspaceLayout->addWidget(_tree);
+    pages->addTab(workspacePage, tr("Workspace"));
+
+    QWidget* editPage = new QWidget(pages);
+    QVBoxLayout* tools = new QVBoxLayout(editPage);
+    tools->setContentsMargins(6, 6, 6, 6);
     auto addTool = [this, tools](QStyle::StandardPixmap icon,
                                 const QString& tip,
                                 const std::function<void()>& command) {
         QToolButton* button = new QToolButton(this);
         button->setIcon(style()->standardIcon(icon));
+        button->setText(tip);
         button->setToolTip(tip);
+        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         connect(button, &QToolButton::clicked, this, command);
         tools->addWidget(button);
     };
@@ -63,7 +86,7 @@ ProjectPanel::ProjectPanel(int panelId, QWidget* parent)
             tr("New Project"), &ok);
         if (!ok || name.isEmpty())
             return;
-        QTreeWidgetItem* item = new QTreeWidgetItem(_tree, {name});
+        QTreeWidgetItem* item = new QTreeWidgetItem(selectedContainer(), {name});
         item->setData(0, NodeTypeRole, WorkspaceNode::Project);
         markDirty();
     });
@@ -100,14 +123,10 @@ ProjectPanel::ProjectPanel(int panelId, QWidget* parent)
         }
     });
     tools->addStretch();
-    layout->addLayout(tools);
-
-    _tree = new QTreeWidget(this);
-    _tree->setHeaderHidden(true);
-    _tree->setContextMenuPolicy(Qt::CustomContextMenu);
-    _tree->setEditTriggers(QAbstractItemView::EditKeyPressed |
-                           QAbstractItemView::SelectedClicked);
-    layout->addWidget(_tree, 1);
+    pages->addTab(editPage, tr("Edit"));
+    pages->tabBar()->setObjectName(QStringLiteral("projectPanelTabs"));
+    layout->addWidget(pages);
+    rebuildTree();
     connect(_tree, &QTreeWidget::itemDoubleClicked, this,
             [this](QTreeWidgetItem* item) {
         if (item->data(0, NodeTypeRole).toInt() == WorkspaceNode::File)
@@ -176,8 +195,13 @@ void ProjectPanel::rebuildTree()
 {
     _tree->blockSignals(true);
     _tree->clear();
+    QTreeWidgetItem* root = new QTreeWidgetItem(_tree, {tr("Workspace")});
+    root->setData(0, SyntheticRootRole, true);
+    root->setIcon(0, style()->standardIcon(QStyle::SP_DirHomeIcon));
+    root->setFlags(root->flags() & ~Qt::ItemIsEditable);
     for (const WorkspaceNode& project : _document.projects())
-        addNodeItem(nullptr, project)->setExpanded(true);
+        addNodeItem(root, project)->setExpanded(true);
+    root->setExpanded(true);
     _tree->blockSignals(false);
 }
 
@@ -196,16 +220,19 @@ WorkspaceNode ProjectPanel::nodeFromItem(QTreeWidgetItem* item) const
 void ProjectPanel::rebuildDocument()
 {
     _document.projects().clear();
-    for (int i = 0; i < _tree->topLevelItemCount(); ++i)
-        _document.projects().append(nodeFromItem(_tree->topLevelItem(i)));
+    QTreeWidgetItem* root = _tree->topLevelItemCount() > 0
+        ? _tree->topLevelItem(0) : nullptr;
+    if (!root)
+        return;
+    for (int i = 0; i < root->childCount(); ++i)
+        _document.projects().append(nodeFromItem(root->child(i)));
 }
 
 QTreeWidgetItem* ProjectPanel::selectedContainer() const
 {
     QTreeWidgetItem* item = _tree->currentItem();
     if (!item)
-        return _tree->topLevelItemCount() > 0
-            ? _tree->topLevelItem(0) : nullptr;
+        return _tree->topLevelItemCount() > 0 ? _tree->topLevelItem(0) : nullptr;
     if (item->data(0, NodeTypeRole).toInt() == WorkspaceNode::File)
         item = item->parent();
     return item;

@@ -87,6 +87,8 @@ int main(int argc, char* argv[])
     mainWindow.resize(1100, 760);
     if (!saveWidget(mainWindow, output + QStringLiteral("/main.png")))
         return 4;
+    if (mainWindow.windowTitle() != QStringLiteral("new 1 - Notepad++"))
+        return 23;
 
     QAction* projectPanelsAction =
         mainWindow.findChild<QAction*>(QStringLiteral("projectPanelsAction"));
@@ -94,6 +96,9 @@ int main(int argc, char* argv[])
         mainWindow.findChild<QDockWidget*>(QStringLiteral("ProjectPanelsDock"));
     if (!projectPanelsAction || !projectPanelsDock)
         return 12;
+    if (!mainWindow.findChild<QDockWidget*>(QStringLiteral("ProjectPanelsDock2"))
+        || !mainWindow.findChild<QDockWidget*>(QStringLiteral("ProjectPanelsDock3")))
+        return 24;
     projectPanelsAction->trigger();
     QApplication::processEvents();
     if (!projectPanelsDock->isVisible()
@@ -116,7 +121,7 @@ int main(int argc, char* argv[])
             modal->grab().save(output + QStringLiteral("/shortcut-mapper.png"));
         QTabWidget* shortcutTabs = modal->findChild<QTabWidget*>(
             QStringLiteral("shortcutMapperTabs"));
-        if (!shortcutTabs || shortcutTabs->count() != 4) {
+        if (!shortcutTabs || shortcutTabs->count() != 5) {
             shortcutMapperCaptured = false;
         } else {
             for (int i = 0; i < shortcutTabs->count(); ++i) {
@@ -212,6 +217,14 @@ int main(int argc, char* argv[])
             return;
         }
         if (forceChinese) {
+            QAbstractButton* closeButton =
+                preferences->findChild<QAbstractButton*>(
+                    QStringLiteral("btnPrefsClose"));
+            if (!closeButton
+                || closeButton->text() != QStringLiteral("关闭")) {
+                preferences->reject();
+                return;
+            }
             QGroupBox* autoInsert =
                 preferences->findChild<QGroupBox*>(
                     QStringLiteral("grpAutoInsert"));
@@ -252,21 +265,8 @@ int main(int argc, char* argv[])
 
         pages->setCurrentRow(13);
         QApplication::processEvents();
-        bool autoInsertCaptured = false;
-        const QList<QScrollArea*> scrollAreas =
-            preferences->findChildren<QScrollArea*>();
-        for (QScrollArea* area : scrollAreas) {
-            if (!area->isVisible()
-                || area->verticalScrollBar()->maximum() <= 0) {
-                continue;
-            }
-            area->verticalScrollBar()->setValue(
-                area->verticalScrollBar()->maximum());
-            QApplication::processEvents();
-            autoInsertCaptured = preferences->grab().save(
-                output + QStringLiteral("/preferences-auto-insert.png"));
-            break;
-        }
+        const bool autoInsertCaptured = preferences->grab().save(
+            output + QStringLiteral("/preferences-auto-insert.png"));
         preferencesCaptured = preferencesCaptured && autoInsertCaptured;
         preferencesTitle = preferences->windowTitle();
         preferencesSize = preferences->size();

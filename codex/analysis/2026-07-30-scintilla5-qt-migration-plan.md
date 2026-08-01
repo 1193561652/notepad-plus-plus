@@ -2,7 +2,17 @@
 
 Date: 2026-07-30
 
-Status: planned, implementation not started
+Status: completed on 2026-08-01
+
+Implementation result:
+
+- Imported Scintilla 5.3.0 and Lexilla 5.1.9 from the v8.4.6 baseline.
+- `ScintillaEditView` now derives from official `ScintillaEditBase`.
+- The application uses real `ILexer5` and `CreateLexer -> SCI_SETILEXER`.
+- Scintilla, Lexilla, and the original Boost.Regex adapter build as static
+  CMake targets.
+- QScintilla sources, includes, classes, and qmake build scripts were removed.
+- Windows/MinGW full build and CTest `29/29` passed.
 
 Decision record:
 `codex/decisions/2026-07-30-scintilla5-qt-baseline.md`

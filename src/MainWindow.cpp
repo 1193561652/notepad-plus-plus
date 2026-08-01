@@ -13,11 +13,13 @@
 #include "MISC/ToolbarIconTheme.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
 #include "ScintillaComponent/ScintillaTextSearch.h"
+#include "ScintillaComponent/EditorMacro.h"
 #include "WinControls/DockingWnd/FileBrowserPanel.h"
 #include "Preferences/PreferenceDlg.h"
 #include "WinControls/DockingWnd/DocumentMapPanel.h"
 #include "WinControls/DockingWnd/FunctionListPanel.h"
 #include "WinControls/ProjectPanel/ProjectPanel.h"
+#include "WinControls/Grid/ShortcutMapper.h"
 #include "PluginSystem/PluginManager.h"
 #include "PluginSystem/PluginAdminDialog.h"
 #include "PluginSystem/PluginAdminModel.h"
@@ -27,10 +29,6 @@
 
 #include "Parameters.h"
 #include "NativeLangSpeaker.h"
-#include <Qsci/qscimacro.h>
-#include <Qsci/qscilexer.h>
-#include <Qsci/qscicommand.h>
-#include <Qsci/qscicommandset.h>
 #include <QDockWidget>
 #include <QTextCodec>
 #include <QFileDialog>
@@ -46,10 +44,10 @@
 #include <QFile>
 #include <QSaveFile>
 #include <QTextStream>
+#include <QTemporaryFile>
 #include <QSplitter>
 #include <QScrollBar>
 #include <QListWidget>
-#include <Qsci/qsciscintilla.h>
 #include <QApplication>
 #include <QCoreApplication>
 #include <QFileSystemWatcher>
@@ -88,24 +86,24 @@
 #include <algorithm>
 #include <functional>
 
-static QsciScintilla::EolMode toScintillaEol(TextEolMode mode,
-                                             QsciScintilla::EolMode fallback)
+static EolMode toScintillaEol(TextEolMode mode,
+                                             EolMode fallback)
 {
     switch (mode) {
-        case TextEolMode::Windows: return QsciScintilla::EolWindows;
-        case TextEolMode::Mac: return QsciScintilla::EolMac;
-        case TextEolMode::Unix: return QsciScintilla::EolUnix;
+        case TextEolMode::Windows: return EolWindows;
+        case TextEolMode::Mac: return EolMac;
+        case TextEolMode::Unix: return EolUnix;
         case TextEolMode::Unknown: return fallback;
     }
     return fallback;
 }
 
-static TextEolMode fromScintillaEol(QsciScintilla::EolMode mode)
+static TextEolMode fromScintillaEol(EolMode mode)
 {
     switch (mode) {
-        case QsciScintilla::EolWindows: return TextEolMode::Windows;
-        case QsciScintilla::EolMac: return TextEolMode::Mac;
-        case QsciScintilla::EolUnix: return TextEolMode::Unix;
+        case EolWindows: return TextEolMode::Windows;
+        case EolMac: return TextEolMode::Mac;
+        case EolUnix: return TextEolMode::Unix;
     }
     return TextEolMode::Unknown;
 }
@@ -379,10 +377,10 @@ void MainWindow::applyFileCommandLineState(
             options.position, view->documentLengthNpp());
         if (position > 0) {
             const qintptr before = view->SendScintillaNpp(
-                QsciScintilla::SCI_POSITIONBEFORE,
+                SCI_POSITIONBEFORE,
                 static_cast<quintptr>(position));
             position = view->SendScintillaNpp(
-                QsciScintilla::SCI_POSITIONAFTER,
+                SCI_POSITIONAFTER,
                 static_cast<quintptr>(before));
         }
         view->setCurrentPositionNpp(position);
@@ -390,18 +388,18 @@ void MainWindow::applyFileCommandLineState(
         const int line = qMax<qint64>(0, options.line - 1);
         if (options.column >= 0) {
             const qintptr position = view->SendScintillaNpp(
-                QsciScintilla::SCI_FINDCOLUMN,
+                SCI_FINDCOLUMN,
                 static_cast<quintptr>(line),
                 qMax<qint64>(0, options.column - 1));
             view->setCurrentPositionNpp(position);
         } else {
             view->SendScintilla(
-                QsciScintilla::SCI_GOTOLINE,
+                SCI_GOTOLINE,
                 static_cast<unsigned long>(line));
         }
     }
     view->SendScintilla(
-        QsciScintilla::SCI_SCROLLCARET);
+        SCI_SCROLLCARET);
 
     if (options.readOnly) {
         buffer->setCommandLineReadOnly(true);
@@ -603,8 +601,8 @@ void MainWindow::setBufferEolMode(Buffer* buffer, int mode, bool convertText)
     if (!buffer || buffer->isReadOnly())
         return;
 
-    const QsciScintilla::EolMode eolMode =
-        static_cast<QsciScintilla::EolMode>(mode);
+    const EolMode eolMode =
+        static_cast<EolMode>(mode);
     ScintillaEditView* sourceView = currentActiveView();
     if (!sourceView || !buffer->containsView(sourceView))
         sourceView = buffer->getView();
@@ -681,7 +679,7 @@ void MainWindow::updateStatusBar()
     // ── STATUSBAR_DOC_SIZE：文件长度 + 行数 ──────────────────────────────────
     // 对应原版 "length : %s    lines : %s"（以千位分隔符格式化）
     const qintptr docLen = view->documentLengthNpp();
-    int  nLines  = (int) view->SendScintilla(QsciScintilla::SCI_GETLINECOUNT);
+    int  nLines  = (int) view->SendScintilla(SCI_GETLINECOUNT);
     _docSizeLabel->setText(
         QString("length : %1    lines : %2")
             .arg(QLocale().toString((qlonglong)docLen))
@@ -693,22 +691,22 @@ void MainWindow::updateStatusBar()
     view->getCursorPosition(&line, &col);
     QString posPart;
     const qintptr selStart =
-        view->SendScintillaNpp(QsciScintilla::SCI_GETSELECTIONSTART);
+        view->SendScintillaNpp(SCI_GETSELECTIONSTART);
     const qintptr selEnd =
-        view->SendScintillaNpp(QsciScintilla::SCI_GETSELECTIONEND);
+        view->SendScintillaNpp(SCI_GETSELECTIONEND);
     if (selStart == selEnd) {
         // 无选区：显示字节位置（Pos，1-based）
         const qintptr pos =
-            view->SendScintillaNpp(QsciScintilla::SCI_GETCURRENTPOS);
+            view->SendScintillaNpp(SCI_GETCURRENTPOS);
         posPart = QString("Pos : %1").arg(QLocale().toString((qlonglong)(pos + 1)));
     } else {
         // 有选区：显示选中字符数 | 选中行数
         const qintptr selChars = selEnd - selStart;
         const int selLineStart = static_cast<int>(view->SendScintillaNpp(
-            QsciScintilla::SCI_LINEFROMPOSITION,
+            SCI_LINEFROMPOSITION,
             static_cast<quintptr>(selStart)));
         const int selLineEnd = static_cast<int>(view->SendScintillaNpp(
-            QsciScintilla::SCI_LINEFROMPOSITION,
+            SCI_LINEFROMPOSITION,
             static_cast<quintptr>(selEnd)));
         int selLines = selLineEnd - selLineStart + 1;
         posPart = QString("Sel : %1 | %2")
@@ -722,9 +720,9 @@ void MainWindow::updateStatusBar()
     // ── STATUSBAR_EOF_FORMAT：换行符类型 ─────────────────────────────────────
     // 对应原版显示名称（CR LF / LF / CR）
     switch (view->eolMode()) {
-        case QsciScintilla::EolWindows: _eolLabel->setText("Windows (CR LF)"); break;
-        case QsciScintilla::EolUnix:    _eolLabel->setText("Unix (LF)");       break;
-        case QsciScintilla::EolMac:     _eolLabel->setText("Macintosh (CR)");  break;
+        case EolWindows: _eolLabel->setText("Windows (CR LF)"); break;
+        case EolUnix:    _eolLabel->setText("Unix (LF)");       break;
+        case EolMac:     _eolLabel->setText("Macintosh (CR)");  break;
     }
 
     // ── STATUSBAR_UNICODE_TYPE：编码 ─────────────────────────────────────────
@@ -734,7 +732,7 @@ void MainWindow::updateStatusBar()
     _encodingLabel->setText(enc);
 
     // ── STATUSBAR_TYPING_MODE：INS / OVR ─────────────────────────────────────
-    bool overtype = view->SendScintilla(QsciScintilla::SCI_GETOVERTYPE);
+    bool overtype = view->SendScintilla(SCI_GETOVERTYPE);
     _insertLabel->setText(overtype ? "OVR" : "INS");
 }
 
@@ -743,8 +741,8 @@ void MainWindow::updateLangStatus()
     // 对应原版 setLangStatus()：更新状态栏左侧的语言类型（STATUSBAR_DOC_TYPE）
     ScintillaEditView* view = currentActiveView();
     if (!view || !_docTypeLabel) return;
-    QsciLexer* lex = view->lexer();
-    _docTypeLabel->setText(lex ? QString(lex->language()) : tr("Normal Text"));
+    const QString language = view->lexerLanguage();
+    _docTypeLabel->setText(language.isEmpty() ? tr("Normal Text") : language);
 }
 
 void MainWindow::connectModificationSignal(ScintillaEditView* view, Buffer* buf)
@@ -865,16 +863,16 @@ Buffer* MainWindow::doNewBuffer(DocTabView* targetTab)
     const NppGUI& gui = NppParameters::getInstance().getNppGUI();
     switch (gui._newDocDefaultFormat) {
         case EolType_windows:
-            view->setEolMode(QsciScintilla::EolWindows);
+            view->setEolMode(EolWindows);
             buf->setEolMode(TextEolMode::Windows);
             break;
         case EolType_macos:
-            view->setEolMode(QsciScintilla::EolMac);
+            view->setEolMode(EolMac);
             buf->setEolMode(TextEolMode::Mac);
             break;
         case EolType_unix:
         default:
-            view->setEolMode(QsciScintilla::EolUnix);
+            view->setEolMode(EolUnix);
             buf->setEolMode(TextEolMode::Unix);
             break;
     }
@@ -909,6 +907,8 @@ Buffer* MainWindow::doNewBuffer(DocTabView* targetTab)
 
     connectModificationSignal(view, buf);
     targetTab->addBuffer(buf);
+    if (targetTab == _activeDocTab)
+        updateWindowTitle(buf);
     updateActionStates();
     return buf;
 }
@@ -955,11 +955,11 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
     }
 
     const NppGUI& gui = NppParameters::getInstance().getNppGUI();
-    QsciScintilla::EolMode fallbackEol = QsciScintilla::EolUnix;
+    EolMode fallbackEol = EolUnix;
     if (gui._newDocDefaultFormat == EolType_windows)
-        fallbackEol = QsciScintilla::EolWindows;
+        fallbackEol = EolWindows;
     else if (gui._newDocDefaultFormat == EolType_macos)
-        fallbackEol = QsciScintilla::EolMac;
+        fallbackEol = EolMac;
 
     buf->setEolMode(buf->getEolMode() == TextEolMode::Unknown
         ? fromScintillaEol(fallbackEol) : buf->getEolMode());
@@ -971,6 +971,8 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
 
     connectModificationSignal(view, buf);
     targetTab->addBuffer(buf);
+    if (targetTab == _activeDocTab)
+        updateWindowTitle(buf);
     watchBufferFile(buf);
     addToRecentFiles(filePath);
     updateLangStatus();   // 对应原版 setLangStatus()，文件打开后更新语言类型
@@ -1026,7 +1028,7 @@ bool MainWindow::doSave(Buffer* buf, const QString& filePath)
     for (ScintillaEditView* view : buf->views()) {
         if (!view)
             continue;
-        view->SendScintilla(QsciScintilla::SCI_SETSAVEPOINT);
+        view->SendScintilla(SCI_SETSAVEPOINT);
         view->setLexerForFile(filePath);
         view->setReadOnly(buf->isReadOnly());
     }
@@ -1481,8 +1483,8 @@ void MainWindow::toggleWordWrap()
             if (_wordWrapAction) _wordWrapAction->setChecked(false);
             return;
         }
-        bool wrap = v->wrapMode() == QsciScintilla::WrapWord;
-        v->setWrapMode(wrap ? QsciScintilla::WrapNone : QsciScintilla::WrapWord);
+        bool wrap = v->wrapMode() == WrapWord;
+        v->setWrapMode(wrap ? WrapNone : WrapWord);
         if (_wordWrapAction) _wordWrapAction->setChecked(!wrap);
     }
 }
@@ -1490,9 +1492,9 @@ void MainWindow::toggleWordWrap()
 void MainWindow::toggleWhitespace()
 {
     if (auto* v = currentActiveView()) {
-        bool vis = v->whitespaceVisibility() != QsciScintilla::WsInvisible;
-        v->setWhitespaceVisibility(vis ? QsciScintilla::WsInvisible
-                                       : QsciScintilla::WsVisible);
+        bool vis = v->whitespaceVisibility() != WsInvisible;
+        v->setWhitespaceVisibility(vis ? WsInvisible
+                                       : WsVisible);
         if (_showWhitespaceAction) _showWhitespaceAction->setChecked(!vis);
     }
 }
@@ -1625,7 +1627,7 @@ void MainWindow::cloneToOtherView()
         return;
     }
 
-    // 创建新的编辑器视图，通过 QsciDocument 共享同一文档内容
+    // 创建新的编辑器视图，通过 Scintilla document pointer 共享内容。
     ScintillaEditView* cloneView = new ScintillaEditView(other);
     cloneView->setDocument(buf->getView()->document());
     cloneView->setLargeFileMode(buf->isLargeFile());
@@ -1742,7 +1744,7 @@ void MainWindow::startMacroRecording()
     if (!view || _isRecording) return;
 
     // 用当前视图创建临时宏对象（只用于录制）
-    _recordingMacro = new QsciMacro(view);
+    _recordingMacro = new EditorMacro(view);
     _recordingView = view;
     _recordingMacro->startRecording();
     // 等待停止录制时获取字符串并销毁
@@ -1816,10 +1818,10 @@ static QPair<int, int> selectedLines(ScintillaEditView* view)
     return qMakePair(firstLine, lastLine);
 }
 
-static QString eolText(QsciScintilla::EolMode mode)
+static QString eolText(EolMode mode)
 {
-    if (mode == QsciScintilla::EolWindows) return "\r\n";
-    if (mode == QsciScintilla::EolMac) return "\r";
+    if (mode == EolWindows) return "\r\n";
+    if (mode == EolMac) return "\r";
     return "\n";
 }
 
@@ -1836,8 +1838,9 @@ static void replaceLines(ScintillaEditView* view, int firstLine, int lastLine,
     if (terminalEol && !lines.isEmpty()) replacement += eol;
     const QByteArray utf8 = replacement.toUtf8();
     view->beginUndoAction();
-    view->SendScintilla(QsciScintilla::SCI_SETTARGETRANGE, start, end);
-    view->SendScintilla(QsciScintilla::SCI_REPLACETARGET, utf8.size(), utf8.constData());
+    view->SendScintilla(SCI_SETTARGETRANGE, start, end);
+    view->SendScintilla(SCI_REPLACETARGET, utf8.size(),
+        reinterpret_cast<sptr_t>(utf8.constData()));
     view->endUndoAction();
 }
 
@@ -1854,16 +1857,16 @@ void MainWindow::sortLines(int mode)
     }
     int sortColumnStart = 0;
     int sortColumnLength = -1;
-    if (view->SendScintilla(QsciScintilla::SCI_GETSELECTIONMODE)
-        == QsciScintilla::SC_SEL_RECTANGLE) {
+    if (view->SendScintilla(SCI_GETSELECTIONMODE)
+        == SC_SEL_RECTANGLE) {
         const int anchor = static_cast<int>(
-            view->SendScintilla(QsciScintilla::SCI_GETANCHOR));
+            view->SendScintilla(SCI_GETANCHOR));
         const int caret = static_cast<int>(
-            view->SendScintilla(QsciScintilla::SCI_GETCURRENTPOS));
+            view->SendScintilla(SCI_GETCURRENTPOS));
         const int anchorColumn = static_cast<int>(view->SendScintilla(
-            QsciScintilla::SCI_GETCOLUMN, anchor));
+            SCI_GETCOLUMN, anchor));
         const int caretColumn = static_cast<int>(view->SendScintilla(
-            QsciScintilla::SCI_GETCOLUMN, caret));
+            SCI_GETCOLUMN, caret));
         sortColumnStart = qMin(anchorColumn, caretColumn);
         sortColumnLength = qAbs(anchorColumn - caretColumn);
     }
@@ -2019,13 +2022,13 @@ void MainWindow::goToMatchingBrace()
         return;
     int position = view->getCurrentPos();
     auto isBrace = [view](int pos) {
-        const int ch = static_cast<int>(view->SendScintilla(QsciScintilla::SCI_GETCHARAT, pos));
+        const int ch = static_cast<int>(view->SendScintilla(SCI_GETCHARAT, pos));
         return ch == '(' || ch == ')' || ch == '[' || ch == ']' || ch == '{' || ch == '}';
     };
     if (!isBrace(position) && position > 0 && isBrace(position - 1)) --position;
     if (!isBrace(position)) return;
     const int match = static_cast<int>(
-        view->SendScintilla(QsciScintilla::SCI_BRACEMATCH,
+        view->SendScintilla(SCI_BRACEMATCH,
                             static_cast<unsigned long>(position), static_cast<long>(0)));
     if (match >= 0) view->setCurrentPos(match);
 }
@@ -2040,28 +2043,28 @@ void MainWindow::jumpSearchMark(bool forward)
     if (forward) {
         position = qMin(length, position + 1);
         while (position < length) {
-            if (view->SendScintilla(QsciScintilla::SCI_INDICATORVALUEAT,
+            if (view->SendScintilla(SCI_INDICATORVALUEAT,
                                     indicator, position) != 0) break;
             int next = static_cast<int>(view->SendScintilla(
-                QsciScintilla::SCI_INDICATOREND, indicator, position));
+                SCI_INDICATOREND, indicator, position));
             position = next > position ? next : position + 1;
         }
     } else {
         position = qMax(0, position - 1);
         while (position > 0) {
-            if (view->SendScintilla(QsciScintilla::SCI_INDICATORVALUEAT,
+            if (view->SendScintilla(SCI_INDICATORVALUEAT,
                                     indicator, position) != 0) {
                 position = static_cast<int>(view->SendScintilla(
-                    QsciScintilla::SCI_INDICATORSTART, indicator, position));
+                    SCI_INDICATORSTART, indicator, position));
                 break;
             }
             int previous = static_cast<int>(view->SendScintilla(
-                QsciScintilla::SCI_INDICATORSTART, indicator, position));
+                SCI_INDICATORSTART, indicator, position));
             position = previous < position ? qMax(0, previous - 1) : position - 1;
         }
     }
     if (position >= 0 && position < length &&
-        view->SendScintilla(QsciScintilla::SCI_INDICATORVALUEAT,
+        view->SendScintilla(SCI_INDICATORVALUEAT,
                             indicator, position) != 0)
         view->setCurrentPos(position);
 }
@@ -2070,9 +2073,9 @@ void MainWindow::clearSearchMarks()
 {
     ScintillaEditView* view = currentActiveView();
     if (!view) return;
-    view->SendScintilla(QsciScintilla::SCI_SETINDICATORCURRENT,
+    view->SendScintilla(SCI_SETINDICATORCURRENT,
                         ScintillaEditView::FIND_MARK_INDICATOR);
-    view->SendScintilla(QsciScintilla::SCI_INDICATORCLEARRANGE, 0, view->length());
+    view->SendScintilla(SCI_INDICATORCLEARRANGE, 0, view->length());
 }
 
 void MainWindow::columnEditor()
@@ -2168,7 +2171,8 @@ void MainWindow::columnEditor()
             position = lineEnd;
         }
         const QByteArray bytes = value.toUtf8();
-        view->SendScintilla(QsciScintilla::SCI_INSERTTEXT, position, bytes.constData());
+        view->SendScintilla(SCI_INSERTTEXT, position,
+            reinterpret_cast<sptr_t>(bytes.constData()));
     }
     view->endUndoAction();
 }
@@ -2179,7 +2183,7 @@ void MainWindow::playMacro()
     ScintillaEditView* view = currentActiveView();
     if (!view) return;
 
-    QsciMacro temp(view);
+    EditorMacro temp(view);
     if (temp.load(_macroStr))
         temp.play();
 }
@@ -2233,23 +2237,23 @@ void MainWindow::onCursorPositionChanged(int line, int col)
     Q_UNUSED(line); Q_UNUSED(col);
     // 只更新频繁变化的两个部分，编码/EOL/INS 不需要每次都刷新
     const qintptr selStart =
-        view->SendScintillaNpp(QsciScintilla::SCI_GETSELECTIONSTART);
+        view->SendScintillaNpp(SCI_GETSELECTIONSTART);
     const qintptr selEnd =
-        view->SendScintillaNpp(QsciScintilla::SCI_GETSELECTIONEND);
+        view->SendScintillaNpp(SCI_GETSELECTIONEND);
     int  curLine, curCol;
     view->getCursorPosition(&curLine, &curCol);
     QString posPart;
     if (selStart == selEnd) {
         const qintptr pos =
-            view->SendScintillaNpp(QsciScintilla::SCI_GETCURRENTPOS);
+            view->SendScintillaNpp(SCI_GETCURRENTPOS);
         posPart  = QString("Pos : %1").arg(QLocale().toString((qlonglong)(pos + 1)));
     } else {
         const qintptr selChars = selEnd - selStart;
         const int selLineStart = static_cast<int>(view->SendScintillaNpp(
-            QsciScintilla::SCI_LINEFROMPOSITION,
+            SCI_LINEFROMPOSITION,
             static_cast<quintptr>(selStart)));
         const int selLineEnd = static_cast<int>(view->SendScintillaNpp(
-            QsciScintilla::SCI_LINEFROMPOSITION,
+            SCI_LINEFROMPOSITION,
             static_cast<quintptr>(selEnd)));
         posPart = QString("Sel : %1 | %2")
             .arg(QLocale().toString((qlonglong)selChars))
@@ -2260,7 +2264,7 @@ void MainWindow::onCursorPositionChanged(int line, int col)
             .arg(curLine + 1).arg(curCol + 1).arg(posPart));
 
     const qintptr docLen = view->documentLengthNpp();
-    int  nLines = (int) view->SendScintilla(QsciScintilla::SCI_GETLINECOUNT);
+    int  nLines = (int) view->SendScintilla(SCI_GETLINECOUNT);
     _docSizeLabel->setText(
         QString("length : %1    lines : %2")
             .arg(QLocale().toString((qlonglong)docLen))
@@ -2499,11 +2503,13 @@ void MainWindow::setupAuxiliaryPanels()
         }
     });
 
-    QTabWidget* projects = new QTabWidget(this);
     for (int i = 0; i < 3; ++i) {
-        ProjectPanel* panel = new ProjectPanel(i, projects);
+        ProjectPanel* panel = new ProjectPanel(i, this);
         _projectPanels[i] = panel;
-        projects->addTab(panel, tr("Project %1").arg(i + 1));
+        NativeLangSpeaker& speaker =
+            NppParameters::getInstance().getNativeLangSpeaker();
+        if (speaker.isLoaded())
+            speaker.changeDlgLang(panel, "ProjectPanel");
         connect(panel, &ProjectPanel::fileActivated, this,
                 [this](const QString& path) { doOpenFile(path, _activeDocTab); });
         connect(panel, &ProjectPanel::workspacePathChanged, this,
@@ -2520,12 +2526,18 @@ void MainWindow::setupAuxiliaryPanels()
             NppParameters::getInstance().workspaceFilePath(i);
         if (!workspace.isEmpty() && QFileInfo::exists(workspace))
             panel->loadWorkspace(workspace);
+
+        QDockWidget* dock = new QDockWidget(tr("Project %1").arg(i + 1), this);
+        dock->setObjectName(i == 0
+            ? QStringLiteral("ProjectPanelsDock")
+            : QStringLiteral("ProjectPanelsDock%1").arg(i + 1));
+        dock->setWidget(panel);
+        dock->setMinimumWidth(190);
+        addDockWidget(Qt::LeftDockWidgetArea, dock);
+        dock->hide();
+        _projectPanelsDock[i] = dock;
     }
-    _projectPanelsDock = new QDockWidget(tr("Project Panels"), this);
-    _projectPanelsDock->setObjectName("ProjectPanelsDock");
-    _projectPanelsDock->setWidget(projects);
-    addDockWidget(Qt::LeftDockWidgetArea, _projectPanelsDock);
-    _projectPanelsDock->hide();
+    resizeDocks({_projectPanelsDock[0]}, {207}, Qt::Horizontal);
 
     _clipboardHistory = new QListWidget(this);
     _clipboardHistory->setWordWrap(true);
@@ -2580,7 +2592,7 @@ void MainWindow::setupFindResultPanel()
     _findResultView->setObjectName(QStringLiteral("findResultView"));
     _findResultView->setFont(QFont(QStringLiteral("Courier New"), 9));
     _findResultView->setBuiltinLanguage(QStringLiteral("searchResult"));
-    _findResultView->setFolding(QsciScintilla::BoxedTreeFoldStyle);
+    _findResultView->setFolding(BoxedTreeFoldStyle);
     _findResultView->setMarginWidth(0, 0);
     _findResultView->setMarginWidth(1, 0);
     _findResultView->setReadOnly(true);
@@ -2593,8 +2605,8 @@ void MainWindow::setupFindResultPanel()
     _findResultDock->hide();
 
     // 双击结果行 → 跳转到对应文档位置。
-    connect(_findResultView, &QsciScintillaBase::SCN_DOUBLECLICK, this,
-            [this](int, int resultLine, int) {
+    connect(_findResultView, &ScintillaEditBase::doubleClick, this,
+            [this](Scintilla::Position, Scintilla::Position resultLine) {
         if (resultLine < 0 ||
             resultLine >= _findResultIndexByLine.size())
             return;
@@ -2623,7 +2635,7 @@ void MainWindow::setupFindResultPanel()
         }
         if (auto* v = currentActiveView()) {
             const int line = static_cast<int>(v->SendScintillaNpp(
-                QsciScintilla::SCI_LINEFROMPOSITION,
+                SCI_LINEFROMPOSITION,
                 static_cast<quintptr>(matchStart)));
             v->setCursorPosition(line, 0);
             v->ensureLineVisible(line);
@@ -2704,33 +2716,33 @@ void MainWindow::onFindAllResults(const QString& searchText,
     _findResultView->setReadOnly(false);
     _findResultView->setText(output.join(QStringLiteral("\n")));
     _findResultView->setReadOnly(true);
-    const int base = QsciScintillaBase::SC_FOLDLEVELBASE;
-    const int header = QsciScintillaBase::SC_FOLDLEVELHEADERFLAG;
+    const int base = SC_FOLDLEVELBASE;
+    const int header = SC_FOLDLEVELHEADERFLAG;
     int currentGroupLine = -1;
     for (int line = 0; line < _findResultIndexByLine.size(); ++line) {
         const int resultIndex = _findResultIndexByLine.at(line);
         if (line == 0) {
             _findResultView->SendScintillaNpp(
-                QsciScintillaBase::SCI_SETFOLDLEVEL, line, base | header);
+                SCI_SETFOLDLEVEL, line, base | header);
         } else if (resultIndex < 0) {
             currentGroupLine = line;
             _findResultView->SendScintillaNpp(
-                QsciScintillaBase::SCI_SETFOLDLEVEL,
+                SCI_SETFOLDLEVEL,
                 line, (base + 1) | header);
         } else {
             _findResultView->SendScintillaNpp(
-                QsciScintillaBase::SCI_SETFOLDLEVEL,
+                SCI_SETFOLDLEVEL,
                 line, base + (currentGroupLine >= 0 ? 2 : 1));
             const FindAllResult& result = results.at(resultIndex);
             const QByteArray prefix =
                 QStringLiteral("  Line %1:\t").arg(result.lineNo + 1).toUtf8();
             const qintptr lineStart = _findResultView->SendScintillaNpp(
-                QsciScintillaBase::SCI_POSITIONFROMLINE, line);
+                SCI_POSITIONFROMLINE, line);
             _findResultView->SendScintillaNpp(
-                QsciScintillaBase::SCI_SETINDICATORCURRENT,
+                SCI_SETINDICATORCURRENT,
                 ScintillaEditView::FIND_MARK_INDICATOR);
             _findResultView->SendScintillaNpp(
-                QsciScintillaBase::SCI_INDICATORFILLRANGE,
+                SCI_INDICATORFILLRANGE,
                 lineStart + prefix.size() + result.lineMatchStart,
                 result.matchLen);
         }
@@ -2766,7 +2778,7 @@ void MainWindow::onFindAllOpenedDocsRequested(const QString& searchText,
             view->getSelectionNpp(&originalStart, &originalEnd);
             const int originalFirstVisible = view->firstVisibleLine();
             const int originalXOffset = static_cast<int>(view->SendScintilla(
-                QsciScintilla::SCI_GETXOFFSET));
+                SCI_GETXOFFSET));
             const qintptr docLen = view->documentLengthNpp();
             view->setCurrentPositionNpp(0);
             bool found = view->findFirst(scintillaSearchText, opt._isRegex, opt._isMatchCase,
@@ -2779,7 +2791,7 @@ void MainWindow::onFindAllOpenedDocsRequested(const QString& searchText,
                     break;
 
                 const int lineNo = static_cast<int>(view->SendScintillaNpp(
-                    QsciScintilla::SCI_LINEFROMPOSITION,
+                    SCI_LINEFROMPOSITION,
                     static_cast<quintptr>(matchStart)));
                 QString lineText = view->text(lineNo);
                 while (!lineText.isEmpty() &&
@@ -2791,7 +2803,7 @@ void MainWindow::onFindAllOpenedDocsRequested(const QString& searchText,
                 r.matchStart = matchStart;
                 r.matchLen = matchEnd - matchStart;
                 const qintptr lineStart = view->SendScintillaNpp(
-                    QsciScintilla::SCI_POSITIONFROMLINE,
+                    SCI_POSITIONFROMLINE,
                     static_cast<quintptr>(lineNo));
                 r.lineMatchStart = matchStart - lineStart;
                 r.lineText = lineText;
@@ -2803,11 +2815,11 @@ void MainWindow::onFindAllOpenedDocsRequested(const QString& searchText,
             }
             view->findFirst(QString(), false, false, false, false, true);
             view->SendScintillaNpp(
-                QsciScintilla::SCI_SETSEL,
+                SCI_SETSEL,
                 static_cast<quintptr>(originalStart), originalEnd);
-            view->SendScintilla(QsciScintilla::SCI_SETFIRSTVISIBLELINE,
+            view->SendScintilla(SCI_SETFIRSTVISIBLELINE,
                                 static_cast<unsigned long>(originalFirstVisible));
-            view->SendScintilla(QsciScintilla::SCI_SETXOFFSET,
+            view->SendScintilla(SCI_SETXOFFSET,
                                 static_cast<unsigned long>(originalXOffset));
         }
     };
@@ -2993,7 +3005,7 @@ void MainWindow::onReplaceAllOpenedDocsRequested(const QString& searchText,
                         const qintptr shiftedOriginal =
                             start + (lengthAfter - lengthBefore);
                         const qintptr nextPosition = view->SendScintillaNpp(
-                            QsciScintilla::SCI_POSITIONAFTER,
+                            SCI_POSITIONAFTER,
                             static_cast<quintptr>(shiftedOriginal));
                         found = findInViewFromPosition(
                             view, scintillaSearchText, opt, nextPosition);
@@ -3005,7 +3017,7 @@ void MainWindow::onReplaceAllOpenedDocsRequested(const QString& searchText,
             view->endUndoAction();
             const qintptr documentLength = view->documentLengthNpp();
             view->SendScintillaNpp(
-                QsciScintilla::SCI_SETSEL,
+                SCI_SETSEL,
                 static_cast<quintptr>(qBound<qintptr>(
                     0, originalStart, documentLength)),
                 qBound<qintptr>(0, originalEnd, documentLength));
@@ -3332,11 +3344,55 @@ bool MainWindow::launchPendingPluginUpdater(QString* error)
         return false;
     }
 
-    const QStringList arguments = {
+    QString planError;
+    const PluginUpdatePlan plan = PluginUpdatePlan::read(
+        _pendingPluginUpdatePlan, &planError);
+    if (!planError.isEmpty()) {
+        if (error)
+            *error = planError;
+        return false;
+    }
+    QString writableDirectory = plan.pluginRoot;
+    while (!QFileInfo(writableDirectory).exists()) {
+        const QString parent = QFileInfo(writableDirectory).absolutePath();
+        if (parent == writableDirectory)
+            break;
+        writableDirectory = parent;
+    }
+    QTemporaryFile writeProbe(QDir(writableDirectory).filePath(
+        QStringLiteral(".npp-plugin-write-test-XXXXXX")));
+    const bool requiresElevation = !writeProbe.open();
+
+    QStringList arguments = {
         QStringLiteral("--plan"), _pendingPluginUpdatePlan,
         QStringLiteral("--wait-pid"),
         QString::number(QCoreApplication::applicationPid())
     };
+    QFile planFile(_pendingPluginUpdatePlan);
+    if (!planFile.open(QFile::ReadOnly)) {
+        if (error)
+            *error = planFile.errorString();
+        return false;
+    }
+    arguments.append(QStringLiteral("--plan-sha256"));
+    arguments.append(QString::fromLatin1(
+        QCryptographicHash::hash(planFile.readAll(),
+                                 QCryptographicHash::Sha256).toHex()));
+#if defined(Q_OS_WIN)
+    if (requiresElevation) {
+        arguments.append(QStringLiteral("--restart-unelevated"));
+        return PlatformServices::startElevated(
+            updaterPath, arguments, applicationDirectory, error);
+    }
+#else
+    if (requiresElevation) {
+        if (error) {
+            *error = tr("The plugin directory is not writable: %1")
+                         .arg(QDir::toNativeSeparators(plan.pluginRoot));
+        }
+        return false;
+    }
+#endif
     if (!QProcess::startDetached(
             updaterPath, arguments, applicationDirectory)) {
         if (error)
@@ -3671,8 +3727,8 @@ void MainWindow::saveSession()
                 : buf->getFullPath());
             ScintillaEditView* view =
                 qobject_cast<ScintillaEditView*>(tab->widget(i));
-            QsciLexer* lexer = view ? view->lexer() : nullptr;
-            sfi._langName = lexer ? QString(lexer->language()) : "Normal Text";
+            const QString language = view ? view->lexerLanguage() : QString();
+            sfi._langName = language.isEmpty() ? "Normal Text" : language;
             sfi._encoding = sessionEncodingForBuffer(buf);
             sfi._userReadOnly = buf->isReadOnly() ||
                                 (view && view->isReadOnly());
@@ -3692,34 +3748,34 @@ void MainWindow::saveSession()
 
             if (view) {
                 sfi._startPos = view->SendScintillaNpp(
-                    QsciScintilla::SCI_GETSELECTIONSTART);
+                    SCI_GETSELECTIONSTART);
                 sfi._endPos = view->SendScintillaNpp(
-                    QsciScintilla::SCI_GETSELECTIONEND);
+                    SCI_GETSELECTIONEND);
                 sfi._firstVisibleLine = view->firstVisibleLine();
                 sfi._xOffset          = view->SendScintilla(
-                    QsciScintilla::SCI_GETXOFFSET);
+                    SCI_GETXOFFSET);
                 sfi._scrollWidth      = view->SendScintilla(
-                    QsciScintilla::SCI_GETSCROLLWIDTH);
+                    SCI_GETSCROLLWIDTH);
                 sfi._selMode          = view->SendScintilla(
-                    QsciScintilla::SCI_GETSELECTIONMODE);
+                    SCI_GETSELECTIONMODE);
 
                 int markedLine = (int)view->SendScintilla(
-                    QsciScintilla::SCI_MARKERNEXT, 0UL, 1L << 1);
+                    SCI_MARKERNEXT, 0UL, 1L << 1);
                 while (markedLine >= 0) {
                     sfi._marks.push_back(static_cast<size_t>(markedLine));
                     markedLine = (int)view->SendScintilla(
-                        QsciScintilla::SCI_MARKERNEXT,
+                        SCI_MARKERNEXT,
                         static_cast<unsigned long>(markedLine + 1), 1L << 1);
                 }
                 if (!buf->isLargeFile()) {
                     for (int line = 0; line < view->lines(); ++line) {
                         const int level = (int)view->SendScintilla(
-                            QsciScintilla::SCI_GETFOLDLEVEL,
+                            SCI_GETFOLDLEVEL,
                             static_cast<unsigned long>(line));
                         if ((level &
-                             QsciScintillaBase::SC_FOLDLEVELHEADERFLAG) &&
+                             SC_FOLDLEVELHEADERFLAG) &&
                             !view->SendScintilla(
-                                QsciScintilla::SCI_GETFOLDEXPANDED,
+                                SCI_GETFOLDEXPANDED,
                                 static_cast<unsigned long>(line))) {
                             sfi._foldStates.push_back(
                                 static_cast<size_t>(line));
@@ -3825,7 +3881,7 @@ void MainWindow::restoreSession()
                         backupView->setText(decoded.text);
                     if (backupView)
                         backupView->SendScintilla(
-                        QsciScintilla::SCI_SETSAVEPOINT); // 不算 undo
+                        SCI_SETSAVEPOINT); // 不算 undo
                     if (backupView)
                         backupView->setReadOnly(readOnly);
                     if (decoded.isValid) {
@@ -3890,17 +3946,17 @@ void MainWindow::restoreSession()
                 0, static_cast<qintptr>(sfi._startPos), documentLength);
             const qintptr selectionEnd = qBound<qintptr>(
                 0, static_cast<qintptr>(sfi._endPos), documentLength);
-            view->SendScintilla(QsciScintilla::SCI_SETSELECTIONMODE,
+            view->SendScintilla(SCI_SETSELECTIONMODE,
                                 static_cast<unsigned long>(sfi._selMode));
             view->SendScintillaNpp(
-                QsciScintilla::SCI_SETSEL,
+                SCI_SETSEL,
                 static_cast<quintptr>(selectionStart), selectionEnd);
-            view->SendScintilla(QsciScintilla::SCI_SETFIRSTVISIBLELINE,
+            view->SendScintilla(SCI_SETFIRSTVISIBLELINE,
                                 static_cast<unsigned long>(sfi._firstVisibleLine));
-            view->SendScintilla(QsciScintilla::SCI_SETXOFFSET,
+            view->SendScintilla(SCI_SETXOFFSET,
                                 static_cast<unsigned long>(sfi._xOffset));
             if (sfi._scrollWidth > 1) {
-                view->SendScintilla(QsciScintilla::SCI_SETSCROLLWIDTH,
+                view->SendScintilla(SCI_SETSCROLLWIDTH,
                                     static_cast<unsigned long>(sfi._scrollWidth));
             }
             for (size_t line : sfi._marks) {
@@ -3911,7 +3967,7 @@ void MainWindow::restoreSession()
                 if (line >= static_cast<size_t>(view->lines()))
                     continue;
                 const bool expanded = view->SendScintilla(
-                    QsciScintilla::SCI_GETFOLDEXPANDED,
+                    SCI_GETFOLDEXPANDED,
                     static_cast<unsigned long>(line));
                 if (expanded)
                     view->foldLine(static_cast<int>(line));
@@ -4280,7 +4336,7 @@ void MainWindow::createActions()
     _deleteLineAction->setShortcut(Qt::CTRL | Qt::SHIFT | Qt::Key_K);
     connect(_deleteLineAction, &QAction::triggered, this, [this]() {
         if (auto* v = currentActiveView())
-            v->SendScintilla(QsciScintilla::SCI_LINEDELETE);
+            v->SendScintilla(SCI_LINEDELETE);
     });
 
     _duplicateLineAction = new QAction(tr("D&uplicate Line"), this);
@@ -4288,7 +4344,7 @@ void MainWindow::createActions()
     _duplicateLineAction->setShortcut(Qt::CTRL | Qt::Key_D);
     connect(_duplicateLineAction, &QAction::triggered, this, [this]() {
         if (auto* v = currentActiveView())
-            v->SendScintilla(QsciScintilla::SCI_LINEDUPLICATE);
+            v->SendScintilla(SCI_LINEDUPLICATE);
     });
 
     _moveLineUpAction = new QAction(tr("Move Line &Up"), this);
@@ -4296,7 +4352,7 @@ void MainWindow::createActions()
     _moveLineUpAction->setShortcut(Qt::CTRL | Qt::SHIFT | Qt::Key_Up);
     connect(_moveLineUpAction, &QAction::triggered, this, [this]() {
         if (auto* v = currentActiveView())
-            v->SendScintilla(QsciScintilla::SCI_MOVESELECTEDLINESUP);
+            v->SendScintilla(SCI_MOVESELECTEDLINESUP);
     });
 
     _moveLineDownAction = new QAction(tr("Move Line Do&wn"), this);
@@ -4304,7 +4360,7 @@ void MainWindow::createActions()
     _moveLineDownAction->setShortcut(Qt::CTRL | Qt::SHIFT | Qt::Key_Down);
     connect(_moveLineDownAction, &QAction::triggered, this, [this]() {
         if (auto* v = currentActiveView())
-            v->SendScintilla(QsciScintilla::SCI_MOVESELECTEDLINESDOWN);
+            v->SendScintilla(SCI_MOVESELECTEDLINESDOWN);
     });
 
     _toggleCommentAction = new QAction(tr("Toggle &Line Comment"), this);
@@ -4319,7 +4375,7 @@ void MainWindow::createActions()
     _toUpperCaseAction->setShortcut(Qt::CTRL | Qt::SHIFT | Qt::Key_U);
     connect(_toUpperCaseAction, &QAction::triggered, this, [this]() {
         if (auto* v = currentActiveView())
-            v->SendScintilla(QsciScintilla::SCI_UPPERCASE);
+            v->SendScintilla(SCI_UPPERCASE);
     });
 
     _toLowerCaseAction = new QAction(tr("&lowercase"), this);
@@ -4327,7 +4383,7 @@ void MainWindow::createActions()
     _toLowerCaseAction->setShortcut(Qt::CTRL | Qt::Key_U);
     connect(_toLowerCaseAction, &QAction::triggered, this, [this]() {
         if (auto* v = currentActiveView())
-            v->SendScintilla(QsciScintilla::SCI_LOWERCASE);
+            v->SendScintilla(SCI_LOWERCASE);
     });
 
     _findAction = new QAction(loadBmpIcon(":/icons/find.bmp"), tr("&Find..."), this);
@@ -4370,7 +4426,7 @@ void MainWindow::createActions()
     _eolWindowsAction->setCheckable(true);
     connect(_eolWindowsAction, &QAction::triggered, this, [this]() {
         setBufferEolMode(_activeDocTab->currentBuffer(),
-                         QsciScintilla::EolWindows, true);
+                         EolWindows, true);
     });
 
     _eolUnixAction = new QAction(tr("&Unix (LF)"), this);
@@ -4378,7 +4434,7 @@ void MainWindow::createActions()
     _eolUnixAction->setCheckable(true);
     connect(_eolUnixAction, &QAction::triggered, this, [this]() {
         setBufferEolMode(_activeDocTab->currentBuffer(),
-                         QsciScintilla::EolUnix, true);
+                         EolUnix, true);
     });
 
     _eolMacAction = new QAction(tr("&Mac (CR)"), this);
@@ -4386,7 +4442,7 @@ void MainWindow::createActions()
     _eolMacAction->setCheckable(true);
     connect(_eolMacAction, &QAction::triggered, this, [this]() {
         setBufferEolMode(_activeDocTab->currentBuffer(),
-                         QsciScintilla::EolMac, true);
+                         EolMac, true);
     });
 
     // 设置
@@ -4528,18 +4584,20 @@ void MainWindow::applyConfiguredShortcuts()
 
 void MainWindow::applyScintillaShortcuts(ScintillaEditView* view)
 {
-    if (!view || !view->standardCommands())
+    if (!view)
         return;
     for (const ScintillaKeyDef& configured :
          NppParameters::getInstance().getScintillaKeys()) {
-        QsciCommand* command = view->standardCommands()->find(
-            static_cast<QsciCommand::Command>(configured.scintillaId));
-        if (!command)
-            continue;
-        command->setKey(configured.shortcuts.isEmpty()
-            ? 0 : configured.shortcuts.at(0).toKeySequence()[0]);
-        command->setAlternateKey(configured.shortcuts.size() < 2
-            ? 0 : configured.shortcuts.at(1).toKeySequence()[0]);
+        for (const ShortcutKey& shortcut : configured.shortcuts) {
+            const int combined = shortcut.toKeySequence()[0];
+            const int key = combined & ~Qt::KeyboardModifierMask;
+            int modifiers = 0;
+            if (combined & Qt::ShiftModifier) modifiers |= SCMOD_SHIFT;
+            if (combined & Qt::ControlModifier) modifiers |= SCMOD_CTRL;
+            if (combined & Qt::AltModifier) modifiers |= SCMOD_ALT;
+            view->SendScintilla(SCI_ASSIGNCMDKEY,
+                key | (modifiers << 16), configured.scintillaId);
+        }
     }
 }
 
@@ -4734,7 +4792,7 @@ void MainWindow::createMenus()
             statusBar()->showMessage(tr("Selection start set"));
         } else {
             const int start = beginEndSelectAction->property("selectionStart").toInt();
-            view->SendScintilla(QsciScintilla::SCI_SETSEL, start, view->getCurrentPos());
+            view->SendScintilla(SCI_SETSEL, start, view->getCurrentPos());
             statusBar()->clearMessage();
         }
     });
@@ -4764,21 +4822,21 @@ void MainWindow::createMenus()
             if (view->hasSelectedText()) {
                 const QString selected = view->selectedText();
                 const qintptr end = view->SendScintillaNpp(
-                    QsciScintilla::SCI_GETSELECTIONEND);
+                    SCI_GETSELECTIONEND);
                 view->SendScintillaNpp(
-                    QsciScintilla::SCI_INSERTTEXT, end,
+                    SCI_INSERTTEXT, end,
                     reinterpret_cast<qintptr>(selected.toUtf8().constData()));
             } else {
-                view->SendScintillaNpp(QsciScintilla::SCI_LINEDUPLICATE);
+                view->SendScintillaNpp(SCI_LINEDUPLICATE);
             }
         }
     });
     addCommand(lineOpsMenu, tr("Split Lines"), "splitLinesAction",
                [this]() { if (auto* view = currentActiveView())
-                    view->SendScintillaNpp(QsciScintilla::SCI_LINESSPLIT, 0); });
+                    view->SendScintillaNpp(SCI_LINESSPLIT, 0); });
     addCommand(lineOpsMenu, tr("Join Lines"), "joinLinesAction",
                [this]() { if (auto* view = currentActiveView())
-                    view->SendScintillaNpp(QsciScintilla::SCI_LINESJOIN); });
+                    view->SendScintillaNpp(SCI_LINESJOIN); });
     addCommand(lineOpsMenu, tr("Insert Blank Line Above"),
                "insertBlankLineAboveAction", [this]() {
         if (auto* view = currentActiveView()) {
@@ -4873,12 +4931,12 @@ void MainWindow::createMenus()
     addCommand(indentationMenu, tr("Increase Line Indent"),
                "increaseIndentAction", [this]() {
         if (auto* view = currentActiveView())
-            view->SendScintillaNpp(QsciScintilla::SCI_TAB);
+            view->SendScintillaNpp(SCI_TAB);
     });
     addCommand(indentationMenu, tr("Decrease Line Indent"),
                "decreaseIndentAction", [this]() {
         if (auto* view = currentActiveView())
-            view->SendScintillaNpp(QsciScintilla::SCI_BACKTAB);
+            view->SendScintillaNpp(SCI_BACKTAB);
     });
 
     QMenu* copySpecialMenu = _editMenu->addMenu(tr("Copy to Clipboard"));
@@ -4981,7 +5039,7 @@ void MainWindow::createMenus()
             QDir::Name | QDir::IgnoreCase);
         const QByteArray list = entries.join(QStringLiteral(" ")).toUtf8();
         view->SendScintillaNpp(
-            QsciScintilla::SCI_AUTOCSHOW, 0,
+            SCI_AUTOCSHOW, 0,
             reinterpret_cast<qintptr>(list.constData()));
     });
     addCommand(autoCompletionMenu, tr("Previous Function Parameter Hint"),
@@ -5057,10 +5115,11 @@ void MainWindow::createMenus()
         const NppGUI& gui = NppParameters::getInstance().getNppGUI();
         QString pattern;
         switch (gui._searchEngineChoice) {
-            case 0: pattern = "https://duckduckgo.com/?q=%s"; break;
-            case 1: pattern = "https://www.bing.com/search?q=%s"; break;
-            case 3: pattern = "https://search.yahoo.com/search?p=%s"; break;
-            case 4: pattern = gui._searchEngineCustom; break;
+            case 0: pattern = gui._searchEngineCustom; break;
+            case 1: pattern = "https://duckduckgo.com/?q=%s"; break;
+            case 3: pattern = "https://www.bing.com/search?q=%s"; break;
+            case 4: pattern = "https://search.yahoo.com/search?p=%s"; break;
+            case 5: pattern = "https://stackoverflow.com/search?q=%s"; break;
             default: pattern = "https://www.google.com/search?q=%s"; break;
         }
         const QString encoded =
@@ -5080,10 +5139,10 @@ void MainWindow::createMenus()
         if (auto* view = currentActiveView()) {
             const qintptr current = view->getCurrentPos();
             const qintptr match = view->SendScintillaNpp(
-                QsciScintilla::SCI_BRACEMATCH, current);
+                SCI_BRACEMATCH, current);
             if (match >= 0)
                 view->SendScintillaNpp(
-                    QsciScintilla::SCI_SETSEL, current, match + 1);
+                    SCI_SETSEL, current, match + 1);
         }
     });
     addCommand(_searchMenu, tr("Next Search Result"),
@@ -5155,13 +5214,13 @@ void MainWindow::createMenus()
             if (!view || !view->hasSelectedText())
                 return;
             const qintptr start = view->SendScintillaNpp(
-                QsciScintilla::SCI_GETSELECTIONSTART);
+                SCI_GETSELECTIONSTART);
             const qintptr end = view->SendScintillaNpp(
-                QsciScintilla::SCI_GETSELECTIONEND);
+                SCI_GETSELECTIONEND);
             view->SendScintillaNpp(
-                QsciScintilla::SCI_SETINDICATORCURRENT, 26 - style);
+                SCI_SETINDICATORCURRENT, 26 - style);
             view->SendScintillaNpp(
-                QsciScintilla::SCI_INDICATORFILLRANGE,
+                SCI_INDICATORFILLRANGE,
                 start, end - start);
         });
     }
@@ -5169,12 +5228,12 @@ void MainWindow::createMenus()
                "clearStyleMarksAction", [this]() {
         if (auto* view = currentActiveView()) {
             const qintptr length = view->SendScintillaNpp(
-                QsciScintilla::SCI_GETLENGTH);
+                SCI_GETLENGTH);
             for (int style = 1; style <= 5; ++style) {
                 view->SendScintillaNpp(
-                    QsciScintilla::SCI_SETINDICATORCURRENT, 26 - style);
+                    SCI_SETINDICATORCURRENT, 26 - style);
                 view->SendScintillaNpp(
-                    QsciScintilla::SCI_INDICATORCLEARRANGE, 0, length);
+                    SCI_INDICATORCLEARRANGE, 0, length);
             }
         }
     });
@@ -5257,8 +5316,8 @@ void MainWindow::createMenus()
     connect(showAllCharactersAction, &QAction::toggled, this, [this](bool show) {
         if (auto* view = currentActiveView()) {
             view->setEolVisibility(show);
-            view->setWhitespaceVisibility(show ? QsciScintilla::WsVisible
-                                               : QsciScintilla::WsInvisible);
+            view->setWhitespaceVisibility(show ? WsVisible
+                                               : WsInvisible);
         }
     });
     showSymMenu->addAction(_showIndentAction);
@@ -5281,19 +5340,19 @@ void MainWindow::createMenus()
                [this]() {
         if (auto* view = currentActiveView()) {
             const int start = view->SendScintillaNpp(
-                QsciScintilla::SCI_LINEFROMPOSITION,
-                view->SendScintillaNpp(QsciScintilla::SCI_GETSELECTIONSTART));
+                SCI_LINEFROMPOSITION,
+                view->SendScintillaNpp(SCI_GETSELECTIONSTART));
             const int end = view->SendScintillaNpp(
-                QsciScintilla::SCI_LINEFROMPOSITION,
-                view->SendScintillaNpp(QsciScintilla::SCI_GETSELECTIONEND));
+                SCI_LINEFROMPOSITION,
+                view->SendScintillaNpp(SCI_GETSELECTIONEND));
             view->SendScintillaNpp(
-                QsciScintilla::SCI_HIDELINES, start, end);
+                SCI_HIDELINES, start, end);
         }
     });
     addCommand(_viewMenu, tr("Show All Hidden Lines"), "showHiddenLinesAction",
                [this]() { if (auto* view = currentActiveView())
                     view->SendScintillaNpp(
-                        QsciScintilla::SCI_SHOWLINES, 0, view->lines()); });
+                        SCI_SHOWLINES, 0, view->lines()); });
     addCommand(_viewMenu, tr("Text Direction RTL"), "textDirectionRtlAction",
                [this]() { if (auto* view = currentActiveView())
                     view->setLayoutDirection(Qt::RightToLeft); });
@@ -5460,9 +5519,23 @@ void MainWindow::createMenus()
     addCommand(_viewMenu, tr("Document List"), "documentListAction", [this]() {
         _documentListDock->setVisible(!_documentListDock->isVisible());
     });
-    addCommand(_viewMenu, tr("Project Panels"), "projectPanelsAction", [this]() {
-        _projectPanelsDock->setVisible(!_projectPanelsDock->isVisible());
-    });
+    QMenu* projectPanelsMenu = _viewMenu->addMenu(tr("Project Panels"));
+    projectPanelsMenu->setObjectName("projectPanelsMenu");
+    for (int panelIndex = 0; panelIndex < 3; ++panelIndex) {
+        QAction* action = addCommand(projectPanelsMenu,
+            tr("Project Panel %1").arg(panelIndex + 1),
+            panelIndex == 0 ? "projectPanelsAction"
+                            : QString("projectPanels%1Action").arg(panelIndex + 1).toLatin1().constData(),
+            [this, panelIndex]() {
+                QDockWidget* dock = _projectPanelsDock[panelIndex];
+                dock->setVisible(!dock->isVisible());
+                if (dock->isVisible())
+                    resizeDocks({dock}, {207}, Qt::Horizontal);
+            });
+        action->setCheckable(true);
+        connect(_projectPanelsDock[panelIndex], &QDockWidget::visibilityChanged,
+                action, &QAction::setChecked);
+    }
     addCommand(_viewMenu, tr("Clipboard History"), "clipboardHistoryAction", [this]() {
         _clipboardDock->setVisible(!_clipboardDock->isVisible());
     });
@@ -5491,12 +5564,12 @@ void MainWindow::createMenus()
     });
     addCommand(foldMenu, tr("Collapse All"), "collapseAllAction",
                [this]() { if (auto* view = currentActiveView())
-                    view->SendScintilla(QsciScintilla::SCI_FOLDALL,
-                                        QsciScintilla::SC_FOLDACTION_CONTRACT); });
+                    view->SendScintilla(SCI_FOLDALL,
+                                        SC_FOLDACTION_CONTRACT); });
     addCommand(foldMenu, tr("Uncollapse All"), "uncollapseAllAction",
                [this]() { if (auto* view = currentActiveView())
-                    view->SendScintilla(QsciScintilla::SCI_FOLDALL,
-                                        QsciScintilla::SC_FOLDACTION_EXPAND); });
+                    view->SendScintilla(SCI_FOLDALL,
+                                        SC_FOLDACTION_EXPAND); });
     QMenu* foldLevelMenu = foldMenu->addMenu(tr("Collapse Level"));
     foldLevelMenu->setObjectName("foldLevelMenu");
     QMenu* unfoldLevelMenu = foldMenu->addMenu(tr("Uncollapse Level"));
@@ -5512,13 +5585,13 @@ void MainWindow::createMenus()
                 if (!view) return;
                 for (int line = 0; line < view->lines(); ++line) {
                     const int foldLevel = view->SendScintillaNpp(
-                        QsciScintilla::SCI_GETFOLDLEVEL, line);
-                    if ((foldLevel & QsciScintilla::SC_FOLDLEVELNUMBERMASK) ==
-                        QsciScintilla::SC_FOLDLEVELBASE + level - 1) {
+                        SCI_GETFOLDLEVEL, line);
+                    if ((foldLevel & SC_FOLDLEVELNUMBERMASK) ==
+                        SC_FOLDLEVELBASE + level - 1) {
                         view->SendScintillaNpp(
-                            QsciScintilla::SCI_FOLDLINE, line,
-                            expand ? QsciScintilla::SC_FOLDACTION_EXPAND
-                                   : QsciScintilla::SC_FOLDACTION_CONTRACT);
+                            SCI_FOLDLINE, line,
+                            expand ? SC_FOLDACTION_EXPAND
+                                   : SC_FOLDACTION_CONTRACT);
                     }
                 }
             });
@@ -6126,191 +6199,36 @@ void MainWindow::createMenus()
     });
     addCommand(_settingsMenu, tr("Shortcut Mapper..."), "shortcutMapperAction",
                [this]() {
-        QDialog dlg(this);
-        dlg.setWindowTitle(tr("Shortcut Mapper"));
-        dlg.resize(680, 520);
-        QVBoxLayout* layout = new QVBoxLayout(&dlg);
-        QTabWidget* tabs = new QTabWidget(&dlg);
-        tabs->setObjectName(QStringLiteral("shortcutMapperTabs"));
-        auto makeTable = [this, &dlg]() {
-            QTableWidget* table = new QTableWidget(&dlg);
-            table->setColumnCount(3);
-            table->setHorizontalHeaderLabels(
-                {tr("Command"), tr("ID"), tr("Shortcut")});
-            table->horizontalHeader()->setStretchLastSection(true);
-            table->verticalHeader()->setVisible(false);
-            table->setSelectionBehavior(QAbstractItemView::SelectRows);
-            return table;
-        };
-
-        QTableWidget* mainTable = makeTable();
         QList<QAction*> actions;
-        for (QAction* action : findChildren<QAction*>()) {
-            if (!action->text().isEmpty() && !action->isSeparator()
-                && action->property("nppCommandId").isValid()
-                && !actions.contains(action)) {
-                actions.append(action);
+        std::function<void(QMenu*)> appendMenuActions =
+            [&](QMenu* menu) {
+            for (QAction* action : menu->actions()) {
+                if (QMenu* subMenu = action->menu()) {
+                    appendMenuActions(subMenu);
+                } else if (!action->isSeparator()
+                    && action->property("nppCommandId").isValid()
+                    && !action->property("userCommandIndex").isValid()
+                    && action->objectName() != "containingFolderAsWorkspaceAction"
+                    && action->objectName() != "restoreLastClosedFileAction"
+                    && !actions.contains(action)) {
+                    actions.append(action);
+                }
             }
+        };
+        for (QAction* topLevel : menuBar()->actions()) {
+            if (QMenu* menu = topLevel->menu())
+                appendMenuActions(menu);
         }
-        std::sort(actions.begin(), actions.end(), [](QAction* a, QAction* b) {
-            return QString::localeAwareCompare(a->text(), b->text()) < 0;
-        });
-        mainTable->setRowCount(actions.size());
-        for (int row = 0; row < actions.size(); ++row) {
-            QAction* action = actions.at(row);
-            QTableWidgetItem* name = new QTableWidgetItem(action->text().remove('&'));
-            name->setFlags(name->flags() & ~Qt::ItemIsEditable);
-            name->setData(Qt::UserRole, QVariant::fromValue<quintptr>(
-                reinterpret_cast<quintptr>(action)));
-            mainTable->setItem(row, 0, name);
-            QTableWidgetItem* id = new QTableWidgetItem(
-                QString::number(action->property("nppCommandId").toInt()));
-            id->setFlags(id->flags() & ~Qt::ItemIsEditable);
-            mainTable->setItem(row, 1, id);
-            mainTable->setCellWidget(row, 2,
-                new QKeySequenceEdit(action->shortcut(), mainTable));
+        ShortcutMapper mapper(actions, this);
+        NativeLangSpeaker& speaker =
+            NppParameters::getInstance().getNativeLangSpeaker();
+        if (speaker.isLoaded())
+            speaker.changeDlgLang(&mapper, "ShortcutMapper");
+        mapper.exec();
+        if (mapper.shortcutsChanged()) {
+            rebuildConfiguredMacroMenu();
+            applyPreferencesToAllViews();
         }
-        mainTable->resizeColumnToContents(0);
-        mainTable->resizeColumnToContents(1);
-        tabs->addTab(mainTable, tr("Main menu"));
-
-        NppParameters& parameters = NppParameters::getInstance();
-        QVector<MacroDef>& macros = parameters.getMacros();
-        QTableWidget* macroTable = makeTable();
-        macroTable->setRowCount(macros.size());
-        for (int row = 0; row < macros.size(); ++row) {
-            QTableWidgetItem* name = new QTableWidgetItem(macros.at(row).name);
-            name->setFlags(name->flags() & ~Qt::ItemIsEditable);
-            name->setData(Qt::UserRole, row);
-            macroTable->setItem(row, 0, name);
-            macroTable->setItem(row, 1, new QTableWidgetItem(QStringLiteral("-")));
-            ShortcutKey key;
-            key.ctrl = macros.at(row).ctrl;
-            key.alt = macros.at(row).alt;
-            key.shift = macros.at(row).shift;
-            key.key = macros.at(row).key;
-            macroTable->setCellWidget(row, 2,
-                new QKeySequenceEdit(key.toKeySequence(), macroTable));
-        }
-        tabs->addTab(macroTable, tr("Macros"));
-
-        QVector<UserCommandDef>& userCommands = parameters.getUserCommands();
-        QTableWidget* runTable = makeTable();
-        runTable->setRowCount(userCommands.size());
-        for (int row = 0; row < userCommands.size(); ++row) {
-            QTableWidgetItem* name =
-                new QTableWidgetItem(userCommands.at(row).name);
-            name->setFlags(name->flags() & ~Qt::ItemIsEditable);
-            name->setData(Qt::UserRole, row);
-            runTable->setItem(row, 0, name);
-            runTable->setItem(row, 1, new QTableWidgetItem(QStringLiteral("-")));
-            ShortcutKey key;
-            key.ctrl = userCommands.at(row).ctrl;
-            key.alt = userCommands.at(row).alt;
-            key.shift = userCommands.at(row).shift;
-            key.key = userCommands.at(row).key;
-            runTable->setCellWidget(row, 2,
-                new QKeySequenceEdit(key.toKeySequence(), runTable));
-        }
-        tabs->addTab(runTable, tr("Run commands"));
-
-        QVector<ScintillaKeyDef>& scintillaKeys = parameters.getScintillaKeys();
-        QTableWidget* scintillaTable = makeTable();
-        int scintillaRows = 0;
-        for (const ScintillaKeyDef& command : scintillaKeys)
-            scintillaRows += command.shortcuts.size();
-        scintillaTable->setRowCount(scintillaRows);
-        int scintillaRow = 0;
-        for (int commandIndex = 0; commandIndex < scintillaKeys.size();
-             ++commandIndex) {
-            const ScintillaKeyDef& command = scintillaKeys.at(commandIndex);
-            for (int keyIndex = 0; keyIndex < command.shortcuts.size();
-                 ++keyIndex, ++scintillaRow) {
-                QTableWidgetItem* name = new QTableWidgetItem(
-                    tr("Scintilla command %1").arg(command.scintillaId));
-                name->setFlags(name->flags() & ~Qt::ItemIsEditable);
-                name->setData(Qt::UserRole, commandIndex);
-                name->setData(Qt::UserRole + 1, keyIndex);
-                scintillaTable->setItem(scintillaRow, 0, name);
-                scintillaTable->setItem(scintillaRow, 1,
-                    new QTableWidgetItem(QString::number(command.menuCommandId)));
-                scintillaTable->setCellWidget(scintillaRow, 2,
-                    new QKeySequenceEdit(
-                        command.shortcuts.at(keyIndex).toKeySequence(),
-                        scintillaTable));
-            }
-        }
-        tabs->addTab(scintillaTable, tr("Scintilla commands"));
-        layout->addWidget(tabs);
-
-        QDialogButtonBox* buttons = new QDialogButtonBox(
-            QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
-        layout->addWidget(buttons);
-        connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
-        connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
-        if (dlg.exec() != QDialog::Accepted)
-            return;
-        for (int row = 0; row < mainTable->rowCount(); ++row) {
-            QAction* action = reinterpret_cast<QAction*>(
-                mainTable->item(row, 0)->data(Qt::UserRole).value<quintptr>());
-            QKeySequenceEdit* editor =
-                qobject_cast<QKeySequenceEdit*>(mainTable->cellWidget(row, 2));
-            if (action && editor)
-                action->setShortcut(editor->keySequence());
-            if (action && editor && action->property("nppCommandId").isValid())
-                parameters.setInternalCommandShortcut(
-                    action->property("nppCommandId").toInt(),
-                    editor->keySequence());
-        }
-        for (int row = 0; row < macroTable->rowCount(); ++row) {
-            const int index = macroTable->item(row, 0)->data(Qt::UserRole).toInt();
-            QKeySequenceEdit* editor = qobject_cast<QKeySequenceEdit*>(
-                macroTable->cellWidget(row, 2));
-            if (index < 0 || index >= macros.size() || !editor)
-                continue;
-            const ShortcutKey key =
-                ShortcutKey::fromKeySequence(editor->keySequence());
-            macros[index].ctrl = key.ctrl;
-            macros[index].alt = key.alt;
-            macros[index].shift = key.shift;
-            macros[index].key = key.key;
-        }
-        for (int row = 0; row < runTable->rowCount(); ++row) {
-            const int index = runTable->item(row, 0)->data(Qt::UserRole).toInt();
-            QKeySequenceEdit* editor = qobject_cast<QKeySequenceEdit*>(
-                runTable->cellWidget(row, 2));
-            if (index < 0 || index >= userCommands.size() || !editor)
-                continue;
-            const ShortcutKey key =
-                ShortcutKey::fromKeySequence(editor->keySequence());
-            userCommands[index].ctrl = key.ctrl;
-            userCommands[index].alt = key.alt;
-            userCommands[index].shift = key.shift;
-            userCommands[index].key = key.key;
-            for (QAction* action : findChildren<QAction*>()) {
-                if (action->property("userCommandIndex").toInt() == index + 1)
-                    action->setShortcut(editor->keySequence());
-            }
-        }
-        for (int row = 0; row < scintillaTable->rowCount(); ++row) {
-            const int commandIndex =
-                scintillaTable->item(row, 0)->data(Qt::UserRole).toInt();
-            const int keyIndex =
-                scintillaTable->item(row, 0)->data(Qt::UserRole + 1).toInt();
-            QKeySequenceEdit* editor = qobject_cast<QKeySequenceEdit*>(
-                scintillaTable->cellWidget(row, 2));
-            if (commandIndex < 0 || commandIndex >= scintillaKeys.size()
-                || keyIndex < 0
-                || keyIndex >= scintillaKeys[commandIndex].shortcuts.size()
-                || !editor) {
-                continue;
-            }
-            scintillaKeys[commandIndex].shortcuts[keyIndex] =
-                ShortcutKey::fromKeySequence(editor->keySequence());
-        }
-        parameters.writeShortcuts();
-        rebuildConfiguredMacroMenu();
-        applyPreferencesToAllViews();
     });
 
     QMenu* importMenu = _settingsMenu->addMenu(tr("Import"));
@@ -6711,7 +6629,7 @@ void MainWindow::updateActionStates()
     if (_wordWrapAction) {
         const bool wrapped = view && currentBuffer &&
             !currentBuffer->isLargeFile() &&
-            view->wrapMode() != QsciScintilla::WrapNone;
+            view->wrapMode() != WrapNone;
         _wordWrapAction->setChecked(wrapped);
     }
     const bool writableBuffer = hasBuf && currentBuffer &&
@@ -6720,9 +6638,9 @@ void MainWindow::updateActionStates()
     _eolUnixAction->setEnabled(writableBuffer);
     _eolMacAction->setEnabled(writableBuffer);
     if (view) {
-        _eolWindowsAction->setChecked(view->eolMode() == QsciScintilla::EolWindows);
-        _eolUnixAction->setChecked(view->eolMode() == QsciScintilla::EolUnix);
-        _eolMacAction->setChecked(view->eolMode() == QsciScintilla::EolMac);
+        _eolWindowsAction->setChecked(view->eolMode() == EolWindows);
+        _eolUnixAction->setChecked(view->eolMode() == EolUnix);
+        _eolMacAction->setChecked(view->eolMode() == EolMac);
     }
     if (_encodingMenu) {
         _encodingMenu->setEnabled(writableBuffer);
@@ -6811,9 +6729,9 @@ void MainWindow::reinterpretAs(const QString& codec)
     }
 
     const qintptr selectionStart = activeView->SendScintillaNpp(
-        QsciScintilla::SCI_GETSELECTIONSTART, 0, 0);
+        SCI_GETSELECTIONSTART, 0, 0);
     const qintptr selectionEnd = activeView->SendScintillaNpp(
-        QsciScintilla::SCI_GETSELECTIONEND, 0, 0);
+        SCI_GETSELECTIONEND, 0, 0);
     const int firstVisibleLine = activeView->firstVisibleLine();
     const bool readOnly = buf->isReadOnly();
 
@@ -6834,7 +6752,7 @@ void MainWindow::reinterpretAs(const QString& codec)
         return;
     }
 
-    const QsciScintilla::EolMode eolMode =
+    const EolMode eolMode =
         toScintillaEol(buf->getEolMode(), activeView->eolMode());
     for (ScintillaEditView* view : buf->views()) {
         if (view != activeView)
@@ -6843,13 +6761,13 @@ void MainWindow::reinterpretAs(const QString& codec)
         view->setEolMode(eolMode);
         view->setLexerForFile(buf->getFullPath());
         applyPreferencesToView(view);
-        view->SendScintilla(QsciScintilla::SCI_SETSAVEPOINT);
+        view->SendScintilla(SCI_SETSAVEPOINT);
         view->setReadOnly(readOnly);
     }
 
     const qintptr documentLength = activeView->documentLengthNpp();
     activeView->SendScintillaNpp(
-        QsciScintilla::SCI_SETSEL,
+        SCI_SETSEL,
         static_cast<quintptr>(qMin(selectionStart, documentLength)),
         qMin(selectionEnd, documentLength));
     activeView->setFirstVisibleLine(firstVisibleLine);
@@ -7114,6 +7032,12 @@ void MainWindow::createStatusBar()
     for (QLabel* l : {_docTypeLabel, _docSizeLabel, _posLabel,
                       _eolLabel, _encodingLabel, _insertLabel})
         l->setContentsMargins(4, 0, 4, 0);
+
+    _docSizeLabel->setMinimumWidth(200);
+    _posLabel->setMinimumWidth(210);
+    _eolLabel->setMinimumWidth(150);
+    _encodingLabel->setMinimumWidth(145);
+    _insertLabel->setMinimumWidth(42);
 
     // DOC_TYPE 在最左侧，自动填充剩余空间（对应原版状态栏第 0 分区）
     statusBar()->addWidget(_docTypeLabel, 1);

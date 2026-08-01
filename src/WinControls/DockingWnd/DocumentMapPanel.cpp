@@ -29,11 +29,11 @@ DocumentMapPanel::DocumentMapPanel(QWidget* parent)
 {
     _miniView = new ScintillaEditView(this);
     _miniView->setReadOnly(true);
-    _miniView->SendScintilla(QsciScintilla::SCI_SETZOOM, -8);
+    _miniView->SendScintilla(SCI_SETZOOM, -8);
     _miniView->setMarginWidth(0, 0);
     _miniView->setMarginWidth(1, 0);
     _miniView->setMarginWidth(2, 0);
-    _miniView->SendScintilla(QsciScintilla::SCI_SETCARETWIDTH, 0);
+    _miniView->SendScintilla(SCI_SETCARETWIDTH, 0);
     _miniView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     _miniView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     _miniView->setFocusPolicy(Qt::NoFocus);
@@ -84,24 +84,24 @@ BufferMapState DocumentMapPanel::sessionState() const
         return state;
 
     state.firstVisibleDisplayLine = static_cast<int>(_miniView->SendScintilla(
-        QsciScintilla::SCI_GETFIRSTVISIBLELINE));
+        SCI_GETFIRSTVISIBLELINE));
     state.firstVisibleDocLine = static_cast<int>(_trackedView->SendScintilla(
-        QsciScintilla::SCI_GETFIRSTVISIBLELINE));
+        SCI_GETFIRSTVISIBLELINE));
     const int visibleLines = static_cast<int>(_trackedView->SendScintilla(
-        QsciScintilla::SCI_LINESONSCREEN));
+        SCI_LINESONSCREEN));
     state.lastVisibleDocLine =
         qMin(_trackedView->lines() - 1,
              state.firstVisibleDocLine + qMax(0, visibleLines - 1));
     state.lineCount = _trackedView->lines();
     state.higherPosition = static_cast<int>(_trackedView->SendScintilla(
-        QsciScintilla::SCI_GETCURRENTPOS));
+        SCI_GETCURRENTPOS));
     state.width = width();
     state.height = height();
     state.kBytesInDocument =
         (_trackedView->documentLengthNpp() + 1023) / 1024;
     state.wrapIndentMode = static_cast<int>(_trackedView->SendScintilla(
-        QsciScintilla::SCI_GETWRAPINDENTMODE));
-    state.isWrap = _trackedView->wrapMode() != QsciScintilla::WrapNone;
+        SCI_GETWRAPINDENTMODE));
+    state.isWrap = _trackedView->wrapMode() != WrapNone;
     return state;
 }
 
@@ -111,17 +111,17 @@ void DocumentMapPanel::restoreSessionState(const BufferMapState& state)
         return;
     if (state.firstVisibleDisplayLine >= 0) {
         _miniView->SendScintilla(
-            QsciScintilla::SCI_SETFIRSTVISIBLELINE,
+            SCI_SETFIRSTVISIBLELINE,
             static_cast<unsigned long>(state.firstVisibleDisplayLine));
     }
     const int miniFirstLine = static_cast<int>(_miniView->SendScintilla(
-        QsciScintilla::SCI_GETFIRSTVISIBLELINE));
+        SCI_GETFIRSTVISIBLELINE));
     const int firstLine = static_cast<int>(_trackedView->SendScintilla(
-        QsciScintilla::SCI_GETFIRSTVISIBLELINE));
+        SCI_GETFIRSTVISIBLELINE));
     const int visibleLines = static_cast<int>(_trackedView->SendScintilla(
-        QsciScintilla::SCI_LINESONSCREEN));
+        SCI_LINESONSCREEN));
     const int lineHeight = static_cast<int>(_miniView->SendScintilla(
-        QsciScintilla::SCI_TEXTHEIGHT, 0));
+        SCI_TEXTHEIGHT, 0));
     if (lineHeight <= 0)
         return;
     const int indicatorY = qMax(0, firstLine - miniFirstLine) * lineHeight;
@@ -138,17 +138,17 @@ void DocumentMapPanel::updatePositionIndicator()
 {
     if (!_trackedView || !_miniView || !isVisible()) return;
 
-    int firstLine   = (int)_trackedView->SendScintilla(QsciScintilla::SCI_GETFIRSTVISIBLELINE);
-    int visibleLines= (int)_trackedView->SendScintilla(QsciScintilla::SCI_LINESONSCREEN);
+    int firstLine   = (int)_trackedView->SendScintilla(SCI_GETFIRSTVISIBLELINE);
+    int visibleLines= (int)_trackedView->SendScintilla(SCI_LINESONSCREEN);
     int totalLines  = _trackedView->lines();
     if (totalLines <= 0) return;
 
     // 滚动缩略图使当前位置居中
     int miniFirstLine = qMax(0, firstLine - visibleLines);
-    _miniView->SendScintilla(QsciScintilla::SCI_SETFIRSTVISIBLELINE, miniFirstLine);
+    _miniView->SendScintilla(SCI_SETFIRSTVISIBLELINE, miniFirstLine);
 
     // 计算指示器位置
-    int lineH = (int)_miniView->SendScintilla(QsciScintilla::SCI_TEXTHEIGHT, 0);
+    int lineH = (int)_miniView->SendScintilla(SCI_TEXTHEIGHT, 0);
     if (lineH <= 0) return;
 
     int relFirst = firstLine - miniFirstLine;
@@ -165,13 +165,13 @@ bool DocumentMapPanel::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == _miniView && event->type() == QEvent::MouseButtonPress) {
         auto* me = static_cast<QMouseEvent*>(event);
-        int pos  = (int)_miniView->SendScintilla(QsciScintilla::SCI_POSITIONFROMPOINT,
+        int pos  = (int)_miniView->SendScintilla(SCI_POSITIONFROMPOINT,
                                                  (ulong)me->x(), (ulong)me->y());
-        int line = (int)_miniView->SendScintilla(QsciScintilla::SCI_LINEFROMPOSITION, pos);
+        int line = (int)_miniView->SendScintilla(SCI_LINEFROMPOSITION, pos);
         if (_trackedView) {
-            int half = (int)_trackedView->SendScintilla(QsciScintilla::SCI_LINESONSCREEN) / 2;
+            int half = (int)_trackedView->SendScintilla(SCI_LINESONSCREEN) / 2;
             int target = qMax(0, line - half);
-            _trackedView->SendScintilla(QsciScintilla::SCI_SETFIRSTVISIBLELINE, target);
+            _trackedView->SendScintilla(SCI_SETFIRSTVISIBLELINE, target);
         }
         return true;
     }

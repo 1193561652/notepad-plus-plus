@@ -1,5 +1,5 @@
+#include <ILexer.h>
 #include <Lexilla.h>
-
 #include <SciLexer.h>
 #include <cstdio>
 
@@ -14,7 +14,7 @@ bool check(bool condition, const char* message)
 
 bool verifyLexer(const char* name)
 {
-    Scintilla::ILexer* lexer = CreateLexer(name);
+    Scintilla::ILexer5* lexer = CreateLexer(name);
     const bool ok = check(lexer != nullptr, name);
     if (lexer)
         lexer->Release();

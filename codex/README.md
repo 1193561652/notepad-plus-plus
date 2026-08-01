@@ -67,7 +67,7 @@ codex/
 `index/build.md` 建议包含：
 
 - Qt 移植版本的构建命令。
-- Qt、CMake、QScintilla 的查找方式。
+- Qt、CMake、Scintilla 和 Lexilla 的构建方式。
 - 已知构建限制和常见问题。
 
 ### 模块知识
@@ -78,7 +78,7 @@ codex/
 - 关键类和关键文件。
 - 主要入口函数。
 - 与原版 Notepad++ 的对应关系。
-- 与 Qt / QScintilla 的适配方式。
+- 与 Qt / Scintilla 平台层的适配方式。
 - 修改该模块时的风险点。
 
 ### 功能索引
@@ -194,3 +194,5 @@ rg "QAction|QMenu|QToolBar|QSettings|QDomDocument"
 - 不确定的信息必须标注待验证。
 - 代码修改后，索引应尽量保持同步。
 - 本地缓存应定期刷新，`cache/latest.md` 始终指向最近一次有效分析摘要。
+- 带日期的分析、决策和变更文件属于历史证据，可能保留当时使用的组件名称；
+  当前事实以源码、`index/`、`features/` 和 `cache/latest.md` 顶部最新段落为准。

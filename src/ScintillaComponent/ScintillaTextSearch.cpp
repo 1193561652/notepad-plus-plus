@@ -1,9 +1,8 @@
 #include "ScintillaTextSearch.h"
-
-#include "../../third_party/boostregex/BoostRegexSearch.h"
+#include <BoostRegexSearch.h>
 
 #include <QByteArray>
-#include <Qsci/qsciscintilla.h>
+#include <ScintillaEditBase.h>
 
 namespace {
 
@@ -12,11 +11,11 @@ int searchFlags(bool regex, bool matchCase, bool wholeWord,
 {
     unsigned int flags = 0;
     if (matchCase)
-        flags |= QsciScintillaBase::SCFIND_MATCHCASE;
+        flags |= SCFIND_MATCHCASE;
     if (wholeWord)
-        flags |= QsciScintillaBase::SCFIND_WHOLEWORD;
+        flags |= SCFIND_WHOLEWORD;
     if (regex) {
-        flags |= QsciScintillaBase::SCFIND_REGEXP;
+        flags |= SCFIND_REGEXP;
         flags |= SCFIND_REGEXP_EMPTYMATCH_ALL;
         flags |= SCFIND_REGEXP_SKIPCRLFASONE;
         if (dotMatchesNewline)
@@ -25,30 +24,45 @@ int searchFlags(bool regex, bool matchCase, bool wholeWord,
     return static_cast<int>(flags);
 }
 
-void prepare(QsciScintilla& editor, const QString& text, int flags)
+void setEditorText(ScintillaEditBase& editor, const QString& text)
 {
-    editor.setUtf8(true);
-    editor.setText(text);
-    editor.SendScintilla(QsciScintillaBase::SCI_SETSEARCHFLAGS, flags);
+    const QByteArray utf8 = text.toUtf8();
+    editor.send(SCI_SETCODEPAGE, SC_CP_UTF8);
+    editor.send(SCI_SETTEXT, 0, reinterpret_cast<sptr_t>(utf8.constData()));
 }
 
-long findTarget(QsciScintilla& editor, const QByteArray& pattern,
+QString editorLineText(ScintillaEditBase& editor, int line)
+{
+    const sptr_t length = editor.send(SCI_LINELENGTH, line);
+    QByteArray bytes(static_cast<int>(length) + 1, '\0');
+    editor.send(SCI_GETLINE, line, reinterpret_cast<sptr_t>(bytes.data()));
+    bytes.truncate(static_cast<int>(length));
+    return QString::fromUtf8(bytes);
+}
+
+void prepare(ScintillaEditBase& editor, const QString& text, int flags)
+{
+    setEditorText(editor, text);
+    editor.send(SCI_SETSEARCHFLAGS, flags);
+}
+
+long findTarget(ScintillaEditBase& editor, const QByteArray& pattern,
                 long start, long end)
 {
-    editor.SendScintilla(QsciScintillaBase::SCI_SETTARGETSTART, start);
-    editor.SendScintilla(QsciScintillaBase::SCI_SETTARGETEND, end);
-    return editor.SendScintilla(QsciScintillaBase::SCI_SEARCHINTARGET,
-                                pattern.size(), pattern.constData());
+    editor.send(SCI_SETTARGETSTART, start);
+    editor.send(SCI_SETTARGETEND, end);
+    return editor.send(SCI_SEARCHINTARGET, pattern.size(),
+        reinterpret_cast<sptr_t>(pattern.constData()));
 }
 
-long nextPosition(QsciScintilla& editor, long matchStart, long matchEnd,
+long nextPosition(ScintillaEditBase& editor, long matchStart, long matchEnd,
                   long documentLength)
 {
     if (matchEnd > matchStart)
         return matchEnd;
     if (matchStart >= documentLength)
         return documentLength + 1;
-    return editor.SendScintilla(QsciScintillaBase::SCI_POSITIONAFTER,
+    return editor.send(SCI_POSITIONAFTER,
                                 matchStart);
 }
 
@@ -65,12 +79,12 @@ QList<ScintillaTextMatch> ScintillaTextSearch::findAll(
     if (searchText.isEmpty())
         return matches;
 
-    QsciScintilla editor;
+    ScintillaEditBase editor;
     prepare(editor, text, searchFlags(regex, matchCase, wholeWord,
                                       dotMatchesNewline));
     const QByteArray pattern = searchText.toUtf8();
     const long documentLength =
-        editor.SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
+        editor.send(SCI_GETLENGTH);
     long position = 0;
     while (position <= documentLength) {
         const long found = findTarget(editor, pattern, position,
@@ -81,18 +95,18 @@ QList<ScintillaTextMatch> ScintillaTextSearch::findAll(
             break;
         }
         const long end =
-            editor.SendScintilla(QsciScintillaBase::SCI_GETTARGETEND);
-        const int line = static_cast<int>(editor.SendScintilla(
-            QsciScintillaBase::SCI_LINEFROMPOSITION, found));
+            editor.send(SCI_GETTARGETEND);
+        const int line = static_cast<int>(editor.send(
+            SCI_LINEFROMPOSITION, found));
 
         ScintillaTextMatch match;
         match.byteStart = static_cast<int>(found);
         match.byteLength = static_cast<int>(end - found);
         match.line = line;
-        const long lineStart = editor.SendScintilla(
-            QsciScintillaBase::SCI_POSITIONFROMLINE, line);
+        const long lineStart = editor.send(
+            SCI_POSITIONFROMLINE, line);
         match.byteColumn = static_cast<int>(found - lineStart);
-        match.lineText = editor.text(line);
+        match.lineText = editorLineText(editor, line);
         while (!match.lineText.isEmpty()
                && (match.lineText.endsWith('\n')
                    || match.lineText.endsWith('\r')))
@@ -110,13 +124,13 @@ int ScintillaTextSearch::replaceAll(
     if (searchText.isEmpty())
         return 0;
 
-    QsciScintilla editor;
+    ScintillaEditBase editor;
     prepare(editor, text, searchFlags(regex, matchCase, wholeWord,
                                       dotMatchesNewline));
     const QByteArray pattern = searchText.toUtf8();
     const QByteArray replacementBytes = replacement.toUtf8();
     long documentLength =
-        editor.SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
+        editor.send(SCI_GETLENGTH);
     long position = 0;
     int count = 0;
     while (position <= documentLength) {
@@ -128,12 +142,13 @@ int ScintillaTextSearch::replaceAll(
             break;
 
         const long matchEnd =
-            editor.SendScintilla(QsciScintillaBase::SCI_GETTARGETEND);
+            editor.send(SCI_GETTARGETEND);
         const bool emptyMatch = matchEnd == found;
-        const long replacementLength = editor.SendScintilla(
-            regex ? QsciScintillaBase::SCI_REPLACETARGETRE
-                  : QsciScintillaBase::SCI_REPLACETARGET,
-            replacementBytes.size(), replacementBytes.constData());
+        const long replacementLength = editor.send(
+            regex ? SCI_REPLACETARGETRE
+                  : SCI_REPLACETARGET,
+            replacementBytes.size(),
+            reinterpret_cast<sptr_t>(replacementBytes.constData()));
         documentLength += replacementLength - (matchEnd - found);
         ++count;
         const long replacementEnd = found + replacementLength;
@@ -142,7 +157,12 @@ int ScintillaTextSearch::replaceAll(
                            documentLength)
             : replacementEnd;
     }
-    text = editor.text();
+    const sptr_t finalLength = editor.send(SCI_GETLENGTH);
+    QByteArray finalText(static_cast<int>(finalLength) + 1, '\0');
+    editor.send(SCI_GETTEXT, finalLength + 1,
+                reinterpret_cast<sptr_t>(finalText.data()));
+    finalText.truncate(static_cast<int>(finalLength));
+    text = QString::fromUtf8(finalText);
     return count;
 }
 
@@ -150,24 +170,30 @@ bool ScintillaTextSearch::replaceWholeMatch(
     QString& text, const QString& searchText, const QString& replacement,
     bool regex, bool matchCase, bool wholeWord, bool dotMatchesNewline)
 {
-    QsciScintilla editor;
+    ScintillaEditBase editor;
     prepare(editor, text, searchFlags(regex, matchCase, wholeWord,
                                       dotMatchesNewline));
     const QByteArray pattern = searchText.toUtf8();
     const long documentLength =
-        editor.SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
+        editor.send(SCI_GETLENGTH);
     const long found = findTarget(editor, pattern, 0, documentLength);
     const long end = found >= 0
-        ? editor.SendScintilla(QsciScintillaBase::SCI_GETTARGETEND)
+        ? editor.send(SCI_GETTARGETEND)
         : -1;
     if (found != 0 || end != documentLength)
         return false;
 
     const QByteArray replacementBytes = replacement.toUtf8();
-    editor.SendScintilla(
-        regex ? QsciScintillaBase::SCI_REPLACETARGETRE
-              : QsciScintillaBase::SCI_REPLACETARGET,
-        replacementBytes.size(), replacementBytes.constData());
-    text = editor.text();
+    editor.send(
+        regex ? SCI_REPLACETARGETRE
+              : SCI_REPLACETARGET,
+        replacementBytes.size(),
+        reinterpret_cast<sptr_t>(replacementBytes.constData()));
+    const sptr_t finalLength = editor.send(SCI_GETLENGTH);
+    QByteArray finalText(static_cast<int>(finalLength) + 1, '\0');
+    editor.send(SCI_GETTEXT, finalLength + 1,
+                reinterpret_cast<sptr_t>(finalText.data()));
+    finalText.truncate(static_cast<int>(finalLength));
+    text = QString::fromUtf8(finalText);
     return true;
 }

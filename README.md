@@ -6,10 +6,10 @@ Win32-specific implementation with Qt and standard C++.
 
 ## Stack
 
-- C++14
+- C++17
 - Qt 5 / Qt Widgets
 - CMake
-- Bundled QScintilla 2.13.3 / Scintilla
+- Bundled Scintilla 5.3.0 Qt platform implementation
 - Separately linked static Lexilla
 - Notepad++ Boost.Regex search backend
 
@@ -43,18 +43,18 @@ validation commands.
   yet part of the verified matrix.
 - macOS with Qt 5 and Apple Clang has a build path but has not yet been verified.
 
-Each platform builds the bundled, project-specific static QScintilla library
-with the Notepad++ Boost.Regex backend and a separate static Lexilla library.
-Linux and macOS therefore require `qmake` and GNU Make in addition to the CMake
-build tool. Packaging and plugin ABI compatibility are outside the current
-platform-build scope.
+Each platform builds the bundled `npp-scintilla-qt` static library with the
+Notepad++ Boost.Regex backend and the separate `npp-lexilla` static library.
+Both are built directly by CMake; qmake is not part of the current build.
+Plugin package management is available, while native Notepad++ plugin ABI
+compatibility remains a separate deferred scope.
 
 ## Repository Layout
 
 - `src/`: application and Qt port implementation
 - `resources/`: compatible XML defaults, localization, icons, and parsers
 - `tests/`: behavior, configuration, and UI runtime tests
-- `third_party/qscintilla/`: bundled QScintilla and Scintilla source
+- `third_party/scintilla/`: bundled Scintilla 5.3.0 source and Qt platform code
 - `third_party/boostregex/`: Boost.Regex integration
 - `third_party/lexilla/`: separately built Lexilla, lexlib, built-in lexers,
   and the v8.4.6 LexUser lexer
@@ -79,6 +79,6 @@ git show v8.4.6:PowerEditor/src/Notepad_plus.cpp
 
 ## License
 
-The port builds on Notepad++, QScintilla, Scintilla, Boost, Lexilla, Qt, and
+The port builds on Notepad++, Scintilla, Boost, Lexilla, Qt, and
 other bundled components. Refer to the license files and source headers in the
 repository and its Git history for component-specific terms.

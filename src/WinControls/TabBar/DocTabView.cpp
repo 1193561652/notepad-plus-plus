@@ -49,8 +49,13 @@ public:
             "}"
             "QTabBar::tab:!selected {"
             "  color: gray;"
-            "  background-color: #C0C0C0;"
+            "  background-color: #E8E8E8;"
             "  margin-top: 2px;"
+            "}"
+            "QTabBar::tab:selected {"
+            "  color: black;"
+            "  background-color: white;"
+            "  margin-top: 0;"
             "}"
         );
     }

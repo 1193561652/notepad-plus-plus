@@ -2,36 +2,10 @@
 // 移植自: v8.4.6:PowerEditor/src/ScintillaComponent/ScintillaEditView.cpp
 
 #include "ScintillaEditView.h"
-#include "../../third_party/boostregex/BoostRegexSearch.h"
 #include "UserDefinedLexer.h"
 #include "../Parameters.h"
 #include "../MISC/AutoCompletionParser.h"
-#include <Qsci/qsciapis.h>
-#include <Qsci/qscidocument.h>
-#include <Qsci/qscilexer.h>
-#include <Qsci/qscilexerbash.h>
-#include <Qsci/qscilexerbatch.h>
-#include <Qsci/qscilexercmake.h>
-#include <Qsci/qscilexercpp.h>
-#include <Qsci/qscilexercsharp.h>
-#include <Qsci/qscilexercss.h>
-#include <Qsci/qscilexerdiff.h>
-#include <Qsci/qscilexerhtml.h>
-#include <Qsci/qscilexerjava.h>
-#include <Qsci/qscilexerjavascript.h>
-#include <Qsci/qscilexerjson.h>
-#include <Qsci/qscilexerlua.h>
-#include <Qsci/qscilexermakefile.h>
-#include <Qsci/qscilexermarkdown.h>
-#include <Qsci/qscilexerperl.h>
-#include <Qsci/qscilexerproperties.h>
-#include <Qsci/qscilexerpython.h>
-#include <Qsci/qscilexerruby.h>
-#include <Qsci/qscilexersql.h>
-#include <Qsci/qscilexertex.h>
-#include <Qsci/qscilexervhdl.h>
-#include <Qsci/qscilexerxml.h>
-#include <Qsci/qscilexeryaml.h>
+#include <ILexer.h>
 #include <Lexilla.h>
 #include <QFileInfo>
 #include <QFont>
@@ -41,42 +15,6 @@
 #include <QUrl>
 
 namespace {
-
-class NppBuiltinLexer final : public QsciLexer
-{
-public:
-    NppBuiltinLexer(const QString& languageName, const QString& lexerName,
-                    const LangDesc* language, QObject* parent)
-        : QsciLexer(parent),
-          _languageName(languageName.toUtf8()),
-          _lexerName(lexerName.toUtf8())
-    {
-        if (language) {
-            for (int i = 0; i < 4; ++i)
-                _keywords[i] = language->keywords[i].toUtf8();
-        }
-    }
-
-    const char* language() const override { return _languageName.constData(); }
-    const char* lexer() const override { return _lexerName.constData(); }
-
-    const char* keywords(int set) const override
-    {
-        return set >= 1 && set <= 4 && !_keywords[set - 1].isEmpty()
-            ? _keywords[set - 1].constData() : nullptr;
-    }
-
-    QString description(int style) const override
-    {
-        return style >= 0 && style < 128
-            ? QStringLiteral("Style %1").arg(style) : QString();
-    }
-
-private:
-    QByteArray _languageName;
-    QByteArray _lexerName;
-    QByteArray _keywords[4];
-};
 
 struct LexerNameMapping
 {
@@ -120,6 +58,83 @@ const LexerNameMapping lexerNameMappings[] = {
     {"markdown", "markdown"}, {"searchresult", "errorlist"}
 };
 
+struct LanguageKeywordMask
+{
+    const char* name;
+    quint16 mask;
+};
+
+constexpr quint16 keywordMask(std::initializer_list<int> indices)
+{
+    quint16 mask = 0;
+    for (const int slot : indices)
+        mask |= static_cast<quint16>(1u << slot);
+    return mask;
+}
+
+// Mirrors the LIST_* selections used by v8.4.6's simple lexer setters.
+const LanguageKeywordMask languageKeywordMasks[] = {
+    {"css", keywordMask({0, 1, 4, 6})},
+    {"lua", keywordMask({0, 1, 2, 3})},
+    {"makefile", 0}, {"ini", 0},
+    {"sql", keywordMask({0, 1, 4})}, {"bash", keywordMask({0})},
+    {"vb", keywordMask({0})}, {"pascal", keywordMask({0})},
+    {"perl", keywordMask({0})}, {"python", keywordMask({0, 1})},
+    {"batch", keywordMask({0})}, {"tex", 0},
+    {"nsis", keywordMask({0, 1, 2, 3})},
+    {"fortran", keywordMask({0, 1, 2})},
+    {"fortran77", keywordMask({0, 1, 2})},
+    {"lisp", keywordMask({0, 1})}, {"scheme", keywordMask({0, 1})},
+    {"asm", keywordMask({0, 1, 2, 3, 4, 5})},
+    {"diff", 0}, {"props", 0},
+    {"postscript", keywordMask({0, 1, 2, 3})},
+    {"ruby", keywordMask({0})}, {"smalltalk", keywordMask({0})},
+    {"vhdl", keywordMask({0, 1, 2, 3, 4, 5, 6})},
+    {"kix", keywordMask({0, 1, 2})},
+    {"autoit", keywordMask({0, 1, 2, 3, 4, 5, 6})},
+    {"caml", keywordMask({0, 1, 2})}, {"ada", keywordMask({0})},
+    {"verilog", keywordMask({0, 1})}, {"matlab", keywordMask({0})},
+    {"haskell", keywordMask({0})},
+    {"inno", keywordMask({0, 1, 2, 3, 4, 5})},
+    {"cmake", keywordMask({0, 1, 2})}, {"yaml", keywordMask({0})},
+    {"cobol", keywordMask({0, 1, 2})},
+    {"gui4cli", keywordMask({0, 1, 2, 3, 4})},
+    {"d", keywordMask({0, 1, 2, 3, 4, 5, 6})},
+    {"powershell", keywordMask({0, 1, 2, 5})},
+    {"r", keywordMask({0, 1, 2})},
+    {"coffeescript", keywordMask({0, 1, 2, 3})},
+    {"baanc", keywordMask({0, 1, 2, 3, 4, 5, 6, 7, 8})},
+    {"srec", 0}, {"ihex", 0}, {"tehex", 0},
+    {"asn1", keywordMask({0, 1, 2, 3})},
+    {"avs", keywordMask({0, 1, 2, 3, 4, 5})},
+    {"blitzbasic", keywordMask({0, 1, 2, 3})},
+    {"purebasic", keywordMask({0, 1, 2, 3})},
+    {"freebasic", keywordMask({0, 1, 2, 3})},
+    {"csound", keywordMask({0, 1, 2})},
+    {"erlang", keywordMask({0, 1, 2, 3, 4, 5})},
+    {"escript", keywordMask({0, 1, 2})},
+    {"forth", keywordMask({0, 1, 2, 3, 4, 5})},
+    {"latex", 0}, {"mmixal", keywordMask({0, 1, 2})},
+    {"nim", keywordMask({0})},
+    {"nncrontab", keywordMask({0, 1, 2})},
+    {"oscript", keywordMask({0, 1, 2, 3, 4, 5})},
+    {"rebol", keywordMask({0, 1, 2, 3, 4, 5, 6})},
+    {"registry", 0}, {"rust", keywordMask({0, 1, 2, 3, 4, 5, 6})},
+    {"spice", keywordMask({0, 1, 2})}, {"txt2tags", 0},
+    {"visualprolog", keywordMask({0, 1, 2, 3})},
+    {"searchresult", 0}
+};
+
+int keywordClassIndex(const QString& keywordClass)
+{
+    const QString normalized = keywordClass.trimmed().toLower();
+    if (normalized == QStringLiteral("instre1")) return 0;
+    if (normalized == QStringLiteral("instre2")) return 1;
+    const QRegularExpressionMatch match =
+        QRegularExpression(QStringLiteral("^type([1-7])$")).match(normalized);
+    return match.hasMatch() ? match.captured(1).toInt() + 1 : -1;
+}
+
 } // namespace
 
 // 静态成员初始化
@@ -130,7 +145,7 @@ const int ScintillaEditView::URL_INDICATOR;
 const int ScintillaEditView::XML_TAG_INDICATOR;
 
 ScintillaEditView::ScintillaEditView(QWidget *parent)
-    : QsciScintilla(parent)
+    : ScintillaEditBase(parent)
 {
     // 初始化编辑器
     init();
@@ -141,20 +156,224 @@ ScintillaEditView::~ScintillaEditView()
     // Qt 会自动清理
 }
 
+QString ScintillaEditView::text(int line) const
+{
+    const sptr_t length = send(SCI_LINELENGTH, line);
+    QByteArray bytes(static_cast<int>(length) + 1, '\0');
+    send(SCI_GETLINE, line, reinterpret_cast<sptr_t>(bytes.data()));
+    bytes.truncate(static_cast<int>(length));
+    return QString::fromUtf8(bytes);
+}
+
+QString ScintillaEditView::text(int start, int end) const
+{
+    if (end <= start)
+        return QString();
+    QByteArray bytes(end - start + 1, '\0');
+    Sci_TextRange range{{static_cast<Sci_PositionCR>(start),
+                         static_cast<Sci_PositionCR>(end)}, bytes.data()};
+    send(SCI_GETTEXTRANGE, 0, reinterpret_cast<sptr_t>(&range));
+    bytes.truncate(end - start);
+    return QString::fromUtf8(bytes);
+}
+
+QString ScintillaEditView::selectedText() const
+{
+    const sptr_t length = send(SCI_GETSELTEXT);
+    if (length <= 0)
+        return QString();
+    QByteArray bytes(static_cast<int>(length) + 1, '\0');
+    send(SCI_GETSELTEXT, 0, reinterpret_cast<sptr_t>(bytes.data()));
+    bytes.truncate(static_cast<int>(length));
+    return QString::fromUtf8(bytes);
+}
+
+void ScintillaEditView::replaceSelectedText(const QString& text)
+{
+    const QByteArray utf8 = text.toUtf8();
+    send(SCI_REPLACESEL, 0, reinterpret_cast<sptr_t>(utf8.constData()));
+}
+
+void ScintillaEditView::insert(const QString& text)
+{
+    const QByteArray utf8 = text.toUtf8();
+    send(SCI_REPLACESEL, 0, reinterpret_cast<sptr_t>(utf8.constData()));
+}
+
+void ScintillaEditView::insertAt(const QString& text, int line, int index)
+{
+    const sptr_t lineStart = send(SCI_POSITIONFROMLINE, line);
+    const sptr_t position = send(SCI_POSITIONRELATIVE, lineStart, index);
+    const QByteArray utf8 = text.toUtf8();
+    send(SCI_INSERTTEXT, position, reinterpret_cast<sptr_t>(utf8.constData()));
+}
+
+void ScintillaEditView::setCursorPosition(int line, int index)
+{
+    const sptr_t position = send(SCI_FINDCOLUMN, line, index);
+    send(SCI_GOTOPOS, position);
+}
+
+void ScintillaEditView::getCursorPosition(int* line, int* index) const
+{
+    const sptr_t position = send(SCI_GETCURRENTPOS);
+    const int currentLine = static_cast<int>(send(SCI_LINEFROMPOSITION, position));
+    if (line) *line = currentLine;
+    if (index) *index = static_cast<int>(send(SCI_GETCOLUMN, position));
+}
+
+void ScintillaEditView::setSelection(int lineFrom, int indexFrom,
+                                     int lineTo, int indexTo)
+{
+    send(SCI_SETSEL, send(SCI_FINDCOLUMN, lineFrom, indexFrom),
+         send(SCI_FINDCOLUMN, lineTo, indexTo));
+}
+
+void ScintillaEditView::getSelection(int* lineFrom, int* indexFrom,
+                                     int* lineTo, int* indexTo) const
+{
+    const sptr_t start = send(SCI_GETSELECTIONSTART);
+    const sptr_t end = send(SCI_GETSELECTIONEND);
+    const int startLine = static_cast<int>(send(SCI_LINEFROMPOSITION, start));
+    const int endLine = static_cast<int>(send(SCI_LINEFROMPOSITION, end));
+    if (lineFrom) *lineFrom = startLine;
+    if (indexFrom) *indexFrom = static_cast<int>(send(SCI_GETCOLUMN, start));
+    if (lineTo) *lineTo = endLine;
+    if (indexTo) *indexTo = static_cast<int>(send(SCI_GETCOLUMN, end));
+}
+
+void ScintillaEditView::setMarginWidth(int margin, const QString& sample)
+{
+    const QByteArray utf8 = sample.toUtf8();
+    send(SCI_SETMARGINWIDTHN, margin,
+         send(SCI_TEXTWIDTH, STYLE_LINENUMBER,
+              reinterpret_cast<sptr_t>(utf8.constData())));
+}
+
+void ScintillaEditView::setFont(const QFont& font)
+{
+    QWidget::setFont(font);
+    const QByteArray family = font.family().toUtf8();
+    send(SCI_STYLESETFONT, STYLE_DEFAULT,
+         reinterpret_cast<sptr_t>(family.constData()));
+    send(SCI_STYLESETSIZE, STYLE_DEFAULT, font.pointSize());
+    send(SCI_STYLECLEARALL);
+}
+
+void ScintillaEditView::lineIndexFromPosition(int position, int* line,
+                                               int* index) const
+{
+    const int currentLine = static_cast<int>(send(SCI_LINEFROMPOSITION, position));
+    if (line) *line = currentLine;
+    if (index) *index = static_cast<int>(send(SCI_GETCOLUMN, position));
+}
+
+QString ScintillaEditView::wordAtLineIndex(int line, int index) const
+{
+    const sptr_t position = send(SCI_FINDCOLUMN, line, index);
+    const sptr_t start = send(SCI_WORDSTARTPOSITION, position, 1);
+    const sptr_t end = send(SCI_WORDENDPOSITION, position, 1);
+    if (end <= start)
+        return QString();
+    QByteArray bytes(static_cast<int>(end - start) + 1, '\0');
+    Sci_TextRange range{{static_cast<Sci_PositionCR>(start),
+                         static_cast<Sci_PositionCR>(end)}, bytes.data()};
+    send(SCI_GETTEXTRANGE, 0, reinterpret_cast<sptr_t>(&range));
+    bytes.truncate(static_cast<int>(end - start));
+    return QString::fromUtf8(bytes);
+}
+
+void ScintillaEditView::setFolding(int)
+{
+    send(SCI_SETPROPERTY, reinterpret_cast<uptr_t>("fold"),
+         reinterpret_cast<sptr_t>("1"));
+    send(SCI_SETMARGINMASKN, _SC_MARGE_FOLDER, SC_MASK_FOLDERS);
+    send(SCI_MARKERDEFINE, SC_MARKNUM_FOLDEROPEN, SC_MARK_BOXMINUS);
+    send(SCI_MARKERDEFINE, SC_MARKNUM_FOLDER, SC_MARK_BOXPLUS);
+    send(SCI_MARKERDEFINE, SC_MARKNUM_FOLDERSUB, SC_MARK_VLINE);
+    send(SCI_MARKERDEFINE, SC_MARKNUM_FOLDERTAIL, SC_MARK_LCORNER);
+    send(SCI_MARKERDEFINE, SC_MARKNUM_FOLDEREND, SC_MARK_BOXPLUSCONNECTED);
+    send(SCI_MARKERDEFINE, SC_MARKNUM_FOLDEROPENMID, SC_MARK_BOXMINUSCONNECTED);
+    send(SCI_MARKERDEFINE, SC_MARKNUM_FOLDERMIDTAIL, SC_MARK_TCORNER);
+}
+
+void ScintillaEditView::autoCompleteFromAPIs()
+{
+    if (_completionWords.isEmpty())
+        return;
+    const sptr_t current = send(SCI_GETCURRENTPOS);
+    const sptr_t start = send(SCI_WORDSTARTPOSITION, current, 1);
+    send(SCI_AUTOCSETSEPARATOR, '\n');
+    const QByteArray list = _completionWords.join(QLatin1Char('\n')).toUtf8();
+    send(SCI_AUTOCSHOW, current - start,
+         reinterpret_cast<sptr_t>(list.constData()));
+}
+
+void ScintillaEditView::autoCompleteFromDocument()
+{
+    const QRegularExpression words(QStringLiteral("[A-Za-z_][A-Za-z0-9_]*"));
+    QStringList entries;
+    auto match = words.globalMatch(getText());
+    while (match.hasNext())
+        entries.append(match.next().captured());
+    entries.removeDuplicates();
+    entries.sort(Qt::CaseInsensitive);
+    if (entries.isEmpty())
+        return;
+    const sptr_t current = send(SCI_GETCURRENTPOS);
+    const sptr_t start = send(SCI_WORDSTARTPOSITION, current, 1);
+    send(SCI_AUTOCSETSEPARATOR, '\n');
+    const QByteArray list = entries.join(QLatin1Char('\n')).toUtf8();
+    send(SCI_AUTOCSHOW, current - start,
+         reinterpret_cast<sptr_t>(list.constData()));
+}
+
+void ScintillaEditView::callTip()
+{
+    if (_completionCallTips.isEmpty())
+        return;
+
+    const qintptr current = send(SCI_GETCURRENTPOS);
+    const qintptr rangeStart = qMax<qintptr>(0, current - 256);
+    const QString prefix = text(static_cast<int>(rangeStart),
+                                static_cast<int>(current));
+    const QRegularExpression identifier(
+        QStringLiteral("([A-Za-z_][A-Za-z0-9_:.]*)\\s*(?:\\([^()]*)?$"));
+    const QRegularExpressionMatch match = identifier.match(prefix);
+    if (!match.hasMatch())
+        return;
+
+    const QString name = match.captured(1);
+    QStringList matches;
+    for (const QString& signature : _completionCallTips) {
+        if (signature.startsWith(name + QLatin1Char('('),
+                                 Qt::CaseInsensitive))
+            matches.append(signature);
+    }
+    if (matches.isEmpty())
+        return;
+
+    const QByteArray callTips = matches.join(QLatin1Char('\n')).toUtf8();
+    send(SCI_CALLTIPSHOW, current,
+         reinterpret_cast<sptr_t>(callTips.constData()));
+}
+
 bool ScintillaEditView::createLargeDocument()
 {
-    QsciDocument largeDocument(
+    const sptr_t created = send(SCI_CREATEDOCUMENT, 0,
         SC_DOCUMENTOPTION_STYLES_NONE | SC_DOCUMENTOPTION_TEXT_LARGE);
-    setDocument(largeDocument);
-    const qintptr options = SendScintillaNpp(SCI_GETDOCUMENTOPTIONS);
+    setDocument(created);
+    send(SCI_RELEASEDOCUMENT, 0, created);
+    const qintptr options = send(SCI_GETDOCUMENTOPTIONS);
     return (options & SC_DOCUMENTOPTION_STYLES_NONE) &&
            (options & SC_DOCUMENTOPTION_TEXT_LARGE);
 }
 
 void ScintillaEditView::createStandardDocument()
 {
-    QsciDocument standardDocument;
-    setDocument(standardDocument);
+    const sptr_t created = send(SCI_CREATEDOCUMENT);
+    setDocument(created);
+    send(SCI_RELEASEDOCUMENT, 0, created);
 }
 
 qintptr ScintillaEditView::documentLengthNpp() const
@@ -214,17 +433,22 @@ void ScintillaEditView::setLargeFileMode(bool enabled)
     _largeFileMode = enabled;
     if (enabled) {
         clearLexer();
-        setBraceMatching(QsciScintilla::NoBraceMatch);
-        QsciScintilla::setWrapMode(QsciScintilla::WrapNone);
-        QsciScintilla::setAutoCompletionSource(QsciScintilla::AcsNone);
-        QsciScintilla::setAutoCompletionThreshold(-1);
+        setBraceMatching(NoBraceMatch);
+        setWrapMode(WrapNone);
+        setAutoCompletionSource(AcsNone);
+        setAutoCompletionThreshold(-1);
     } else {
-        setBraceMatching(QsciScintilla::SloppyBraceMatch);
+        setBraceMatching(SloppyBraceMatch);
     }
 }
 
 void ScintillaEditView::init()
 {
+    // QAbstractScrollArea owns a separate viewport.  Scintilla changes the
+    // cursor while moving across margins, so the viewport must receive moves
+    // even when no mouse button is pressed.
+    viewport()->setMouseTracking(true);
+
     _urlRefreshTimer = new QTimer(this);
     _urlRefreshTimer->setSingleShot(true);
     _urlRefreshTimer->setInterval(120);
@@ -240,8 +464,8 @@ void ScintillaEditView::init()
     setupIndicators();
 
     // 设置基本属性
-    setUtf8(true);  // 使用 UTF-8 编码
-    setEolMode(QsciScintilla::EolWindows);  // Windows 行尾
+    execute(SCI_SETCODEPAGE, SC_CP_UTF8);
+    setEolMode(EolWindows);  // Windows 行尾
 
     // 设置制表符
     setTabWidth(4);
@@ -251,22 +475,47 @@ void ScintillaEditView::init()
     setAutoIndent(true);
 
     // 设置括号匹配
-    setBraceMatching(QsciScintilla::SloppyBraceMatch);
+    setBraceMatching(SloppyBraceMatch);
 
     // 边距点击（切换书签）
-    connect(this, SIGNAL(marginClicked(int,int,Qt::KeyboardModifiers)),
-            this, SLOT(onMarginClicked(int,int,Qt::KeyboardModifiers)));
+    connect(this, &ScintillaEditBase::marginClicked, this,
+            [this](Scintilla::Position position, Scintilla::KeyMod modifiers,
+                   int margin) {
+        onMarginClicked(margin,
+            static_cast<int>(send(SCI_LINEFROMPOSITION, position)),
+            static_cast<Qt::KeyboardModifiers>(static_cast<int>(modifiers)));
+    });
 
     // Smart Highlighting：通过 SCN_UPDATEUI 驱动（选区变化/滚动均触发）
-    connect(this, SIGNAL(SCN_UPDATEUI(int)),
-            this, SLOT(updateSmartHighlight(int)));
-    connect(this, SIGNAL(SCN_CHARADDED(int)),
-            this, SLOT(onCharacterAdded(int)));
-    connect(this, SIGNAL(SCN_INDICATORRELEASE(int,int)),
-            this, SLOT(onIndicatorClicked(int,int)));
-    connect(this, &QsciScintilla::textChanged,
+    connect(this, &ScintillaEditBase::updateUi, this,
+            [this](Scintilla::Update updated) {
+        updateSmartHighlight(static_cast<int>(updated));
+        int line = 0, index = 0;
+        getCursorPosition(&line, &index);
+        emit cursorPositionChanged(line, index);
+    });
+    connect(this, &ScintillaEditBase::charAdded,
+            this, &ScintillaEditView::onCharacterAdded);
+    connect(this, &ScintillaEditBase::notify, this,
+            [this](Scintilla::NotificationData* notification) {
+        if (notification && notification->nmhdr.code ==
+                Scintilla::Notification::IndicatorRelease) {
+            onIndicatorClicked(
+                static_cast<int>(notification->position),
+                static_cast<int>(notification->modifiers));
+        }
+    });
+    connect(this, &ScintillaEditBase::modified, this,
+            [this](Scintilla::ModificationFlags type, Scintilla::Position,
+                   Scintilla::Position, Scintilla::Position,
+                   const QByteArray&, Scintilla::Position,
+                   Scintilla::FoldLevel, Scintilla::FoldLevel) {
+        if ((static_cast<int>(type) & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0)
+            emit textChanged();
+    });
+    connect(this, &textChanged,
             this, &ScintillaEditView::scheduleUrlRefresh);
-    connect(this, &QsciScintilla::cursorPositionChanged,
+    connect(this, &cursorPositionChanged,
             this, [this](int, int) { refreshXmlTagHighlight(); });
 
     // 当前行背景高亮（对应原版 SCI_SETCARETLINEVISIBLEALWAYS）
@@ -296,26 +545,32 @@ void ScintillaEditView::setupDefaultStyles()
 void ScintillaEditView::setupMargins()
 {
     // 行号边距
-    setMarginType(_SC_MARGE_LINENUMBER, QsciScintilla::NumberMargin);
+    setMarginType(_SC_MARGE_LINENUMBER, NumberMargin);
     setMarginWidth(_SC_MARGE_LINENUMBER, "00000");
     setMarginsForegroundColor(QColor(128, 128, 128));
     setMarginsBackgroundColor(QColor(240, 240, 240));
 
     // 符号边距（书签等）
-    setMarginType(_SC_MARGE_SYMBOL, QsciScintilla::SymbolMargin);
+    // Notepad++ uses a colour margin so "Bookmark margin" from stylers.xml
+    // controls the whole strip independently from the line-number style.
+    setMarginType(_SC_MARGE_SYMBOL, ColourMargin);
     setMarginWidth(_SC_MARGE_SYMBOL, 16);
+    execute(SCI_SETMARGINMASKN, _SC_MARGE_SYMBOL, 1 << BOOKMARK_MARKER);
     setMarginSensitivity(_SC_MARGE_SYMBOL, true);
+    execute(SCI_SETMARGINCURSORN, _SC_MARGE_SYMBOL, SC_CURSORREVERSEARROW);
 
     // 书签标记：蓝色圆形
-    markerDefine(QsciScintilla::Circle, BOOKMARK_MARKER);
+    markerDefine(Circle, BOOKMARK_MARKER);
     setMarkerBackgroundColor(QColor(50, 130, 255), BOOKMARK_MARKER);
     setMarkerForegroundColor(QColor(255, 255, 255), BOOKMARK_MARKER);
 
     // 折叠边距
-    setMarginType(_SC_MARGE_FOLDER, QsciScintilla::SymbolMargin);
+    setMarginType(_SC_MARGE_FOLDER, SymbolMargin);
     setMarginWidth(_SC_MARGE_FOLDER, 14);
-    setFolding(QsciScintilla::BoxedTreeFoldStyle);
+    execute(SCI_SETMARGINMASKN, _SC_MARGE_FOLDER, SC_MASK_FOLDERS);
+    setFolding(BoxedTreeFoldStyle);
     setMarginSensitivity(_SC_MARGE_FOLDER, true);
+    execute(SCI_SETMARGINCURSORN, _SC_MARGE_FOLDER, SC_CURSORARROW);
 }
 
 void ScintillaEditView::setupIndicators()
@@ -351,22 +606,30 @@ void ScintillaEditView::setupIndicators()
 // 文本操作方法
 void ScintillaEditView::setText(const QString &text)
 {
-    QsciScintilla::setText(text);
+    const QByteArray utf8 = text.toUtf8();
+    send(SCI_SETTEXT, 0, reinterpret_cast<sptr_t>(utf8.constData()));
 }
 
 QString ScintillaEditView::getText() const
 {
-    return text();
+    const sptr_t length = send(SCI_GETLENGTH);
+    QByteArray utf8(static_cast<int>(length) + 1, '\0');
+    send(SCI_GETTEXT, length + 1, reinterpret_cast<sptr_t>(utf8.data()));
+    utf8.truncate(static_cast<int>(length));
+    return QString::fromUtf8(utf8);
 }
 
 void ScintillaEditView::appendText(const QString &text)
 {
-    append(text);
+    const QByteArray utf8 = text.toUtf8();
+    send(SCI_APPENDTEXT, utf8.size(),
+         reinterpret_cast<sptr_t>(utf8.constData()));
 }
 
 void ScintillaEditView::insertText(int pos, const QString &text)
 {
-    insertAt(text, 0, pos);  // QScintilla 使用 (line, index)
+    const QByteArray utf8 = text.toUtf8();
+    send(SCI_INSERTTEXT, pos, reinterpret_cast<sptr_t>(utf8.constData()));
 }
 
 // 光标和选择方法
@@ -574,7 +837,7 @@ static QString extToNppName(const QString& ext, const QString& fileName)
     return QString();
 }
 
-// Notepad++ 语言名 → QsciLexer 实例
+// Notepad++ 语言名到 Lexilla lexer 名称。
 QString ScintillaEditView::builtinLexerName(const QString& nppLanguageName)
 {
     const QString normalized = nppLanguageName.trimmed().toLower();
@@ -585,61 +848,245 @@ QString ScintillaEditView::builtinLexerName(const QString& nppLanguageName)
     return QString();
 }
 
-static QsciLexer* createLexer(const QString& nppName, QObject* parent)
+bool ScintillaEditView::installLexer(const QString& lexerName,
+                                     const LangDesc* language)
 {
-    const QString normalized = nppName.trimmed().toLower();
-    if (normalized=="cpp"||normalized=="c"||normalized=="objc") return new QsciLexerCPP(parent);
-    if (normalized=="cs")         return new QsciLexerCSharp(parent);
-    if (normalized=="java")       return new QsciLexerJava(parent);
-    if (normalized=="python")     return new QsciLexerPython(parent);
-    if (normalized=="javascript") return new QsciLexerJavaScript(parent);
-    if (normalized=="html")       return new QsciLexerHTML(parent);
-    if (normalized=="css")        return new QsciLexerCSS(parent);
-    if (normalized=="xml")        return new QsciLexerXML(parent);
-    if (normalized=="bash")       return new QsciLexerBash(parent);
-    if (normalized=="batch")      return new QsciLexerBatch(parent);
-    if (normalized=="sql")        return new QsciLexerSQL(parent);
-    if (normalized=="lua")        return new QsciLexerLua(parent);
-    if (normalized=="ruby")       return new QsciLexerRuby(parent);
-    if (normalized=="perl")       return new QsciLexerPerl(parent);
-    if (normalized=="json")       return new QsciLexerJSON(parent);
-    if (normalized=="yaml")       return new QsciLexerYAML(parent);
-    if (normalized=="markdown")   return new QsciLexerMarkdown(parent);
-    if (normalized=="cmake")      return new QsciLexerCMake(parent);
-    if (normalized=="makefile")   return new QsciLexerMakefile(parent);
-    if (normalized=="tex")        return new QsciLexerTeX(parent);
-    if (normalized=="diff")       return new QsciLexerDiff(parent);
-    if (normalized=="vhdl")       return new QsciLexerVHDL(parent);
-    if (normalized=="ini")        return new QsciLexerProperties(parent);
-
-    const QString lexerName = ScintillaEditView::builtinLexerName(normalized);
-    if (lexerName.isEmpty())
-        return nullptr;
-    return new NppBuiltinLexer(
-        normalized, lexerName,
-        NppParameters::getInstance().getLangDescByName(normalized), parent);
-}
-
-bool ScintillaEditView::installLexer(QsciLexer* configured)
-{
-    Scintilla::ILexer* instance = nullptr;
-    if (configured) {
-        const char* lexerName = configured->lexer();
-        if (!lexerName || !*lexerName) {
-            delete configured;
+    Q_UNUSED(language);
+    Scintilla::ILexer5* lexer = nullptr;
+    if (!lexerName.isEmpty()) {
+        const QByteArray name = lexerName.toLatin1();
+        lexer = CreateLexer(name.constData());
+        if (!lexer)
             return false;
-        }
-        instance = CreateLexer(lexerName);
-        if (!instance) {
-            delete configured;
-            return false;
-        }
     }
 
-    QsciLexer* old = lexer();
-    setLexer(configured, instance);
-    delete old;
+    send(SCI_SETILEXER, 0, reinterpret_cast<sptr_t>(lexer));
+    _lexerInstalled = lexer != nullptr;
+    for (int set = 0; set < LangDesc::KeywordSetCount; ++set)
+        setKeywordSlot(set, QString());
     return true;
+}
+
+void ScintillaEditView::setKeywordSlot(int slot, const QString& keywords)
+{
+    while (_installedKeywordSets.size() < LangDesc::KeywordSetCount)
+        _installedKeywordSets.append(QString());
+    if (slot >= 0 && slot < _installedKeywordSets.size())
+        _installedKeywordSets[slot] = keywords;
+    const QByteArray utf8 = keywords.toUtf8();
+    send(SCI_SETKEYWORDS, slot,
+         reinterpret_cast<sptr_t>(utf8.constData()));
+}
+
+void ScintillaEditView::setLexerProperty(const char* name, const char* value)
+{
+    send(SCI_SETPROPERTY, reinterpret_cast<uptr_t>(name),
+         reinterpret_cast<sptr_t>(value));
+}
+
+QStringList ScintillaEditView::configuredKeywords(
+    const QString& languageName) const
+{
+    QStringList result;
+    result.reserve(LangDesc::KeywordSetCount);
+    const NppParameters& parameters = NppParameters::getInstance();
+    const LangDesc* language = parameters.getLangDescByName(languageName);
+    for (int index = 0; index < LangDesc::KeywordSetCount; ++index)
+        result.append(language ? language->keywords[index] : QString());
+
+    const LexerStyler* styler = parameters.getLexerStyler(languageName);
+    if (!styler)
+        return result;
+    for (const WordsStyle& style : styler->styles) {
+        const int index = keywordClassIndex(style.keywordClass);
+        const QString userWords = style.userKeywords.trimmed();
+        if (index < 0 || index >= result.size() || userWords.isEmpty())
+            continue;
+        if (!result[index].isEmpty())
+            result[index].append(QLatin1Char(' '));
+        result[index].append(userWords);
+    }
+    return result;
+}
+
+void ScintillaEditView::configureLexer(const QString& languageName)
+{
+    const QString language = languageName.trimmed().toLower();
+    for (int slot = 0; slot < LangDesc::KeywordSetCount; ++slot)
+        setKeywordSlot(slot, QString());
+
+    const QStringList words = configuredKeywords(language);
+    auto sourceWords = [this](const QString& source, int index) {
+        const QStringList sourceSets = configuredKeywords(source);
+        return index >= 0 && index < sourceSets.size()
+            ? sourceSets[index] : QString();
+    };
+    auto setFrom = [this, &sourceWords](int slot, const QString& source,
+                                        int sourceIndex) {
+        setKeywordSlot(slot, sourceWords(source, sourceIndex));
+    };
+    auto setCurrent = [this, &words](int slot, int sourceIndex) {
+        if (sourceIndex >= 0 && sourceIndex < words.size())
+            setKeywordSlot(slot, words[sourceIndex]);
+    };
+
+    const bool cppFamily = language == QStringLiteral("c") ||
+        language == QStringLiteral("cpp") ||
+        language == QStringLiteral("cs") ||
+        language == QStringLiteral("java") ||
+        language == QStringLiteral("rc") ||
+        language == QStringLiteral("actionscript") ||
+        language == QStringLiteral("swift");
+    if (cppFamily) {
+        setCurrent(0, 0);
+        setCurrent(1, 2);
+        if (language != QStringLiteral("rc"))
+            setFrom(2, QStringLiteral("cpp"), 3);
+        setLexerProperty("fold", "1");
+        setLexerProperty("fold.compact", "0");
+        setLexerProperty("fold.comment", "1");
+        setLexerProperty("fold.cpp.comment.explicit", "0");
+        setLexerProperty("fold.preprocessor", "1");
+        setLexerProperty("lexer.cpp.track.preprocessor", "0");
+    } else if (language == QStringLiteral("javascript")) {
+        setCurrent(0, 0);
+        setCurrent(1, 2);
+        setFrom(2, QStringLiteral("cpp"), 3);
+        setCurrent(3, 1);
+        setLexerProperty("fold", "1");
+        setLexerProperty("fold.compact", "0");
+        setLexerProperty("fold.comment", "1");
+        setLexerProperty("fold.cpp.comment.explicit", "0");
+        setLexerProperty("fold.preprocessor", "1");
+        setLexerProperty("lexer.cpp.track.preprocessor", "0");
+        setLexerProperty("lexer.cpp.backquoted.strings", "1");
+    } else if (language == QStringLiteral("typescript")) {
+        setCurrent(0, 0);
+        setCurrent(1, 2);
+        setFrom(2, QStringLiteral("cpp"), 3);
+        setLexerProperty("fold", "1");
+        setLexerProperty("fold.compact", "0");
+        setLexerProperty("fold.comment", "1");
+        setLexerProperty("fold.cpp.comment.explicit", "0");
+        setLexerProperty("fold.preprocessor", "1");
+        setLexerProperty("lexer.cpp.track.preprocessor", "0");
+        setLexerProperty("lexer.cpp.backquoted.strings", "1");
+    } else if (language == QStringLiteral("objc")) {
+        setCurrent(0, 0);
+        setCurrent(1, 2);
+        setFrom(2, QStringLiteral("cpp"), 3);
+        setCurrent(3, 1);
+        setCurrent(4, 3);
+        setLexerProperty("fold", "1");
+        setLexerProperty("fold.compact", "0");
+        setLexerProperty("fold.comment", "1");
+        setLexerProperty("fold.cpp.comment.explicit", "0");
+        setLexerProperty("fold.preprocessor", "1");
+    } else if (language == QStringLiteral("tcl")) {
+        setCurrent(0, 0);
+        setCurrent(1, 2);
+    } else if (language == QStringLiteral("json")) {
+        setCurrent(0, 0);
+        setCurrent(1, 1);
+        setLexerProperty("fold", "1");
+        setLexerProperty("fold.compact", "0");
+        setLexerProperty("fold.comment", "1");
+        setLexerProperty("fold.preprocessor", "1");
+    } else if (language == QStringLiteral("xml")) {
+        setLexerProperty("lexer.xml.allow.scripts", "0");
+        setLexerProperty("fold", "1");
+        setLexerProperty("fold.compact", "0");
+        setLexerProperty("fold.html", "1");
+        setLexerProperty("fold.hypertext.comment", "1");
+    } else if (language == QStringLiteral("html") ||
+               language == QStringLiteral("php") ||
+               language == QStringLiteral("asp") ||
+               language == QStringLiteral("jsp")) {
+        setFrom(0, QStringLiteral("html"), 0);
+        setFrom(1, QStringLiteral("javascript.js"), 0);
+        setFrom(2, QStringLiteral("vb"), 0);
+        setFrom(4, QStringLiteral("php"), 0);
+        setLexerProperty("asp.default.language", "2");
+        setLexerProperty("fold", "1");
+        setLexerProperty("fold.compact", "0");
+        setLexerProperty("fold.html", "1");
+        setLexerProperty("fold.hypertext.comment", "1");
+        applyStylers(QStringLiteral("javascript.js"));
+        applyStylers(QStringLiteral("php"));
+        applyStylers(QStringLiteral("asp"));
+        send(SCI_STYLESETEOLFILLED, SCE_HJ_DEFAULT, 1);
+        send(SCI_STYLESETEOLFILLED, SCE_HJ_COMMENT, 1);
+        send(SCI_STYLESETEOLFILLED, SCE_HJ_COMMENTDOC, 1);
+        send(SCI_STYLESETEOLFILLED, SCE_HPHP_DEFAULT, 1);
+        send(SCI_STYLESETEOLFILLED, SCE_HPHP_COMMENT, 1);
+        send(SCI_STYLESETEOLFILLED, SCE_HBA_DEFAULT, 1);
+    } else {
+        quint16 mask = 0;
+        bool found = false;
+        for (const LanguageKeywordMask& entry : languageKeywordMasks) {
+            if (language == QLatin1String(entry.name)) {
+                mask = entry.mask;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            for (int index = 0; index < words.size(); ++index)
+                if (!words[index].isEmpty())
+                    mask |= static_cast<quint16>(1u << index);
+        }
+        for (int slot = 0; slot < words.size(); ++slot)
+            if (mask & (1u << slot))
+                setKeywordSlot(slot, words[slot]);
+    }
+
+    if (language == QStringLiteral("sql"))
+        setLexerProperty("sql.backslash.escapes",
+            NppParameters::getInstance().getNppGUI()
+                ._backSlashIsEscapeCharacterForSql ? "1" : "0");
+    if (language == QStringLiteral("pascal") ||
+        language == QStringLiteral("autoit") ||
+        language == QStringLiteral("verilog"))
+        setLexerProperty("fold.preprocessor", "1");
+    if (language == QStringLiteral("python"))
+        setLexerProperty("fold.quotes.python", "1");
+    if (language == QStringLiteral("ini"))
+        send(SCI_STYLESETEOLFILLED, SCE_PROPS_SECTION, 1);
+    if (language == QStringLiteral("ruby"))
+        send(SCI_STYLESETEOLFILLED, SCE_RB_POD, 1);
+    if (language == QStringLiteral("csound"))
+        send(SCI_STYLESETEOLFILLED, SCE_CSOUND_STRINGEOL, 1);
+    if (language == QStringLiteral("searchresult")) {
+        send(SCI_STYLESETEOLFILLED, SCE_SEARCHRESULT_FILE_HEADER, 1);
+        send(SCI_STYLESETEOLFILLED, SCE_SEARCHRESULT_SEARCH_HEADER, 1);
+    }
+    if (language == QStringLiteral("baanc")) {
+        setLexerProperty("lexer.baan.styling.within.preprocessor", "1");
+        setLexerProperty("fold.preprocessor", "1");
+        setLexerProperty("fold.baan.syntax.based", "1");
+        setLexerProperty("fold.baan.keywords.based", "1");
+        setLexerProperty("fold.baan.sections", "1");
+        setLexerProperty("fold.baan.inner.level", "1");
+        send(SCI_SETWORDCHARS, 0, reinterpret_cast<sptr_t>(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$:"));
+        send(SCI_STYLESETEOLFILLED, SCE_BAAN_STRINGEOL, 1);
+    } else if (language == QStringLiteral("avs")) {
+        send(SCI_SETWORDCHARS, 0, reinterpret_cast<sptr_t>(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_#"));
+    } else if (language == QStringLiteral("forth") ||
+               language == QStringLiteral("nncrontab")) {
+        send(SCI_SETWORDCHARS, 0, reinterpret_cast<sptr_t>(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789%-"));
+    } else if (language == QStringLiteral("oscript")) {
+        send(SCI_SETWORDCHARS, 0, reinterpret_cast<sptr_t>(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$"));
+    } else if (language == QStringLiteral("rebol")) {
+        send(SCI_SETWORDCHARS, 0, reinterpret_cast<sptr_t>(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789?!.'+-*&|=_~"));
+    } else if (language == QStringLiteral("rust")) {
+        send(SCI_SETWORDCHARS, 0, reinterpret_cast<sptr_t>(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_#"));
+    }
 }
 
 void ScintillaEditView::setLexerForFile(const QString& filePath)
@@ -652,7 +1099,10 @@ void ScintillaEditView::setLexerForFile(const QString& filePath)
     QString ext      = fi.suffix().toLower();
     QString fileName = fi.fileName().toLower();
 
-    QString nppName  = extToNppName(ext, fileName);
+    const LangDesc* extensionLanguage =
+        NppParameters::getInstance().getLangDescByExt(ext);
+    QString nppName = extensionLanguage
+        ? extensionLanguage->name : extToNppName(ext, fileName);
     _currentLexerName = nppName.toLower();
 
     if (nppName.isEmpty()) {
@@ -675,17 +1125,18 @@ void ScintillaEditView::setLexerForFile(const QString& filePath)
         }
     }
 
-    QsciLexer* newLexer = nppName.isEmpty() ? nullptr : createLexer(nppName, this);
-    if (newLexer)
-        newLexer->setDefaultFont(editorFont());
+    const QString lexerName = builtinLexerName(nppName);
+    const LangDesc* language =
+        NppParameters::getInstance().getLangDescByName(nppName);
+    const bool installed = !lexerName.isEmpty() &&
+        installLexer(lexerName, language);
 
-    if (!installLexer(newLexer))
-        newLexer = nullptr;
-
-    if (newLexer) {
+    if (installed) {
         applyStylers(nppName);  // 从 stylers.xml 应用颜色
+        configureLexer(nppName);
         setupAutoComplete();
     } else {
+        installLexer(QString());
         setFont(editorFont());
     }
     applyGlobalStyles();
@@ -698,11 +1149,14 @@ void ScintillaEditView::setBuiltinLanguage(const QString& languageName)
     if (_largeFileMode)
         return;
     _currentLexerName = languageName.toLower();
-    QsciLexer* configured = createLexer(_currentLexerName, this);
-    if (configured)
-        configured->setDefaultFont(editorFont());
-    if (installLexer(configured))
+    const QString lexerName = builtinLexerName(_currentLexerName);
+    const LangDesc* language =
+        NppParameters::getInstance().getLangDescByName(_currentLexerName);
+    if (!lexerName.isEmpty() && installLexer(lexerName, language)) {
         applyStylers(_currentLexerName);
+        configureLexer(_currentLexerName);
+        setupAutoComplete();
+    }
     applyGlobalStyles();
 }
 
@@ -717,10 +1171,9 @@ void ScintillaEditView::setUserDefinedLanguage(const UserLangDesc& language)
     _commentStart = language.blockCommentStart;
     _commentEnd = language.blockCommentEnd;
 
-    UserDefinedLexer* custom = new UserDefinedLexer(language, this);
-    custom->setDefaultFont(editorFont());
-    if (!installLexer(custom))
+    if (!installLexer(QStringLiteral("user")))
         return;
+    UserDefinedLexer::configure(*this, language);
     setupAutoComplete();
     applyGlobalStyles();
 }
@@ -730,7 +1183,7 @@ void ScintillaEditView::setUserDefinedLanguage(const UserLangDesc& language)
 void ScintillaEditView::applyStylers(const QString& nppLexerName)
 {
     const LexerStyler* ls = NppParameters::getInstance().getLexerStyler(nppLexerName);
-    if (!ls || !lexer()) return;
+    if (!ls || !hasLexer()) return;
 
     NppGUI& gui = NppParameters::getInstance().getNppGUI();
     QFont   defaultFont(gui._editorFontName, gui._editorFontSize);
@@ -740,46 +1193,19 @@ void ScintillaEditView::applyStylers(const QString& nppLexerName)
         if (ws.fontStyle & 1) f.setBold(true);
         if (ws.fontStyle & 2) f.setItalic(true);
         if (ws.fontStyle & 4) f.setUnderline(true);
-        lexer()->setFont(f, ws.styleID);
-        if (ws.hasFg) lexer()->setColor(ws.fgColor, ws.styleID);
-        if (ws.hasBg) lexer()->setPaper(ws.bgColor, ws.styleID);
+        const QByteArray family = f.family().toUtf8();
+        execute(SCI_STYLESETFONT, ws.styleID,
+                reinterpret_cast<sptr_t>(family.constData()));
+        execute(SCI_STYLESETSIZE, ws.styleID, f.pointSize());
+        execute(SCI_STYLESETBOLD, ws.styleID, f.bold());
+        execute(SCI_STYLESETITALIC, ws.styleID, f.italic());
+        execute(SCI_STYLESETUNDERLINE, ws.styleID, f.underline());
+        if (ws.hasFg) execute(SCI_STYLESETFORE, ws.styleID,
+            ws.fgColor.red() | (ws.fgColor.green() << 8) | (ws.fgColor.blue() << 16));
+        if (ws.hasBg) execute(SCI_STYLESETBACK, ws.styleID,
+            ws.bgColor.red() | (ws.bgColor.green() << 8) | (ws.bgColor.blue() << 16));
     }
 
-    QString keywordSets[9];
-    const LangDesc* language =
-        NppParameters::getInstance().getLangDescByName(nppLexerName);
-    if (language) {
-        for (int set = 0; set < 4; ++set)
-            keywordSets[set] = language->keywords[set];
-    }
-    static const QMap<QString, int> keywordClassSets = {
-        {QStringLiteral("instre1"), 0},
-        {QStringLiteral("instre2"), 1},
-        {QStringLiteral("type1"), 2},
-        {QStringLiteral("type2"), 3},
-        {QStringLiteral("type3"), 4},
-        {QStringLiteral("type4"), 5},
-        {QStringLiteral("type5"), 6},
-        {QStringLiteral("type6"), 7},
-        {QStringLiteral("type7"), 8}
-    };
-    for (const WordsStyle& style : ls->styles) {
-        const auto set = keywordClassSets.constFind(
-            style.keywordClass.toLower());
-        if (set == keywordClassSets.constEnd() ||
-            style.userKeywords.trimmed().isEmpty())
-            continue;
-        if (!keywordSets[set.value()].isEmpty())
-            keywordSets[set.value()].append(QLatin1Char(' '));
-        keywordSets[set.value()].append(style.userKeywords.trimmed());
-    }
-    for (int set = 0; set < 9; ++set) {
-        if (keywordSets[set].isEmpty())
-            continue;
-        const QByteArray utf8 = keywordSets[set].toUtf8();
-        execute(SCI_SETKEYWORDS, set,
-                reinterpret_cast<qintptr>(utf8.constData()));
-    }
 }
 
 void ScintillaEditView::applyGlobalStyles()
@@ -851,7 +1277,7 @@ void ScintillaEditView::applyGlobalStyles()
     if (pStyle && pStyle->hasBg)
         setSelectionBackgroundColor(pStyle->bgColor);
     // 对应原版 _isSelectFgColorEnabled=false：不强制覆盖选区文字颜色，让文字保持原色。
-    // 同时撤销 QScintilla 构造器里 setSelectionForegroundColor(palette.highlightedText())
+    // 保持选区文字使用原样式前景色。
     // 设下的白色前景，确保选中文字不会变白。
     resetSelectionForegroundColor();  // SCI_SETSELFORE(0) → 文字保持原色
 
@@ -913,8 +1339,10 @@ void ScintillaEditView::applyGlobalStyles()
 
 void ScintillaEditView::reloadConfiguredStyles()
 {
-    if (lexer() && !_currentLexerName.isEmpty())
+    if (hasLexer() && !_currentLexerName.isEmpty()) {
         applyStylers(_currentLexerName);
+        configureLexer(_currentLexerName);
+    }
     applyGlobalStyles();
 }
 
@@ -937,8 +1365,8 @@ bool ScintillaEditView::setLexerByName(const QString& name)
         return true;
     }
 
-    QsciLexer* newLexer = createLexer(normalized, this);
-    if (!newLexer)
+    const QString lexerName = builtinLexerName(normalized);
+    if (lexerName.isEmpty())
         return false;
     _currentLexerName = normalized;
     _commentLine.clear();
@@ -950,10 +1378,11 @@ bool ScintillaEditView::setLexerByName(const QString& name)
         _commentStart = language->commentStart;
         _commentEnd = language->commentEnd;
     }
-    newLexer->setDefaultFont(editorFont());
-    if (!installLexer(newLexer))
+    if (!installLexer(lexerName,
+            NppParameters::getInstance().getLangDescByName(normalized)))
         return false;
     applyStylers(normalized);
+    configureLexer(normalized);
     setupAutoComplete();
     applyGlobalStyles();
     scheduleUrlRefresh();
@@ -961,11 +1390,36 @@ bool ScintillaEditView::setLexerByName(const QString& name)
     return true;
 }
 
+bool ScintillaEditView::installExternalLexer(
+    const QString& name, ExternalLexerFactory factory)
+{
+    if (_largeFileMode || !factory || name.trimmed().isEmpty())
+        return false;
+    const QByteArray lexerName = name.toLatin1();
+    Scintilla::ILexer5* lexer = factory(lexerName.constData());
+    if (!lexer)
+        return false;
+
+    send(SCI_SETILEXER, 0, reinterpret_cast<sptr_t>(lexer));
+    _lexerInstalled = true;
+    _currentLexerName = name.trimmed().toLower();
+    for (int slot = 0; slot < LangDesc::KeywordSetCount; ++slot)
+        setKeywordSlot(slot, QString());
+    applyStylers(_currentLexerName);
+    configureLexer(_currentLexerName);
+    setupAutoComplete();
+    applyGlobalStyles();
+    return true;
+}
+
 void ScintillaEditView::clearLexer()
 {
     _currentLexerName.clear();
-    installLexer(nullptr);
+    installLexer(QString());
+    _completionWords.clear();
+    _completionCallTips.clear();
     setFont(editorFont());
+    applyGlobalStyles();
 }
 
 // ─── 行注释切换 ───────────────────────────────────────────────────────────────
@@ -975,11 +1429,10 @@ void ScintillaEditView::toggleLineComment()
     // 优先使用从 langs.xml 读取的行注释符
     QString commentStr = _commentLine;
 
-    // 回退：从 QScintilla lexer 推断
+    // 回退：从当前 Notepad++ 语言名推断。
     if (commentStr.isEmpty()) {
-        QsciLexer* lex = lexer();
-        if (!lex) return;
-        QString lang = QString(lex->language()).toLower();
+        const QString lang = _currentLexerName;
+        if (lang.isEmpty()) return;
         if (lang.contains("c++") || lang.contains("c#") || lang.contains("java") ||
             lang == "javascript" || lang == "css") {
             commentStr = "//";
@@ -998,7 +1451,7 @@ void ScintillaEditView::toggleLineComment()
     // 确定操作行范围
     int fromLine, fromIdx, toLine, toIdx;
     if (hasSelectedText()) {
-        QsciScintilla::getSelection(&fromLine, &fromIdx, &toLine, &toIdx);
+        getSelection(&fromLine, &fromIdx, &toLine, &toIdx);
         // 选区刚好到行首时不包含最后一行
         if (toIdx == 0 && toLine > fromLine) --toLine;
     } else {
@@ -1070,30 +1523,34 @@ void ScintillaEditView::blockUncomment()
 
 void ScintillaEditView::setupAutoComplete()
 {
-    QsciLexer* lex = lexer();
-    if (!lex) return;
+    if (!hasLexer()) return;
 
-    QsciAPIs* api = new QsciAPIs(lex);
-
-    // 使用词法分析器内置的关键字集合填充 API
-    for (int set = 1; set <= 9; ++set) {
-        const char* kw = lex->keywords(set);
-        if (!kw) continue;
-        QString kwStr(kw);
-        for (const QString& word : kwStr.split(' ', QString::SkipEmptyParts))
-            api->add(word);
+    QStringList words;
+    if (const LangDesc* language = NppParameters::getInstance()
+            .getLangDescByName(_currentLexerName)) {
+        for (int set = 0; set < LangDesc::KeywordSetCount; ++set)
+            words.append(language->keywords[set].split(
+                QLatin1Char(' '), QString::SkipEmptyParts));
     }
     const NppParameters& parameters = NppParameters::getInstance();
     const QVector<AutoCompletionEntry> configured =
         AutoCompletionParser::loadLanguage(
             _currentLexerName, parameters.getUserPath(),
             parameters.getNppPath());
-    for (const AutoCompletionEntry& entry : configured)
-        api->add(entry.apiText());
-    api->prepare();
+    QStringList callTips;
+    for (const AutoCompletionEntry& entry : configured) {
+        const QString apiText = entry.apiText();
+        words.append(apiText);
+        if (!entry.parameters.isEmpty())
+            callTips.append(apiText);
+    }
+    words.removeDuplicates();
+    words.sort(Qt::CaseInsensitive);
+    _completionWords = words;
+    _completionCallTips = callTips;
 
     // 从文档单词和 API 两处补全
-    setAutoCompletionSource(QsciScintilla::AcsAll);
+    setAutoCompletionSource(AcsAll);
     setAutoCompletionThreshold(3);
     setAutoCompletionCaseSensitivity(false);
     setAutoCompletionReplaceWord(true);
@@ -1104,10 +1561,10 @@ void ScintillaEditView::applyAutoComplete(bool enable, int threshold)
     if (_largeFileMode)
         enable = false;
     if (enable) {
-        setAutoCompletionSource(QsciScintilla::AcsAll);
+        setAutoCompletionSource(AcsAll);
         setAutoCompletionThreshold(threshold);
     } else {
-        setAutoCompletionSource(QsciScintilla::AcsNone);
+        setAutoCompletionSource(AcsNone);
     }
 }
 
@@ -1116,13 +1573,20 @@ void ScintillaEditView::applyAutoComplete(bool enable, int threshold)
 void ScintillaEditView::onMarginClicked(int margin, int line, Qt::KeyboardModifiers)
 {
     if (margin == _SC_MARGE_SYMBOL)
-        toggleBookmark();
+        toggleBookmark(line);
 }
 
 void ScintillaEditView::toggleBookmark()
 {
     int line, index;
     getCursorPosition(&line, &index);
+    toggleBookmark(line);
+}
+
+void ScintillaEditView::toggleBookmark(int line)
+{
+    if (line < 0 || line >= lines())
+        return;
     if (markersAtLine(line) & (1 << BOOKMARK_MARKER))
         markerDelete(line, BOOKMARK_MARKER);
     else
@@ -1167,10 +1631,7 @@ void ScintillaEditView::applyFont(const QString& family, int size)
     QFont f(family, size);
     setFont(f);
     // 同步更新词法分析器字体
-    if (lexer()) {
-        lexer()->setDefaultFont(f);
-        reloadConfiguredStyles();
-    }
+    reloadConfiguredStyles();
 }
 
 void ScintillaEditView::applyTabSettings(int width, bool useSpaces)
@@ -1183,12 +1644,12 @@ void ScintillaEditView::applyWordWrap(bool enable)
 {
     if (_largeFileMode)
         enable = false;
-    setWrapMode(enable ? QsciScintilla::WrapWord : QsciScintilla::WrapNone);
+    setWrapMode(enable ? WrapWord : WrapNone);
 }
 
 void ScintillaEditView::applyShowWhitespace(bool show)
 {
-    setWhitespaceVisibility(show ? QsciScintilla::WsVisible : QsciScintilla::WsInvisible);
+    setWhitespaceVisibility(show ? WsVisible : WsInvisible);
 }
 
 void ScintillaEditView::applyShowEol(bool show)
@@ -1199,7 +1660,7 @@ void ScintillaEditView::applyShowEol(bool show)
 void ScintillaEditView::applyShowIndentGuide(bool show)
 {
     // 对应原版 showIndentGuideLine()：
-    // 使用 SC_IV_LOOKBOTH（原版非 Python 语言默认），而非 QScintilla 默认的 SC_IV_REAL
+    // 使用 SC_IV_LOOKBOTH，与原版非 Python 语言默认行为一致。
     // SC_IV_LOOKBOTH 会同时向前后查找非空行确定缩进级别，显示更完整的缩进线
     execute(SCI_SETINDENTATIONGUIDES, show ? SC_IV_LOOKBOTH : SC_IV_NONE);
 }
@@ -1399,6 +1860,13 @@ void ScintillaEditView::onCharacterAdded(int character)
             _autoPairEditing = false;
         }
     }
+
+    if (_autoCompletionSource != AcsNone && _autoCompletionThreshold > 0) {
+        const qintptr current = send(SCI_GETCURRENTPOS);
+        const qintptr start = send(SCI_WORDSTARTPOSITION, current, 1);
+        if (current - start >= _autoCompletionThreshold)
+            autoCompleteFromAPIs();
+    }
 }
 
 void ScintillaEditView::onIndicatorClicked(int position, int)
@@ -1422,11 +1890,11 @@ QString ScintillaEditView::markedText(int indicator) const
     qintptr position = 0;
     while (position < length) {
         const qintptr rangeEnd = SendScintillaNpp(
-            QsciScintilla::SCI_INDICATOREND,
+            SCI_INDICATOREND,
             static_cast<quintptr>(indicator), position);
         if (rangeEnd <= position)
             break;
-        if (SendScintillaNpp(QsciScintilla::SCI_INDICATORVALUEAT,
+        if (SendScintillaNpp(SCI_INDICATORVALUEAT,
                              static_cast<quintptr>(indicator), position) != 0) {
             const char* data = utf8RangePointer(position, rangeEnd - position);
             if (data) {
@@ -1481,7 +1949,8 @@ void ScintillaEditView::updateSmartHighlight(int updated)
 
     // 直接读取选区文本
     QByteArray bytes(selLen + 1, '\0');
-    SendScintilla(SCI_GETSELTEXT, bytes.data());
+    SendScintilla(SCI_GETSELTEXT, 0,
+                  reinterpret_cast<sptr_t>(bytes.data()));
     bytes.resize(selLen);
 
     // 多行选区 → 不高亮
@@ -1489,7 +1958,7 @@ void ScintillaEditView::updateSmartHighlight(int updated)
         return;
 
     // 用像素坐标反查可视行范围，避免 SCI_GETFIRSTVISIBLELINE/SCI_LINESONSCREEN 在
-    // QScintilla 中可能返回偏小范围（导致选区在屏幕上半部分时落在搜索范围外）的问题
+    // 使用完整可见范围，避免选区位于屏幕上半部分时落在搜索范围外。
     int viewH = viewport()->height();
     long firstPos = (long)SendScintilla(SCI_POSITIONFROMPOINT, (unsigned long)0, (long)0);
     long lastPos  = (long)SendScintilla(SCI_POSITIONFROMPOINT, (unsigned long)0,
@@ -1502,9 +1971,9 @@ void ScintillaEditView::updateSmartHighlight(int updated)
     // 按整词搜索（SCFIND_WHOLEWORD = 2）
     unsigned long searchFlags = 0;
     if (gui._smartHighlightWholeWord)
-        searchFlags |= QsciScintillaBase::SCFIND_WHOLEWORD;
+        searchFlags |= SCFIND_WHOLEWORD;
     if (gui._smartHighlightMatchCase)
-        searchFlags |= QsciScintillaBase::SCFIND_MATCHCASE;
+        searchFlags |= SCFIND_MATCHCASE;
     SendScintilla(SCI_SETSEARCHFLAGS, searchFlags);
     SendScintilla(SCI_SETINDICATORCURRENT, SMART_HIGHLIGHT_INDICATOR);
 
@@ -1520,7 +1989,7 @@ void ScintillaEditView::updateSmartHighlight(int updated)
         while (true) {
             long found = (long)SendScintilla(SCI_SEARCHINTARGET,
                                              (uintptr_t)selLen,
-                                             bytes.constData());
+                                             reinterpret_cast<sptr_t>(bytes.constData()));
             if (found < 0)
                 break;
 

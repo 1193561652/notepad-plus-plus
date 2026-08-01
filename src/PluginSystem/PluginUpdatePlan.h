@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QString>
 #include <QVector>
 
@@ -30,6 +31,8 @@ struct PluginUpdatePlan
 
     static PluginUpdatePlan read(const QString& filePath,
                                  QString* error = nullptr);
+    static PluginUpdatePlan fromJson(const QByteArray& bytes,
+                                     QString* error = nullptr);
     static QString operationName(PluginOperationType type);
     static bool parseOperationName(const QString& name,
                                    PluginOperationType* type);

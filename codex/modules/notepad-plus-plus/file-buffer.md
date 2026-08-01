@@ -64,8 +64,8 @@
 - 新增 `src/MISC/TextFileCodec.*`，作为打开、reload、保存、文件搜索替换的统一编码入口。
 - `Buffer` 现在维护 `QList<ScintillaEditView*>`，`getView()`只返回当前首选 view；
   涉及同步时必须遍历 `views()`。
-- `DocTabView::addBufferView()`用于移动现有 editor widget；`addClone()`用于注册共享
-  `QsciDocument` 的新 view。
+- `DocTabView::addBufferView()`用于移动现有 editor widget；`addClone()`使用
+  Scintilla document pointer 注册共享文档的新 view。
 - 关闭单个 clone 只调用 `Buffer::removeView()`；仅最后一个 view 关闭时才调用
   `FileManager::closeBuffer()`。
 - 文本脏状态与编码/BOM/EOL 元数据脏状态分开记录，`Buffer::isDirty()`合并两者。
@@ -80,7 +80,7 @@
 - `FileManager::saveBufferCopy()` 从 Scintilla 连续范围流式转码并原子写出，
   跨 gap 时拆分范围。
 - 大文件文档使用无样式、大文本 Scintilla 选项；clone 和 Document Map
-  继续共享 QsciDocument。
+  继续通过 `SCI_GETDOCPOINTER` / `SCI_SETDOCPOINTER` 共享文档。
 - lexer、Wrap、自动完成、匹配、Smart Highlight、Function List 和周期备份
   通过 Buffer 大文件状态统一降级。
 - 位置、长度、搜索替换和 Session 选择区使用指针宽度消息接口。

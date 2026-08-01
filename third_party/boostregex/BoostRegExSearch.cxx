@@ -10,7 +10,6 @@
  */
 
 #include <stdlib.h>
-#include <cstring>
 #include <vector>
 #include <memory>
 #include <string_view>
@@ -18,6 +17,10 @@
 #include <optional>
 
 #include "Scintilla.h"
+#include "ScintillaTypes.h"
+#include "ScintillaMessages.h"
+#include "Debugging.h"
+#include "Geometry.h"
 #include "Platform.h"
 #include "ILoader.h"
 #include "ILexer.h"
@@ -33,6 +36,7 @@
 #include "Decoration.h"
 #include "ILexer.h"
 #include "CaseFolder.h"
+#include "CharacterCategoryMap.h"
 #include "Document.h"
 #include "UniConversion.h"
 #include "UTF8DocumentIterator.h"
@@ -43,7 +47,7 @@
 #define CP_UTF8 65001
 #define SC_CP_UTF8 65001
 
-using namespace Scintilla;
+using namespace Scintilla::Internal;
 using namespace boost;
 
 class BoostRegexSearch : public RegexSearchBase
@@ -58,7 +62,7 @@ public:
 	}
 	
 	virtual Sci::Position FindText(Document* doc, Sci::Position minPos, Sci::Position maxPos, const char *regex,
-                        bool caseSensitive, bool word, bool wordStart, int sciSearchFlags, Sci::Position *lengthRet) override;
+                        bool caseSensitive, bool word, bool wordStart, Scintilla::FindOption sciSearchFlags, Sci::Position *lengthRet) override;
 	
 	virtual const char *SubstituteByPosition(Document* doc, const char *text, Sci::Position *length) override;
 
@@ -130,16 +134,16 @@ private:
 		{
 			if (modifiedDocument == _document)
 			{
-				if (mh.modificationType & (SC_PERFORMED_UNDO | SC_PERFORMED_REDO))
+				if (FlagSet(mh.modificationType, (Scintilla::ModificationFlags::Undo | Scintilla::ModificationFlags::Redo)) )
 					_documentModified = true;
 				// Replacing last found text should not make isContinuationSearch return false.
-				else if (mh.modificationType & SC_MOD_DELETETEXT)
+				else if (FlagSet(mh.modificationType, Scintilla::ModificationFlags::DeleteText))
 				{
 					if (mh.position == position() && mh.length == length()) // Deleting what we last found.
 						_endPositionForContinuationCheck = _position;
 					else _documentModified = true;
 				}
-				else if (mh.modificationType & SC_MOD_INSERTTEXT)
+				else if (FlagSet(mh.modificationType, Scintilla::ModificationFlags::InsertText))
 				{
 					if (mh.position == position() && position() == _endPositionForContinuationCheck) // Replace at last found position.
 						_endPositionForContinuationCheck += mh.length;
@@ -163,7 +167,7 @@ private:
 		virtual void NotifySavePoint(Document* /*document*/, void* /*userData*/, bool /*atSavePoint*/) {}
 		virtual void NotifyStyleNeeded(Document* /*document*/, void* /*userData*/, Sci::Position /*endPos*/) {}
 		virtual void NotifyLexerChanged(Document* /*document*/, void* /*userData*/) {}
-		virtual void NotifyErrorOccurred(Document* /*document*/, void* /*userData*/, int /*status*/) {}
+		virtual void NotifyErrorOccurred(Document* /*document*/, void* /*userData*/, Scintilla::Status /*status*/) {}
 		
 		Document* _document;
 		bool _documentModified;
@@ -245,7 +249,7 @@ private:
 	int _lastDirection;
 };
 
-namespace Scintilla
+namespace Scintilla::Internal
 {
 #ifdef SCI_OWNREGEX
 RegexSearchBase *CreateRegexSearch(CharClassify* /* charClassTable */)
@@ -263,7 +267,7 @@ std::string g_exceptionMessage;
  */
 
 Sci::Position BoostRegexSearch::FindText(Document* doc, Sci::Position startPosition, Sci::Position endPosition, const char *regexString,
-                        bool caseSensitive, bool /*word*/, bool /*wordStart*/, int sciSearchFlags, Sci::Position *lengthRet)
+                        bool caseSensitive, bool /*word*/, bool /*wordStart*/, Scintilla::FindOption sciSearchFlags, Sci::Position *lengthRet)
 {
 	g_exceptionMessage.clear();
 	try {
@@ -466,9 +470,9 @@ wchar_t *BoostRegexSearch::utf8ToWchar(const char *utf8)
 {
 	size_t utf8Size = strlen(utf8);
 	std::string s(utf8, utf8Size);
-	size_t wcharSize = UTF16Length(s.data(), s.size());
+	size_t wcharSize = UTF16Length(s);
 	wchar_t *w = new wchar_t[wcharSize + 1];
-	UTF16FromUTF8(s.data(), s.size(), w, wcharSize + 1);
+	UTF16FromUTF8(s, w, wcharSize + 1);
 	w[wcharSize] = 0;
 	return w;
 }
@@ -477,9 +481,9 @@ char *BoostRegexSearch::wcharToUtf8(const wchar_t *w)
 {
 	//int wcharSize = static_cast<int>(wcslen(w));
 	std::wstring ws(w);
-	size_t charSize = UTF8Length(ws.data(), ws.size());
+	size_t charSize = UTF8Length(ws);
 	char *c = new char[charSize + 1];
-	UTF8FromUTF16(ws.data(), ws.size(), c, charSize);
+	UTF8FromUTF16(ws, c, charSize);
 	c[charSize] = 0;
 	return c;
 }

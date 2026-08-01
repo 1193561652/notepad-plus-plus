@@ -1,9 +1,11 @@
 #include "PluginArchiveExtractor.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QStringList>
+#include <QTemporaryFile>
 
 namespace {
 
@@ -41,12 +43,47 @@ bool runProcess(const QString& program, const QStringList& arguments,
 
 #if defined(Q_OS_WIN)
 const char kListScript[] =
+    "param([string]$Archive)\n"
     "Add-Type -AssemblyName System.IO.Compression.FileSystem; "
-    "$a=[IO.Compression.ZipFile]::OpenRead($args[0]); "
+    "$a=[IO.Compression.ZipFile]::OpenRead($Archive); "
     "try {$a.Entries | ForEach-Object {$_.FullName}} finally {$a.Dispose()}";
 const char kExtractScript[] =
+    "param([string]$Archive,[string]$Destination)\n"
     "Add-Type -AssemblyName System.IO.Compression.FileSystem; "
-    "[IO.Compression.ZipFile]::ExtractToDirectory($args[0],$args[1])";
+    "[IO.Compression.ZipFile]::ExtractToDirectory($Archive,$Destination)";
+
+bool runPowerShell(const QByteArray& script, const QStringList& arguments,
+                   QByteArray* standardOutput, QString* error)
+{
+    QString scriptPath;
+    {
+        QTemporaryFile scriptFile(
+            QDir(QDir::tempPath()).filePath(
+                QStringLiteral("npp-plugin-XXXXXX.ps1")));
+        if (!scriptFile.open() ||
+            scriptFile.write(script) != script.size() ||
+            !scriptFile.flush()) {
+            if (error) {
+                *error = QStringLiteral(
+                    "Could not prepare the ZIP helper script.");
+            }
+            return false;
+        }
+        scriptPath = scriptFile.fileName();
+        scriptFile.setAutoRemove(false);
+    }
+    QStringList processArguments = {
+        QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"),
+        QStringLiteral("-ExecutionPolicy"), QStringLiteral("Bypass"),
+        QStringLiteral("-File"), scriptPath
+    };
+    processArguments.append(arguments);
+    const bool succeeded = runProcess(
+        QStringLiteral("powershell.exe"), processArguments,
+        standardOutput, error);
+    QFile::remove(scriptPath);
+    return succeeded;
+}
 #endif
 
 bool containsSymbolicLink(const QDir& directory, QString* linkPath)
@@ -114,20 +151,18 @@ bool PluginArchiveExtractor::extractZip(const QString& archivePath,
 
     QByteArray listing;
 #if defined(Q_OS_WIN)
-    const QString program = QStringLiteral("powershell.exe");
-    const QStringList listArguments = {
-        QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"),
-        QStringLiteral("-Command"), QString::fromLatin1(kListScript),
-        archivePath
-    };
+    if (!runPowerShell(QByteArray(kListScript), {archivePath},
+                       &listing, error)) {
+        return false;
+    }
 #else
     const QString program = QStringLiteral("unzip");
     const QStringList listArguments = {
         QStringLiteral("-Z1"), archivePath
     };
-#endif
     if (!runProcess(program, listArguments, &listing, error))
         return false;
+#endif
 
     const QStringList entries =
         QString::fromUtf8(listing).split(QLatin1Char('\n'),
@@ -143,19 +178,19 @@ bool PluginArchiveExtractor::extractZip(const QString& archivePath,
     }
 
 #if defined(Q_OS_WIN)
-    const QStringList extractArguments = {
-        QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"),
-        QStringLiteral("-Command"), QString::fromLatin1(kExtractScript),
-        archivePath, destinationDir.absolutePath()
-    };
+    if (!runPowerShell(QByteArray(kExtractScript),
+                       {archivePath, destinationDir.absolutePath()},
+                       nullptr, error)) {
+        return false;
+    }
 #else
     const QStringList extractArguments = {
         QStringLiteral("-qq"), archivePath,
         QStringLiteral("-d"), destinationDir.absolutePath()
     };
-#endif
     if (!runProcess(program, extractArguments, nullptr, error))
         return false;
+#endif
 
     QString linkPath;
     if (containsSymbolicLink(destinationDir, &linkPath)) {

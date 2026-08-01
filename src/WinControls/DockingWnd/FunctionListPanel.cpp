@@ -1,7 +1,6 @@
 // FunctionListPanel.cpp - 函数列表面板实现
 
 #include "FunctionListPanel.h"
-#include <Qsci/qscilexer.h>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QRegExp>
@@ -56,8 +55,7 @@ void FunctionListPanel::refresh()
 
     if (!_currentView || _currentView->isLargeFileMode()) return;
 
-    QsciLexer* lex  = _currentView->lexer();
-    QString lang     = lex ? QString(lex->language()).toLower() : QString();
+    const QString lang = _currentView->lexerLanguage().toLower();
     QString text     = _currentView->text();
     _allEntries      = parseText(text, lang);
 

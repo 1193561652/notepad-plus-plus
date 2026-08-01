@@ -6,11 +6,10 @@
 #include <QFileInfo>
 #include <QLocale>
 #include <QPainter>
-#include <Qsci/qsciscintilla.h>
 
 NotepadPlusPrinter::NotepadPlusPrinter(
     const NppGUI& gui, const QString& filePath)
-    : QsciPrinter(QPrinter::HighResolution), _gui(gui), _filePath(filePath)
+    : QPrinter(QPrinter::HighResolution), _gui(gui), _filePath(filePath)
 {
 }
 
@@ -19,17 +18,43 @@ void NotepadPlusPrinter::printView(ScintillaEditView* view)
     if (!view)
         return;
     const long previousColourMode = view->SendScintilla(
-        QsciScintilla::SCI_GETPRINTCOLOURMODE);
+        SCI_GETPRINTCOLOURMODE);
     const int previousMarginWidth = view->marginWidth(0);
     view->SendScintilla(
-        QsciScintilla::SCI_SETPRINTCOLOURMODE,
+        SCI_SETPRINTCOLOURMODE,
         static_cast<unsigned long>(qBound(0, _gui._printOption, 3)));
     if (!_gui._printLineNumber)
         view->setMarginWidth(0, 0);
-    printRange(view);
+    QPainter painter(this);
+    if (painter.isActive()) {
+        const QRect page = pageRect(QPrinter::DevicePixel).toRect();
+        sptr_t position = 0;
+        const sptr_t end = view->SendScintilla(SCI_GETLENGTH);
+        int pageNumber = 1;
+        while (position < end) {
+            if (pageNumber > 1 && !newPage())
+                break;
+            QRect area = page;
+            formatPage(painter, true, area, pageNumber);
+            Sci_RangeToFormat range{};
+            range.hdc = painter.device();
+            range.hdcTarget = painter.device();
+            range.rc = {area.left(), area.top(), area.right(), area.bottom()};
+            range.rcPage = {page.left(), page.top(), page.right(), page.bottom()};
+            range.chrg = {static_cast<Sci_PositionCR>(position),
+                          static_cast<Sci_PositionCR>(end)};
+            const sptr_t next = view->SendScintilla(
+                SCI_FORMATRANGE, 1, reinterpret_cast<sptr_t>(&range));
+            if (next <= position)
+                break;
+            position = next;
+            ++pageNumber;
+        }
+        view->SendScintilla(SCI_FORMATRANGE, 0, 0);
+    }
     view->setMarginWidth(0, previousMarginWidth);
     view->SendScintilla(
-        QsciScintilla::SCI_SETPRINTCOLOURMODE,
+        SCI_SETPRINTCOLOURMODE,
         static_cast<unsigned long>(previousColourMode));
 }
 

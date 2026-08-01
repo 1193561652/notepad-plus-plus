@@ -17,6 +17,9 @@ bool registerFileAssociation(const QString& extension, const QString& applicatio
 bool unregisterFileAssociation(const QString& extension,
                                QString* errorMessage = nullptr);
 bool openDefaultApplicationsSettings();
+bool startElevated(const QString& program, const QStringList& arguments,
+                   const QString& workingDirectory,
+                   QString* errorMessage = nullptr);
 }
 
 #endif // PLATFORMSERVICES_H

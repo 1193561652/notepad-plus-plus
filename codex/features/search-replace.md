@@ -27,18 +27,16 @@
 
 ## 风险点
 
-- 正则表达式部分项目约束允许暂时跳过 Boost.Regex，但需要明确 Qt `QRegularExpression` 与原版行为差异。
+- 用户正则统一由 `SCI_OWNREGEX` 和 v8.4.6 `BoostRegExSearch.cxx` 执行；新增路径不得回退到 `QRegularExpression`。
 - 文档字节偏移和 QString 字符偏移可能不一致，影响查找结果跳转。
 - Find in Files 当前是否完整实现待核验。
 - 查找历史、选区查找、扩展模式转义规则需要对照原版。
 
 ## 与原版差异
 
-- 原版 `FindReplaceDlg` 包含 `Finder`、Find All、Replace All、Find in Files、Find in Projects、Mark、结果面板、搜索历史、宏命令保存/回放等完整体系。
-- Qt 版已有 Find/Replace/Find in Files/Mark UI 结构，但部分按钮明确禁用或尚无完整连接。
-- 原版搜索结果使用专门标记结构和 search result lexer 交互；Qt 版当前通过 signal 发送简单结果列表。
-- 原版支持所有打开文档、目录、项目面板等范围；Qt 版当前主要集中于当前文档。
-- Regex 行为不能简单等同于 Qt `QRegularExpression`，后续需要制定兼容或暂缓策略。
+- 当前文档、所有打开文档、目录和三个 Project Panel 范围均已接通查找替换。
+- Finder 已有来源分组、高亮、字节位置导航和进度取消；结果 lexer 的少量绘制细节仍可能与原版不同。
+- 正则执行后端与原版一致，Qt 版主要风险在边界 UI、超大目录性能和结果呈现，而非正则引擎替代。
 
 ## 2026-07-22 阶段五完成项
 
@@ -68,7 +66,7 @@
 - Replace in Files 和 Replace All in Opened Docs 仍未实现。
 - Find in Projects 仍为占位。
 - Find in Files 尚未支持取消搜索、二进制跳过、超大文件分批搜索和完整编码自动识别。
-- Regex 仍使用 Qt/QScintilla 能力，和原版 Boost.Regex 仍存在潜在语义差异。
+- 此段是阶段六历史状态；当前正则后端已在 2026-07-25 后切换为原版 Boost.Regex 适配层。
 
 ## 后续索引任务
 
@@ -92,7 +90,7 @@
 - 已新增原版 `NotepadPlus/Project/Folder/File` workspace XML 数据模型和三个独立 Project Panel。
 - Find/Replace in Projects 现在根据 Panel 1/2/3 选择，仅处理对应 workspace 的文件成员。
 - Replace in Projects 保留原编码/BOM，使用 `QSaveFile`，并跳过二进制、只读和已打开的脏文件。
-- 用户正则搜索统一使用静态 QScintilla 中的原版 Boost.Regex 适配层。
+- 用户正则搜索统一使用 `npp-scintilla-qt` 中的原版 Boost.Regex 适配层。
 
 ## 2026-07-25 索引更新
 

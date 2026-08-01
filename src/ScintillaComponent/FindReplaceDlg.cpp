@@ -31,11 +31,10 @@
 #include <QLineEdit>
 #include <QFileDialog>
 #include <QEvent>
-#include <Qsci/qsciscintilla.h>
 
 static const int BOOKMARK_MARKER = 1;
-static const int BTN_MIN_WIDTH   = 150;
-static const int LBL_WIDTH       = 88;
+static const int BTN_MIN_WIDTH   = 135;
+static const int LBL_WIDTH       = 108;
 
 static bool findFromPosition(ScintillaEditView* view, const QString& text,
                              const FindOption& option, qintptr position)
@@ -73,6 +72,8 @@ void FindReplaceDlg::setupUi()
     _tabBar->addTab(tr("Find in Files"));      // 2
     _tabBar->addTab(tr("Find in Projects"));
     _tabBar->addTab(tr("Mark"));               // 4
+    _tabBar->setExpanding(false);
+    _tabBar->setDrawBase(true);
     main->addWidget(_tabBar);
 
     // ── 2. 内容区：左（输入+选项）| 右（按钮列，含取消） ───────────────────
@@ -118,7 +119,7 @@ void FindReplaceDlg::setupUi()
             this, [this](const QString&){ _statusLabel->clear(); });
 
     onTabChanged(0);
-    resize(573, 336);
+    setFixedSize(573, 336);
 }
 
 // ─── 底部行：搜索模式 + 透明度 ────────────────────────────────────────────────
@@ -456,8 +457,8 @@ QWidget* FindReplaceDlg::makeFindButtons()
 
     lay->addWidget(_findNextBtn);
     lay->addWidget(_countBtn);
-    lay->addWidget(_findAllOpenedBtn);
     lay->addWidget(_findAllCurBtn);
+    lay->addWidget(_findAllOpenedBtn);
     lay->addStretch();
     lay->addWidget(closeBtn);
 
@@ -791,9 +792,9 @@ void FindReplaceDlg::onFindAllInCurrentDoc()
     // ── 1. 清除当前文档中旧的 Find All 高亮（indicator 31）─────────────────────
     const int FIND_MARK = ScintillaEditView::FIND_MARK_INDICATOR;
     const qintptr docLen = _currentView->documentLengthNpp();
-    _currentView->SendScintilla(QsciScintilla::SCI_SETINDICATORCURRENT, (unsigned long)FIND_MARK);
+    _currentView->SendScintilla(SCI_SETINDICATORCURRENT, (unsigned long)FIND_MARK);
     _currentView->SendScintillaNpp(
-        QsciScintilla::SCI_INDICATORCLEARRANGE, 0, docLen);
+        SCI_INDICATORCLEARRANGE, 0, docLen);
 
     // ── 2. 确定搜索范围 ────────────────────────────────────────────────────────
     qintptr rangeStart = 0;
@@ -820,16 +821,16 @@ void FindReplaceDlg::onFindAllInCurrentDoc()
 
         // 对应原版 ProcessFindAll：SCI_SETINDICATORCURRENT + SCI_INDICATORFILLRANGE
         if (matchLen > 0) {
-            _currentView->SendScintilla(QsciScintilla::SCI_SETINDICATORCURRENT,
+            _currentView->SendScintilla(SCI_SETINDICATORCURRENT,
                                         (unsigned long)FIND_MARK);
             _currentView->SendScintillaNpp(
-                QsciScintilla::SCI_INDICATORFILLRANGE,
+                SCI_INDICATORFILLRANGE,
                 static_cast<quintptr>(matchStart), matchLen);
         }
 
         // 收集结果信息（对应原版 FoundInfo）
         const int lineNo = static_cast<int>(_currentView->SendScintillaNpp(
-            QsciScintilla::SCI_LINEFROMPOSITION,
+            SCI_LINEFROMPOSITION,
             static_cast<quintptr>(matchStart)));
         QString lineText = _currentView->text(lineNo);
         // 去掉行尾换行符
@@ -842,7 +843,7 @@ void FindReplaceDlg::onFindAllInCurrentDoc()
         r.matchStart = matchStart;
         r.matchLen   = matchLen;
         const qintptr lineStart = _currentView->SendScintillaNpp(
-            QsciScintilla::SCI_POSITIONFROMLINE,
+            SCI_POSITIONFROMLINE,
             static_cast<quintptr>(lineNo));
         r.lineMatchStart = matchStart - lineStart;
         r.lineText   = lineText;
@@ -851,7 +852,7 @@ void FindReplaceDlg::onFindAllInCurrentDoc()
         found = _currentView->findNext();
     }
 
-    // 终止查找状态（清除 QScintilla 内部查找高亮）
+    // 终止查找状态并清除编辑器查找高亮。
     _currentView->findFirst(QString(), false, false, false, false, true);
 
     // ── 4. 显示结果 ────────────────────────────────────────────────────────────
@@ -1019,7 +1020,7 @@ void FindReplaceDlg::onReplaceAll()
                         matchStart + (lengthAfter - lengthBefore);
                     const qintptr nextPosition =
                         _currentView->SendScintillaNpp(
-                            QsciScintilla::SCI_POSITIONAFTER,
+                            SCI_POSITIONAFTER,
                             static_cast<quintptr>(shiftedOriginal));
                     found = findFromPosition(
                         _currentView, search, opt, nextPosition);
@@ -1049,7 +1050,7 @@ void FindReplaceDlg::onReplaceAll()
                         matchStart + (lengthAfter - lengthBefore);
                     const qintptr nextPosition =
                         _currentView->SendScintillaNpp(
-                            QsciScintilla::SCI_POSITIONAFTER,
+                            SCI_POSITIONAFTER,
                             static_cast<quintptr>(shiftedOriginal));
                     found = findFromPosition(
                         _currentView, search, opt, nextPosition);
@@ -1352,7 +1353,7 @@ int FindReplaceDlg::countOccurrences()
     _currentView->getSelectionNpp(&originalStart, &originalEnd);
     const int originalFirstVisible = _currentView->firstVisibleLine();
     const int originalXOffset = static_cast<int>(_currentView->SendScintilla(
-        QsciScintilla::SCI_GETXOFFSET));
+        SCI_GETXOFFSET));
 
     if (isInSelectionMode() && _currentView->hasSelectedText()) {
         // ── 选区内计数 ─────────────────────────────────────────────────────
@@ -1381,11 +1382,11 @@ int FindReplaceDlg::countOccurrences()
 
     _currentView->findFirst("", false, false, false, false, true);
     _currentView->SendScintillaNpp(
-        QsciScintilla::SCI_SETSEL,
+        SCI_SETSEL,
         static_cast<quintptr>(originalStart), originalEnd);
-    _currentView->SendScintilla(QsciScintilla::SCI_SETFIRSTVISIBLELINE,
+    _currentView->SendScintilla(SCI_SETFIRSTVISIBLELINE,
                                 static_cast<unsigned long>(originalFirstVisible));
-    _currentView->SendScintilla(QsciScintilla::SCI_SETXOFFSET,
+    _currentView->SendScintilla(SCI_SETXOFFSET,
                                 static_cast<unsigned long>(originalXOffset));
     return count;
 }
@@ -1402,7 +1403,7 @@ void FindReplaceDlg::markAllOccurrences(bool bookmarkLine, bool purge)
     if (purge)
         _currentView->markerDeleteAll(BOOKMARK_MARKER);
 
-    _currentView->markerDefine(BOOKMARK_MARKER, QsciScintilla::Circle);
+    _currentView->markerDefine(Circle, BOOKMARK_MARKER);
     _currentView->setMarkerBackgroundColor(QColor(0x0A, 0x24, 0x6A), BOOKMARK_MARKER);
 
     FindOption opt = buildOptions();
@@ -1430,7 +1431,7 @@ void FindReplaceDlg::markAllOccurrences(bool bookmarkLine, bool purge)
             if (bookmarkLine) {
                 const int line = static_cast<int>(
                     _currentView->SendScintillaNpp(
-                        QsciScintilla::SCI_LINEFROMPOSITION,
+                        SCI_LINEFROMPOSITION,
                         static_cast<quintptr>(matchStart)));
                 _currentView->markerAdd(line, BOOKMARK_MARKER);
             }
@@ -1453,7 +1454,7 @@ void FindReplaceDlg::markAllOccurrences(bool bookmarkLine, bool purge)
 
     _currentView->findFirst("", false, false, false, false, true);
     _currentView->SendScintillaNpp(
-        QsciScintilla::SCI_SETSEL,
+        SCI_SETSEL,
         static_cast<quintptr>(originalStart), originalEnd);
     addToFindHistory(currentFindText());
 

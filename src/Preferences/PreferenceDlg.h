@@ -112,6 +112,7 @@ private:
     QRadioButton* _fmtUnixRB     = nullptr;
     QRadioButton* _fmtMacRB      = nullptr;
     QComboBox*    _encodingCombo  = nullptr;
+    QCheckBox*    _openAnsiAsUtf8CB = nullptr;
 
     // ── 7. Recent Files History ───────────────────────────────────────────────
     QSpinBox*  _maxRecentFilesSB  = nullptr;
@@ -127,6 +128,7 @@ private:
     QCheckBox* _smartAnotherViewCB = nullptr;
     QCheckBox* _tagMatchCB = nullptr;
     QCheckBox* _tagAttributesCB = nullptr;
+    QCheckBox* _tagNonHtmlCB = nullptr;
 
     QCheckBox* _printLineNumberCB = nullptr;
     QComboBox* _printOptionCombo = nullptr;
@@ -137,11 +139,13 @@ private:
     QLineEdit* _footerMiddleEdit = nullptr;
     QLineEdit* _footerRightEdit = nullptr;
 
-    QCheckBox* _searchMatchWordCB = nullptr;
-    QCheckBox* _searchMatchCaseCB = nullptr;
-    QCheckBox* _searchWrapCB = nullptr;
-    QCheckBox* _searchRecursiveCB = nullptr;
-    QCheckBox* _searchHiddenCB = nullptr;
+    QCheckBox* _fillFindSelectedCB = nullptr;
+    QCheckBox* _fillFindCaretCB = nullptr;
+    QCheckBox* _findMonospacedCB = nullptr;
+    QCheckBox* _findAlwaysVisibleCB = nullptr;
+    QCheckBox* _confirmReplaceOpenedCB = nullptr;
+    QCheckBox* _replaceStopsCB = nullptr;
+    QCheckBox* _showOneEntryCB = nullptr;
 
     QComboBox* _multiInstanceCombo = nullptr;
     QLineEdit* _dateTimeFormatEdit = nullptr;
@@ -152,6 +156,7 @@ private:
     QCheckBox* _delimiterWholeDocumentCB = nullptr;
 
     QComboBox* _urlModeCombo = nullptr;
+    QLineEdit* _uriSchemesEdit = nullptr;
     QComboBox* _searchEngineCombo = nullptr;
     QLineEdit* _searchEngineCustomEdit = nullptr;
 
@@ -189,6 +194,7 @@ private:
     QComboBox* _fileAutoDetectCombo   = nullptr;
     QCheckBox* _checkHistoryFilesCB   = nullptr;
     QCheckBox* _restoreSessionCB      = nullptr;
+    QCheckBox* _detectEncodingCB      = nullptr;
 
     bool _langChanged = false;
 };
