@@ -6,10 +6,10 @@
 
 class ScintillaEditView;
 
-class NotepadPlusPrinter : public QPrinter
+class Printer : public QPrinter
 {
 public:
-    NotepadPlusPrinter(const NppGUI& gui, const QString& filePath);
+    Printer(const NppGUI& gui, const QString& filePath);
 
     void printView(ScintillaEditView* view);
     void formatPage(QPainter& painter, bool drawing, QRect& area,

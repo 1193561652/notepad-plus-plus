@@ -1788,6 +1788,12 @@ void NppParameters::feedGUIConfig(const TiXmlElement* el)
             : (currentLine != "hide");
         _svp._wrapSymbolShow          = (attr(L"wrapSymbolShow")           == "show");
         _svp._doWrap                  = parseBool(attr(L"Wrap"),           false);
+        const QString borderEdge = attr(L"borderEdge");
+        if (!borderEdge.isEmpty())
+            _svp._showBorderEdge = parseBool(borderEdge, true);
+        const QString borderWidth = attr(L"borderWidth");
+        if (!borderWidth.isEmpty())
+            _svp._borderWidth = qBound(0, parseInt(borderWidth, 2), 30);
         const QString edge = attr(L"edge");
         _svp._edgeShow = parseBool(edge, false);
         const QString edgeColumn = attr(L"edgeNbColumn");
@@ -2420,6 +2426,10 @@ bool NppParameters::writeConfigXml(const QString& filePath)
         }
         el->SetAttribute(L"wrapSymbolShow",          _svp._wrapSymbolShow          ? L"show" : L"hide");
         el->SetAttribute(L"Wrap",                    bw(_svp._doWrap));
+        if (el->Attribute(L"borderEdge"))
+            el->SetAttribute(L"borderEdge", bw(_svp._showBorderEdge));
+        if (el->Attribute(L"borderWidth"))
+            el->SetAttribute(L"borderWidth", _svp._borderWidth);
         if (el->Attribute(L"edge"))
             el->SetAttribute(L"edge", bw(_svp._edgeShow));
         if (el->Attribute(L"edgeNbColumn"))

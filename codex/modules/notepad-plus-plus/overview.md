@@ -24,12 +24,14 @@
 - `src/main.cpp`：应用程序入口。
 - `src/MainWindow.h|cpp`：主窗口和多数用户可见行为的协调入口。
 - `src/ScintillaComponent/ScintillaEditView.h|cpp`：官方 Scintilla Qt 平台封装与消息边界。
+- `src/ScintillaComponent/Printer.h|cpp`：Qt 打印设备、Scintilla 分页及页眉页脚渲染。
 - `src/ScintillaComponent/Buffer.h|cpp`：文档缓冲区。
 - `src/MISC/FileManager.h|cpp`：文件和 Buffer 生命周期管理。
 - `src/WinControls/TabBar/DocTabView.h|cpp`：标签页管理。
 - `src/Parameters.h|cpp`：配置管理。
-- `src/PluginSystem/PluginAdmin*`、`PluginUpdate*`：插件清单、管理 UI 和退出后更新器。
-- `src/PluginSystem/IPlugin.h`、`PluginManager.h|cpp`：插件运行接口预留。
+- `src/WinControls/PluginsAdmin/PluginAdmin*`：插件管理 UI 和展示模型。
+- `src/MISC/PluginsManager/PluginCatalog*`、`PluginUpdate*`、`updater/`：插件清单、计划和退出后更新器。
+- `src/MISC/PluginsManager/IPlugin.h`、`PluginManager.h|cpp`：插件运行接口预留。
 
 ## 开发约束
 

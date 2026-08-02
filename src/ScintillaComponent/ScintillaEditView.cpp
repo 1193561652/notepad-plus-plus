@@ -529,6 +529,20 @@ void ScintillaEditView::init()
     applyGlobalStyles();
 }
 
+void ScintillaEditView::setBorderEdge(bool enabled, bool darkMode)
+{
+    if (!enabled) {
+        setFrameStyle(QFrame::NoFrame);
+        return;
+    }
+
+    setLineWidth(1);
+    setMidLineWidth(0);
+    setFrameStyle(darkMode
+        ? QFrame::Box | QFrame::Plain
+        : QFrame::WinPanel | QFrame::Sunken);
+}
+
 void ScintillaEditView::setupDefaultStyles()
 {
     // 设置默认字体

@@ -110,9 +110,9 @@ Dock 或内部窗口，也不能保证通过版本区间和导出检查的插件
 
 当前入口：
 
-- `src/PluginSystem/IPlugin.h`
-- `src/PluginSystem/PluginManager.h`
-- `src/PluginSystem/PluginManager.cpp`
+- `src/MISC/PluginsManager/IPlugin.h`
+- `src/MISC/PluginsManager/PluginManager.h`
+- `src/MISC/PluginsManager/PluginManager.cpp`
 - `src/MainWindow.h`
 - `src/MainWindow.cpp`
 - `CMakeLists.txt`
@@ -350,148 +350,123 @@ Dock 持久化键至少包含插件 ID 和面板 ID；缺少插件时保留布�
 
 ## 6. 建议模块划分
 
-建议逐步把现有 `src/PluginSystem/` 演进为：
+后续插件运行时应在原版目录职责上继续演进，不再建立顶层 `PluginSystem`：
 
 ```text
-src/PluginSystem/
+src/MISC/PluginsManager/
   abi/
     NppQtPluginAbi.h
-  core/
-    PluginRegistry.*
-    PluginLoader.*
-    PluginHostServices.*
-    PluginCommandRouter.*
-    PluginEventBus.*
-    PluginStorage.*
-    PluginDiagnostics.*
-  qt/
-    QtPluginUiAdapter.*
-    PluginDockService.*
-  legacy_win/
-    LegacyPluginAdapterWin.*
-    LegacyMessageRouterWin.*
-    LegacyDockAdapterWin.*
+  PluginRegistry.*
+  PluginLoader.*
+  PluginHostServices.*
+  PluginCommandRouter.*
+  PluginEventBus.*
+  PluginStorage.*
+  PluginDiagnostics.*
+  updater/
+    PluginArchiveExtractor.*
+    PluginUpdateExecutor.*
+    PluginUpdaterMain.cpp
   sdk/
     QtPluginSdk.*
+
+src/WinControls/PluginsAdmin/
+  PluginAdminModel.*
+  PluginAdminDialog.*
+  QtPluginUiAdapter.*
+  PluginDockService.*
+
+src/Win32PluginSystem/
+  LegacyPluginAdapterWin.*
+  LegacyPluginLoaderWin.*
+  LegacyMessageRouterWin.*
+  LegacyDockAdapterWin.*
+  LegacyPluginRecoveryWin.*
 ```
 
 `MainWindow` 只负责建立宿主 facade、提供菜单/Dock 挂载点和转发明确的应用事件。
-插件扫描、ABI 解析、错误处理、资源所有权和卸载顺序都留在 PluginSystem 内。
+插件扫描、ABI 解析、错误处理、资源所有权和卸载顺序都留在
+`MISC/PluginsManager`；插件管理界面只留在 `WinControls/PluginsAdmin`；原版
+Windows DLL 插件兼容实现隔离在 `Win32PluginSystem`。
+
+顶层 CMake 只在 `WIN32` 条件内进入 `src/Win32PluginSystem`。该目录可以直接
+依赖 Windows SDK 和调用 Windows API；Linux/macOS 不配置、不编译其中源码，
+也不为该兼容层维护平台桩实现。新增源文件只登记在目录内的 `CMakeLists.txt`。
 
 首个重构步骤应把现有 `IPluginHost` 从 `MainWindow` 继承关系中移出，并用组合的
 `PluginHostServices` 适配器替代。旧 `IPlugin` 在迁移期可作为实验接口保留，
 但要明确标记为不稳定，最终通过新 ABI 的 Qt SDK 实现。
 
-## 7. 长期能力阶段参考
+## 7. 当前实施阶段
 
-本节保留各项长期能力及其完成条件，但不再代表当前执行顺序。Windows 原版插件
-兼容工作的权威顺序是 `PS-025`；新 ABI、SDK、Dock 和 Plugin Admin 后续阶段应
-根据插件调查结果重新排序。
+### 已完成基线：插件包管理
 
-### 调查与契约准备
+Plugin Admin、清单/兼容模型、退出后安装/更新/卸载、SHA-256、ZIP 防护、事务
+回滚、Windows UAC 和普通权限重启已经实现并测试。它不再列为未来阶段；详细状态
+见 `codex/features/plugin-system.md`。
 
-工作：
+### 阶段 0：规划与状态归一（已完成）
 
-- 建立 v8.4.6 `NPPM_*`、`NPPN_*`、Scintilla 消息使用清单。
-- 选择一组开源插件作为兼容语料，按命令型、编辑器型、Dock 型、lexer 型分类。
-- 按使用量、源码、许可证、维护状态、可复现构建和移植成本建立插件候选表。
-- 为 Windows 兼容层冻结首批接口白名单，白名单外接口默认不承诺支持。
-- 跨平台 ABI v1 的错误模型、所有权、线程和版本规则在插件调查完成后再冻结。
-- 为当前禁用插件的启动路径建立回归测试。
+- 旧阶段编号已按当前依赖重排。
+- 插件包管理与插件加载运行保持独立。
+- Windows 原版 ABI 有限兼容先行，跨平台版本化 C ABI 是长期主线。
+- 不完整模拟 Notepad++ Win32 窗口树，不在 Linux/macOS 运行 Windows DLL。
 
-完成条件：
+### 阶段 1：x86 调查与代理评价（已完成）
 
-- 每项原版接口都有“首版支持、延后或 Windows 专属”的明确归类。
-- 未启用插件时，Windows/Linux/macOS 行为不变。
+- v8.4.6 x86 清单 169/169 项完成身份、版本、源码、许可证/维护、API、依赖、
+  Win32/UI、线程/运行时、双代理风险和 A/B/C/D/U 初评。
+- 62 项有对应版本源码证据；107 项证据不足并严格保持 `U`，未反汇编。
+- 统一矩阵：`codex/analysis/plugins-v846/api-dependency-matrix.md`。
+- 自动校验保证 JSON、inventory、importance 和六个字母批次恰好覆盖同一 169 项。
 
-### 后续：加载器和稳定 ABI
+阶段 1 不表示任何真实 DLL 已兼容，只为安全加载和接口白名单提供输入。
 
-工作：
+### 阶段 2：安全加载基础
 
-- 实现 manifest、确定性扫描、ABI 查询、结构化诊断和完整回滚。
-- 提供最小 Application、Storage 和日志服务。
-- 制作不依赖 Qt ABI 的测试插件。
+- 实现 PE 架构、六导出、调用约定和依赖预检。
+- 建立当前加载插件日志、异常启动恢复、`-noPlugin` 和注册资源回滚。
+- 测试缺导出、错误架构、缺依赖、初始化失败、重复插件和卸载残留。
 
-完成条件：
+### 阶段 3：Windows 原版 ABI 与双代理骨架
 
-- 正常、缺导出、空入口、错误架构、ABI 不符、初始化异常和重复插件均有测试。
-- 插件卸载后无回调、对象或动态库残留。
-- ASan/UBSan 可用平台的测试无新增问题。
+- 实现 `NppData`、`FuncItem`、命令 ID、菜单和快捷键。
+- 为主/副视图建立生命周期稳定的代理 HWND，先实现已批准的同步 SCI 白名单。
+- Win32 类型只存在于 `src/Win32PluginSystem/` 和必要的平台桥接代码。
 
-### 阶段 2：命令、菜单和快捷键
+### 阶段 4：通知和 Host Services
 
-工作：
+- 转换 `NPPN_*` 与 `SCNotification`，覆盖 Buffer、文件、语言、主题和关闭顺序。
+- 把可跨平台能力收敛到组合式 `PluginHostServices`，不继续让 MainWindow 实现 ABI。
+- 验证双视图、clone、高频通知、线程和回调重入。
 
-- 建立稳定命令键与运行期 ID 映射。
-- 接入 Plugins 菜单、状态同步和 `PluginCommands` 配置。
-- 支持工具栏贡献，但由宿主管理图标与 QAction。
+### 阶段 5：首批真实插件
 
-完成条件：
+- A 类先用 `mimeTools` 验证最小命令插件。
+- B 类用 `JsonTools`、`NPPJSONViewer`、`XMLTools` 验证文本、Dock 和运行时。
+- 每个插件单独批准消息增量；失败不得留下 QAction、命令、回调或 Dock。
 
-- 命令执行、勾选/禁用、快捷键冲突、重启恢复和卸载保留配置通过测试。
-- 菜单工作流与 v8.4.6 一致。
+### 阶段 6：跨平台 ABI v1
 
-### 阶段 3：文档、视图、编辑器和通知
+- 基于真实语料冻结版本化 C ABI 的错误、所有权、线程和服务发现规则。
+- Qt/C++ 只作为 SDK 包装，不跨 ABI 传递 Qt/STL 类型或异常。
+- Windows、Linux、macOS 使用同一源码测试插件重新编译验证。
 
-工作：
+### 阶段 7：复杂插件源码移植
 
-- 提供稳定文档/视图句柄。
-- 接入文件生命周期、Buffer 激活、语言、主题及 Scintilla 通知。
-- 实现受控 Scintilla 消息入口。
+- `ComparePlus`、`DSpellCheck`、`Explorer` 走新 Host Services 和 Qt UI。
+- `HexEditor` 使用自定义文档/视图协议，不兼容原 DLL。
+- direct call、主窗口/Tab subclass 和任意脚本宿主不得反向扩大旧兼容层。
 
-完成条件：
+### 阶段 8：跨平台生态与发布
 
-- 主/副视图、克隆 Buffer、多文档切换和关闭顺序均有覆盖。
-- 通知顺序与线程测试通过，高频事件没有明显性能回退。
+- 建立 Linux/macOS 原生清单和包，发布 SDK、示例、兼容清单和迁移说明。
+- 完成架构包、签名、macOS quarantine/公证和目标桌面 UI 验证。
 
-### 阶段 4：Dock 和插件 UI
+### 阶段 9：加固和可选隔离
 
-工作：
-
-- 实现宿主拥有的 Dock 服务、状态持久化和缺失插件恢复。
-- 明确 Qt SDK 构建兼容规则。
-- 为 Windows 原版子窗口托管做独立原型。
-
-完成条件：
-
-- 显示、隐藏、浮动、停靠、重启恢复、卸载和主题切换通过 UI 测试。
-- 插件不能遗留悬空 QWidget 或 QAction。
-
-### 阶段 5：Windows 原版 ABI
-
-工作：
-
-- 实现 v8.4.6 导出解析、消息路由、通知、命令和资源分配。
-- 只按目标插件和测试语料实现已批准白名单中的 `NPPM_*`、`NPPN_*` 和
-  `SCI_*` 用法。
-- 隔离 lexer 插件适配；不要与普通命令插件加载逻辑混写。
-
-完成条件：
-
-- 选定的无 UI、编辑器和 Dock 插件分别通过行为测试。
-- 32/64 位不匹配、缺依赖和插件异常有明确恢复体验。
-- 所有 Win32 类型只存在于 `legacy_win/` 和平台桥接代码。
-
-### 阶段 6：Plugin Admin
-
-工作：
-
-- 定义跨平台包格式、兼容范围和 SHA-256 字段。
-- 实现安装、更新、移除的退出后清理/解压和重启流程。
-- Windows 原版插件目录与新插件包在界面中明确区分。
-
-完成条件：
-
-- 离线包、网络失败、SHA-256 失败和磁盘失败均有测试。
-- 不经过用户确认不执行动态代码安装。
-
-### 阶段 7：加固和可选进程隔离
-
-工作：
-
-- 建立插件加载性能、故障恢复和隐私审计。
-- 评估脚本插件或进程外协议，不改变 ABI v1。
-- 发布 SDK、示例、兼容清单和迁移说明。
+- 建立加载性能、故障恢复和隐私审计。
+- 评估未知插件预检、脚本插件或进程外协议，不改变 ABI v1。
 
 ## 8. 测试策略
 
@@ -561,8 +536,10 @@ ctest --test-dir build-no-plugins --output-on-failure
 
 ## 10. 当前实施主流程
 
-Windows 原版插件兼容工作先执行调查和代理窗口可行性分析，新 API 不作为首个实施
-切片。具体流程以讨论记录中的 `PS-025` 为准。
+阶段 0 和阶段 1 已完成。当前下一切片是阶段 2 安全加载基础：只处理架构、导出、
+依赖、加载诊断、异常启动恢复和资源回滚，不提前扩大 ABI 消息白名单。阶段 2 完成
+后再进入 Windows 原版 ABI 与双代理骨架；新 API 不作为首个实现切片。具体依赖
+顺序以讨论记录中的 `PS-025` 为准。
 
 每一阶段先产生可审查的调查或验证记录，再修改兼容原则或实现代码。不得在未核验
 插件真实 API 使用情况时，为设想中的插件扩大兼容层。
@@ -716,11 +693,12 @@ UI 手工操作仍按发布验证矩阵执行，不再作为管理代码未实�
 - `PS-030`（已确认）：逐插件调查当前只覆盖 x86 清单 `pl.x86.json` 中的 169
   个插件。x64 和 ARM64 JSON 继续作为原始资料保留，但不进入本轮统计、源码/API
   调查或兼容评级；代理窗口实测也以 Windows x86 为当前目标。
-- `PS-031`（首轮调查完成）：x86 清单 169 项均已形成静态首版记录，统计为
+- `PS-031`（阶段 1 已完成）：x86 清单 169 项均已形成静态首版记录，统计为
   A 13、B 23、C 25、D 1、U 107。逐项证据和待验证项见
   `codex/analysis/plugins-v846/`。`U` 表示没有足够的对应版本源码证据，不等于
-  不兼容；本轮遵守约定未反汇编。该评级仍须在兼容原则修订后重新评价，并在
-  Windows x86 上验证六导出、消息集合、双视图、通知顺序和故障边界。
+  不兼容；本轮遵守约定未反汇编。统一 API、依赖和双代理风险矩阵已经形成，
+  但评级仍须在 Windows x86 上通过六导出、消息集合、双视图、通知顺序和故障
+  边界实测复核。
 - `PS-032`（重要度首评）：兼容难度和插件重要度必须分别评价。x86 169 项的
   重要度首评为高 20、中 94、低 55，并为每项记录置信度、社区证据或功能判断。
   当前没有统一可靠的安装量数据，不能用 GitHub star、是否仍在官方清单或单个
@@ -771,6 +749,9 @@ UI 手工操作仍按发布验证矩阵执行，不再作为管理代码未实�
   6. 新 API、难兼容但重要插件的源码移植、不兼容插件稳定性专项测试等后续工作，
      在上述结果形成后再决定。
 
+  当前进度：步骤 1-4 的静态调查与原则修订已完成；步骤 5 尚未开始。安全加载
+  基础作为 `PS-026` 规定的前置门槛，对应当前阶段 2。
+
 #### 调查产物
 
 - 插件清单：插件 ID、名称、版本、来源、架构、维护状态、源码和使用范围依据。
@@ -811,14 +792,15 @@ UI 手工操作仍按发布验证矩阵执行，不再作为管理代码未实�
 
 ## 12. 待讨论议题
 
-当前先按 `PS-025` 完成插件调查、API 矩阵、代理窗口评价和兼容原则修订。以下议题
-在调查结果形成后再确定优先级：
+插件调查、API 矩阵、代理窗口评价和兼容原则修订已经完成。进入阶段 2 前后需要按
+实现依赖依次确认以下议题：
 
-1. Windows 原版兼容接口白名单及稳定性保护级别。
-2. 新 API 的公开形态和最小 Host Services。
-3. 难兼容但重要插件的首批源码移植名单。
-4. Qt 面板 SDK 和稳定 ABI 的边界。
-5. 自定义文档/视图协议。
+1. 安全加载的自动加载范围、辅助进程预检、异常恢复和 SEH 保护级别。
+2. Windows 原版兼容接口的首批白名单。
+3. 新 API 的公开形态和最小 Host Services。
+4. 难兼容但重要插件的首批源码移植名单。
+5. Qt 面板 SDK 和稳定 ABI 的边界。
+6. 自定义文档/视图协议。
 
 每个议题应记录：候选方案、最终选择、选择理由、明确不做的内容、兼容影响、验证
 方法和仍未解决的问题。

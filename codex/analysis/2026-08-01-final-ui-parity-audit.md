@@ -7,7 +7,8 @@
 > 状态更新：本文件最初记录的是第一次最终对照。其后已完成 Preferences、
 > Shortcut Mapper、Project Panel、Find 外框、工具栏/状态栏/标签和编辑器边栏收口。
 > 当前结论以本节更新、`codex/changes/2026-08-01-preferences-shortcut-project-parity.md`
-> 和 `codex/changes/2026-08-01-preferences-margin-ui-finalization.md` 为准。
+>、`codex/changes/2026-08-01-preferences-margin-ui-finalization.md` 和
+> `codex/changes/2026-08-01-editor-border-edge.md` 为准。
 
 本轮已完成当前 Windows 环境中的最终 UI 对照。原版基线固定为
 Notepad++ v8.4.6，Qt 版固定为本次 Scintilla 5 / Lexilla 迁移后的主线。
@@ -17,6 +18,8 @@ Notepad++ v8.4.6，Qt 版固定为本次 Scintilla 5 / Lexilla 迁移后的主�
 - Preferences 的 19 个分类、页面职责、主要分组、客户区和单一 Close 已按 v8.4.6 重建。
 - Shortcut Mapper 已恢复五页、过滤/冲突/修改工作流；Project 1/2/3 已恢复独立 Dock 与 Workspace/Edit。
 - Qt 浅色/深色和 100%/150% DPI 均无文字重叠、截断或不可读控件。
+- 编辑器恢复 `borderEdge` 和 `borderWidth`：浅色为原版双线 3D 下沉客户区边框，
+  深色为单线边框，默认保留 2px 外部间距；首选项及配置写回均可用。
 - Windows 100% DPI 的客户区、控件层级和工作流已达到当前像素对照基线；
   Qt 与 Win32 的字体栅格和系统控件绘制仍不承诺截图逐字节相同。
 

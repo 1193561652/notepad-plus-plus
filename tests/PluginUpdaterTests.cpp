@@ -1,6 +1,6 @@
-#include "PluginSystem/PluginArchiveExtractor.h"
-#include "PluginSystem/PluginArtifactResolver.h"
-#include "PluginSystem/PluginUpdateExecutor.h"
+#include "MISC/PluginsManager/updater/PluginArchiveExtractor.h"
+#include "MISC/PluginsManager/PluginArtifactResolver.h"
+#include "MISC/PluginsManager/updater/PluginUpdateExecutor.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>

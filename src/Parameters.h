@@ -215,6 +215,8 @@ struct ScintillaViewParams {
     bool _folding                 = true;
     int  _lineWrapMethod          = 0;
     bool _scrollBeyondLastLine    = false;
+    bool _showBorderEdge          = true;
+    int  _borderWidth             = 2;
     bool _edgeShow                = false;
     int  _edgeNbColumn            = 80;
     int  _zoom                    = 0;

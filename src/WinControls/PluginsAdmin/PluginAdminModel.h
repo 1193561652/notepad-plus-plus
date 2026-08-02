@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PluginCatalog.h"
+#include "MISC/PluginsManager/PluginCatalog.h"
 
 #include <QString>
 #include <QVector>

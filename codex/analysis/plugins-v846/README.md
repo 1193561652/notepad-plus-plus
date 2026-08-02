@@ -14,6 +14,7 @@
 | --- | --- | --- |
 | `inventory.md` | x86 全量 169 项索引 | 已完成 |
 | `importance.md` | 169 项重要度、置信度、依据和兼容等级交叉统计 | 首版完成 |
+| `api-dependency-matrix.md` | 六导出、NPPM/NPPN/SCI、依赖和双代理风险统一矩阵 | 已完成 |
 | `batch-priority-complex.md` | ComparePlus、XMLTools、DSpellCheck、HexEditor、JSON Viewer、JsonTools | 首版完成 |
 | `batch-a-c.md` | 数字、下划线及 A-C | 首版完成 |
 | `batch-d-h.md` | D-H | 首版完成 |
@@ -47,3 +48,12 @@
 
 汇总时发现原 A-C 批次边界漏掉 `CustomLineNumbers`，现已补查并纳入 A-C，
 因此各批次分别为 24、23、23、50、32、17 项，并集恰好为 169 项。
+
+## 阶段结论
+
+插件移植阶段 0（规划与状态归一）和阶段 1（x86 调查与代理评价）已完成。
+`tests/PluginInvestigationTests.cpp` 自动核对清单、索引、重要度、等级、源码证据计数、
+六个字母批次和统一矩阵，防止后续文档更新破坏 169 项基线。
+
+本阶段只完成静态证据调查和兼容风险分流，没有加载或验证任何真实插件 DLL。
+后续必须先完成安全加载基础，再实现 Windows 原版 ABI 和双代理消息白名单。

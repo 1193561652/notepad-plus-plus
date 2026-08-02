@@ -309,7 +309,19 @@ bool FileManager::saveBuffer(Buffer* buf, const QString& filePath,
 bool FileManager::saveBufferCopy(const Buffer* buf, const QString& filePath,
                                  QString* errorMessage) const
 {
-    if (!buf || !buf->getView()) {
+    ScintillaEditView* view = nullptr;
+    if (buf) {
+        for (ScintillaEditView* candidate : buf->views()) {
+            if (candidate && buf->document() ==
+                    static_cast<qintptr>(candidate->document())) {
+                view = candidate;
+                break;
+            }
+        }
+        if (!view)
+            view = buf->getView();
+    }
+    if (!view) {
         if (errorMessage)
             *errorMessage = "The document has no active editor view.";
         return false;
@@ -353,7 +365,6 @@ bool FileManager::saveBufferCopy(const Buffer* buf, const QString& filePath,
         utf8Codec->makeDecoder(QTextCodec::IgnoreHeader));
     QScopedPointer<QTextEncoder> encoder(
         targetCodec->makeEncoder(QTextCodec::IgnoreHeader));
-    ScintillaEditView* view = buf->getView();
     const qintptr length = view->documentLengthNpp();
     const qintptr gap = view->gapPositionNpp();
     qintptr position = 0;
@@ -443,7 +454,8 @@ Buffer* FileManager::findBufferByView(const ScintillaEditView* view) const
         return nullptr;
     for (Buffer* buffer : _buffers) {
         if (buffer && buffer->containsView(
-                const_cast<ScintillaEditView*>(view)))
+                const_cast<ScintillaEditView*>(view)) &&
+            buffer->document() == static_cast<qintptr>(view->document()))
             return buffer;
     }
     return nullptr;

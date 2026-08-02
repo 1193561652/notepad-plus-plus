@@ -1,7 +1,7 @@
-#include "PluginSystem/PluginAdminModel.h"
-#include "PluginSystem/PluginArtifactResolver.h"
-#include "PluginSystem/PluginCatalog.h"
-#include "PluginSystem/PluginUpdatePlan.h"
+#include "WinControls/PluginsAdmin/PluginAdminModel.h"
+#include "MISC/PluginsManager/PluginArtifactResolver.h"
+#include "MISC/PluginsManager/PluginCatalog.h"
+#include "MISC/PluginsManager/PluginUpdatePlan.h"
 
 #include <QCoreApplication>
 #include <QDir>

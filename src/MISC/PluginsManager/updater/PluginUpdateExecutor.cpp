@@ -1,7 +1,7 @@
 #include "PluginUpdateExecutor.h"
 
 #include "PluginArchiveExtractor.h"
-#include "PluginArtifactResolver.h"
+#include "MISC/PluginsManager/PluginArtifactResolver.h"
 
 #include <QCryptographicHash>
 #include <QDir>

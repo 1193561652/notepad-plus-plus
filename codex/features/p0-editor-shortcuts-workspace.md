@@ -21,7 +21,7 @@
 
 - `src/Parameters.h|cpp`
   - 配置、项目面板路径和 `shortcuts.xml` 数据模型。
-- `src/Preferences/PreferenceDlg.h|cpp`
+- `src/WinControls/Preference/PreferenceDlg.h|cpp`
   - 备份、自定义 URI、标签匹配和自动插入偏好设置。
 - `src/ScintillaComponent/ScintillaEditView.h|cpp`
   - URL、标签匹配和自动插入行为。

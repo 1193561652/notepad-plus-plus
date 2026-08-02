@@ -12,8 +12,8 @@
 
 #include "ScintillaComponent/Buffer.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
-#include "PluginSystem/IPlugin.h"
-#include "PluginSystem/PluginUpdatePlan.h"
+#include "MISC/PluginsManager/IPlugin.h"
+#include "MISC/PluginsManager/PluginUpdatePlan.h"
 #include "CommandLineOptions.h"
 #include "MISC/ClosedFileHistory.h"
 
@@ -24,6 +24,9 @@ class PreferenceDlg;
 class DocumentMapPanel;
 class FunctionListPanel;
 class PluginManager;
+#ifdef Q_OS_WIN
+class Win32PluginManager;
+#endif
 class PluginAdminDialog;
 class EditorMacro;
 class QSplitter;
@@ -53,6 +56,12 @@ public:
     void openFile(const QString& path) override { doOpenFile(path, _activeDocTab); }
     QString currentFilePath() const override;
     QMainWindow* mainWindow() override { return this; }
+#ifdef Q_OS_WIN
+    Win32PluginManager* win32PluginManager() const
+    {
+        return _win32PluginManager;
+    }
+#endif
 
 protected:
     void closeEvent(QCloseEvent* event) override;
@@ -136,6 +145,8 @@ private:
     void updateStatusBar();
     void updateLangStatus();   // 更新状态栏语言类型（对应原版 setLangStatus）
     ScintillaEditView* currentActiveView() const;
+    ScintillaEditView* activateBufferView(
+        Buffer* buffer, DocTabView* preferredTab = nullptr);
     void applyFileCommandLineState(Buffer* buffer,
                                    const CommandLineOptions& options);
 
@@ -285,6 +296,9 @@ private:
     QDockWidget*       _characterDock    = nullptr;
     QListWidget*       _characterList    = nullptr;
     PluginManager*     _pluginManager    = nullptr;
+#ifdef Q_OS_WIN
+    Win32PluginManager* _win32PluginManager = nullptr;
+#endif
     QString _pendingPluginUpdatePlan;
     bool _pluginUpdaterStarted = false;
 

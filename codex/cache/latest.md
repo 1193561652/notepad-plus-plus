@@ -1,6 +1,50 @@
 # 本地缓存：最新分析
 
-缓存日期：2026-08-01
+缓存日期：2026-08-02
+
+## 2026-08-02 主/副永久 Scintilla 视图
+
+- 文档 UI 已从“每个标签创建一个编辑器”改为与原版一致的两个永久
+  `ScintillaEditView`：`MainDocTab` 与 `SubDocTab` 各持有一个。
+- `DocTabView` 由 `QTabBar + ScintillaEditView` 组成；标签只保存 `Buffer*`，切换
+  标签通过 `SCI_SETDOCPOINTER` 把永久编辑器附着到 Buffer 文档。
+- `Buffer` 持有经 `SCI_ADDREFDOCUMENT` 保留的 document pointer，并在关闭或主窗口
+  析构时通过 `SCI_RELEASEDOCUMENT` 释放；主/副 clone 共享同一文档对象。
+- 每个视图的选择区、首个可见行和水平偏移按 Buffer 独立缓存；标签切换前保存，
+  切换后恢复。
+- 保存、reload、定时备份、打开文档批量搜索替换、编码重解释和 Session 保存/恢复
+  均先激活目标 Buffer，禁止把 `Buffer::getView()` 当作“当前正显示该文档”的保证。
+- Windows 插件管理器现在直接持有两个永久编辑器及其稳定 HWND。
+- `Win32PluginSystem` 新增主窗口、主编辑器和副编辑器三个独立适配层；管理器保留
+  原有 handle 接口并委托给相应适配器。
+- 主窗口适配器映射真实主窗口 HWND；主/副编辑器适配器分别映射主窗口左上角两个
+  隐藏的 `1×1` 原生子窗口。这两个窗口当前仅作为稳定消息接收器存在。
+- Win32 管理器已实现原版六导出 DLL 加载顺序，并通过 `setInfo(NppData)` 注入三个
+  HWND；最初的内置 smoke DLL 已由后文记录的 Plugins Admin/updater 安装链路取代。
+- 全量构建成功，CTest `31/31` 通过；UI 运行测试额外断言两个永久编辑器的唯一性，
+  以及同一编辑器对象切换两个 Buffer 后文本独立保留。
+- 记录：`codex/changes/2026-08-02-permanent-scintilla-views.md`。
+
+## 2026-08-02 原版模块布局与边栏光标
+
+- Preferences 已归位到 `src/WinControls/Preference`。
+- 插件运行、清单、计划和更新器已归位到 `src/MISC/PluginsManager`；
+  Plugin Admin UI 已归位到 `src/WinControls/PluginsAdmin`。
+- 顶层 `src/PluginSystem` 与 `src/Preferences` 不再作为当前代码结构使用。
+- 打印功能保留，并按原版归位为 `src/ScintillaComponent/Printer.*`；顶层
+  `src/Printing` 已删除。
+- 空的迁移/占位目录 `src/PluginSystem`、`src/Preferences`、`include` 和 `cmake`
+  已删除。
+- 新建 `src/Win32PluginSystem`，只用于原版 Windows DLL 插件 ABI、消息和窗口
+  兼容；包管理和跨平台公共模型不迁入该目录。
+- 该目录允许直接使用 Windows API；顶层 CMake 仅在 `WIN32` 时进入其独立
+  `CMakeLists.txt`，非 Windows 平台完全跳过。
+- Windows 启动时，`MainWindow` 在创建主/副永久编辑器后构造
+  `Win32PluginManager`，传入主窗口与两个 `ScintillaEditView`，并保留对应 HWND。
+- Scintilla Qt 平台层已实现 `Cursor::reverseArrow`，行号和书签边栏显示热点在
+  右上角的右向指针，文本区仍使用 I-beam。
+- 全目标 Debug 构建成功，CTest `31/31` 与单独 UI 光标捕获均通过。
+- 记录：`codex/changes/2026-08-02-original-module-layout-and-margin-cursor.md`。
 
 ## 2026-08-01 插件管理事务闭环与索引清理
 
@@ -208,7 +252,7 @@
 - `src/MISC/FileManager.*`。
 - `src/WinControls/TabBar/DocTabView.*`。
 - `src/ScintillaComponent/FindReplaceDlg.h`。
-- `src/PluginSystem/IPlugin.h`、`PluginManager.h`。
+- `src/MISC/PluginsManager/IPlugin.h`、`PluginManager.h`。
 - `resources/resources.qrc`。
 - 原版 `PowerEditor/src/` 下的关键模块，包括 `Notepad_plus.cpp`、`NppIO.cpp`、`Parameters.*`、`Buffer.*`、`FindReplaceDlg.*`、`PluginsManager/*`、`menuCmdID.h` 等。
 - 阶段一 XML 资源基础：默认 XML 模型、qrc 回退、配置目录骨架。
@@ -443,3 +487,50 @@
 - Ubuntu 下主程序、更新器和 `plugin-admin-tests` 构建通过，针对性测试通过；
   Windows 与真实插件包验证项已单独记录。
 - 插件清单采集方法和逐插件兼容调查模板已写入 `codex/analysis/`。
+
+## 2026-08-01 插件移植阶段 0/1
+
+- 阶段 0 已按实际依赖重排插件路线；插件包管理确认为已完成基线。
+- 阶段 1 已覆盖 v8.4.6 x86 清单 169/169 项：62 项有对应版本源码证据，107 项
+  因证据不足保持 `U`，未反汇编。
+- 兼容初评为 A 13、B 23、C 25、D 1、U 107；重要度为高 20、中 94、低 55。
+- 统一结论：`codex/analysis/plugins-v846/api-dependency-matrix.md`。
+- `plugin-investigation-tests` 自动校验 JSON、索引、重要度、六批次和统一矩阵。
+- Debug 全目标构建成功，CTest `31/31` 通过。
+- 阶段 1 不代表真实 DLL 已兼容；下一阶段为安全加载基础。
+
+## 2026-08-01 编辑器边框一致性
+
+- 原版 v8.4.6 的 `ScintillaEditView::setBorderEdge()` 在浅色模式使用 3D client edge，
+  深色模式使用单线 border；Qt 官方基类默认强制 `QFrame::NoFrame`。
+- Qt 适配层已恢复对应 frame 语义，并接通 `ScintillaPrimaryView borderEdge`、
+  `borderWidth` 与 Preferences 的“无边缘”和宽度滑块。
+- 浅色使用 `WinPanel/Sunken` 双线边缘，深色使用 `Box/Plain`；DocTabView 按原版
+  默认保留 2px 外部间距，宽度配置范围为 0-30px。
+- UI 捕获自动断言边框类型和默认外部间距，覆盖 100%/150% DPI。
+- Debug 全目标构建成功，CTest `31/31` 通过。
+# 2026-08-02 Win32 real plugin fixture
+
+- Win32 ABI 运行语料由自制 `NppWin32SmokePlugin.dll` 改为官方插件列表中的真实
+  `mimeTools 2.8 x64`。
+- 固定包来自官方 GitHub Release；ZIP SHA-256 为
+  `ed5133f8a0552e974135ada78a0260581be979f916ddbcd45697d2a1a1b8f280`，与
+  `pl.x64.json` 一致；DLL SHA-256 为
+  `b9a8ca258aa3edca1aa1b3ea4e264d3b0cda7c82a30b7464586d8be95701ea61`。
+- DLL 为 PE x86-64，只导入 `KERNEL32.dll`、`USER32.dll`，并导出
+  `beNotified/getFuncsArray/getName/isUnicode/messageProc/setInfo`。
+- 插件管理 updater 已从官方 Release 真实下载、校验并事务安装到
+  `build/plugins/mimeTools`，并生成 `.npp-package.json` 收据。
+- Win32 加载器改为扫描 `NppPath/plugins`。当前测试传入 `mimeTools` 白名单；加入
+  另一个结构合法的 DLL 目录后仍只加载 `MIME Tools`，证明过滤生效。
+- CTest 使用相同 updater 和标准计划从固定 ZIP 缓存重复安装，随后验证收据、插件名
+  和非空命令表；应用构建不再直接复制测试 DLL。
+- Windows 全目标构建成功，CTest `32/32` 通过，其中
+  `mimetools-managed-install` 是新增的插件管理安装夹具。
+- `Win32MainWindowAdapter` 已通过 Win32 subclass 处理
+  `NPPM_GETCURRENTSCINTILLA`；主/副 editor adapter 通过代理 HWND 白名单转发
+  mimeTools v2.8 使用的九个标准 `SCI_*`。
+- 官方 mimeTools DLL 的 Base64 Encode 已分别修改主/副永久视图，URL Encode 已
+  覆盖显式 target range、selection 和插件分配输出缓冲。
+- 永久视图迁移将标签容器改为独立 `QTabBar` 后，Qt 默认的 expanding 行为曾把少量
+  标签拉伸到整行；`NppTabBar` 现显式 `setExpanding(false)`，恢复原版按内容宽度布局。

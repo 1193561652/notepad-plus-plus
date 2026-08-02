@@ -1,5 +1,5 @@
 #include "PluginUpdateExecutor.h"
-#include "PluginUpdatePlan.h"
+#include "MISC/PluginsManager/PluginUpdatePlan.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -128,10 +128,11 @@ int main(int argc, char** argv)
     const int hashIndex = arguments.indexOf(QStringLiteral("--plan-sha256"));
     const bool restartWithoutElevation =
         arguments.contains(QStringLiteral("--restart-unelevated"));
+    const bool noRestart = arguments.contains(QStringLiteral("--no-restart"));
     if (planIndex < 0 || planIndex + 1 >= arguments.size()) {
         writeError(QStringLiteral("Usage: npp-plugin-updater --plan <file> "
                                   "[--plan-sha256 <hash>] "
-                                  "[--wait-pid <pid>]"));
+                                  "[--wait-pid <pid>] [--no-restart]"));
         return 2;
     }
 
@@ -153,6 +154,7 @@ int main(int argc, char** argv)
         return 4;
     }
     const QByteArray planBytes = planFile.readAll();
+    planFile.close();
     if (hashIndex >= 0) {
         if (hashIndex + 1 >= arguments.size()) {
             writeError(QStringLiteral("Plugin update plan hash is missing."));
@@ -180,7 +182,11 @@ int main(int argc, char** argv)
         return 5;
     }
 
+    if (noRestart)
+        return 0;
+
     QFile::remove(planPath);
+
     bool restarted = false;
 #if defined(Q_OS_WIN)
     if (restartWithoutElevation)

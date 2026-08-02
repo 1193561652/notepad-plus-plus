@@ -11,6 +11,7 @@
 #include <QMouseEvent>
 #include <QStyleOptionTab>
 #include <QCollator>
+#include <QVBoxLayout>
 #include <algorithm>
 
 static QColor individualTabColour(int id)
@@ -33,6 +34,7 @@ class NppTabBar : public QTabBar
 public:
     explicit NppTabBar(QWidget* parent = nullptr) : QTabBar(parent)
     {
+        setExpanding(false);
         // 为标签顶部预留 4px 空间，使图标/文字不被黄色横线遮挡
         setStyleSheet(
             "QTabBar::tab {"
@@ -124,53 +126,63 @@ static const QIcon& unsavedIcon()
 // ─── DocTabView ──────────────────────────────────────────────────────────────
 
 DocTabView::DocTabView(QWidget* parent)
-    : QTabWidget(parent)
+    : QWidget(parent)
 {
-    NppTabBar* bar = new NppTabBar(this);
-    setTabBar(bar);
-    setTabsClosable(true);
-    setMovable(true);
-    setDocumentMode(true);
+    _tabBar = new NppTabBar(this);
+    _tabBar->setTabsClosable(true);
+    _tabBar->setMovable(true);
+    _tabBar->setDocumentMode(true);
+    _editor = new ScintillaEditView(this);
 
-    connect(this, &QTabWidget::tabCloseRequested,
+    QVBoxLayout* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(_tabBar);
+    layout->addWidget(_editor, 1);
+
+    connect(_tabBar, &QTabBar::tabCloseRequested,
             this, &DocTabView::onTabCloseRequested);
-    connect(this, &QTabWidget::currentChanged,
+    connect(_tabBar, &QTabBar::currentChanged,
             this, &DocTabView::onCurrentChanged);
-    connect(bar, &NppTabBar::emptyAreaDoubleClicked,
+    connect(static_cast<NppTabBar*>(_tabBar),
+            &NppTabBar::emptyAreaDoubleClicked,
             this, &DocTabView::newTabRequested);
 }
 
 void DocTabView::addBuffer(Buffer* buf)
 {
-    addBufferView(buf, buf ? buf->getView() : nullptr);
+    addBufferView(buf, _editor);
 }
 
 void DocTabView::addBufferView(Buffer* buf, ScintillaEditView* view)
 {
-    if (!buf || !view)
+    if (!buf || !view || !buf->document())
         return;
     if (indexOfBuffer(buf) != -1)
         return;
 
-    buf->addView(view);
+    buf->addView(_editor);
     QIcon icon = buf->isDirty() ? unsavedIcon() : savedIcon();
-    int idx = addTab(view, icon, buf->getTabLabel());
+    int idx = _tabBar->addTab(icon, buf->getTabLabel());
     // 用 quintptr 存储指针以避免 QVariant 对 void* 的限制
-    tabBar()->setTabData(idx, QVariant(static_cast<quintptr>(
+    _tabBar->setTabData(idx, QVariant(static_cast<quintptr>(
         reinterpret_cast<quintptr>(buf))));
-    setCurrentIndex(idx);
+    _tabBar->setCurrentIndex(idx);
+    attachBuffer(idx);
 }
 
 void DocTabView::addClone(Buffer* buf, ScintillaEditView* cloneView)
 {
-    if (!buf || !cloneView) return;
+    Q_UNUSED(cloneView)
+    if (!buf || !buf->document()) return;
     if (indexOfBuffer(buf) != -1) return;
-    buf->addView(cloneView);
+    buf->addView(_editor);
     QIcon icon = buf->isDirty() ? unsavedIcon() : savedIcon();
-    int idx = addTab(cloneView, icon, buf->getTabLabel());
-    tabBar()->setTabData(idx, QVariant(static_cast<quintptr>(
+    int idx = _tabBar->addTab(icon, buf->getTabLabel());
+    _tabBar->setTabData(idx, QVariant(static_cast<quintptr>(
         reinterpret_cast<quintptr>(buf))));
-    setCurrentIndex(idx);
+    _tabBar->setCurrentIndex(idx);
+    attachBuffer(idx);
 }
 
 void DocTabView::setIndividualTabColour(Buffer* buf, int colour)
@@ -178,7 +190,18 @@ void DocTabView::setIndividualTabColour(Buffer* buf, int colour)
     if (!buf)
         return;
     buf->setIndividualTabColour(colour);
-    tabBar()->update();
+    _tabBar->update();
+}
+
+void DocTabView::setEditorBorderWidth(int width)
+{
+    width = qBound(0, width, 30);
+    if (_editorBorderWidth == width)
+        return;
+    _editorBorderWidth = width;
+    layout()->setContentsMargins(width, 0, width, width);
+    setStyleSheet(QStringLiteral(
+        "DocTabView { padding: %1px; }").arg(width));
 }
 
 void DocTabView::removeBuffer(Buffer* buf)
@@ -188,29 +211,45 @@ void DocTabView::removeBuffer(Buffer* buf)
         removeTab(idx);
 }
 
+void DocTabView::removeTab(int index)
+{
+    Buffer* buffer = bufferAt(index);
+    if (!buffer)
+        return;
+    if (buffer == _attachedBuffer)
+        saveCurrentViewState();
+    buffer->removeView(_editor);
+    _viewStates.remove(buffer);
+    _tabBar->removeTab(index);
+    if (_tabBar->count() == 0) {
+        _attachedBuffer = nullptr;
+        _editor->createStandardDocument();
+    }
+}
+
 void DocTabView::activateBuffer(Buffer* buf)
 {
     int idx = indexOfBuffer(buf);
     if (idx != -1)
-        setCurrentIndex(idx);
+        _tabBar->setCurrentIndex(idx);
 }
 
 Buffer* DocTabView::currentBuffer() const
 {
-    return bufferAt(currentIndex());
+    return bufferAt(_tabBar->currentIndex());
 }
 
 Buffer* DocTabView::bufferAt(int index) const
 {
-    if (index < 0 || index >= count())
+    if (index < 0 || index >= _tabBar->count())
         return nullptr;
-    quintptr val = tabBar()->tabData(index).value<quintptr>();
+    quintptr val = _tabBar->tabData(index).value<quintptr>();
     return reinterpret_cast<Buffer*>(val);
 }
 
 int DocTabView::indexOfBuffer(Buffer* buf) const
 {
-    for (int i = 0; i < count(); ++i) {
+    for (int i = 0; i < _tabBar->count(); ++i) {
         if (bufferAt(i) == buf)
             return i;
     }
@@ -221,15 +260,15 @@ void DocTabView::updateTabTitle(Buffer* buf)
 {
     int idx = indexOfBuffer(buf);
     if (idx != -1) {
-        setTabText(idx, buf->getTabLabel());
-        setTabIcon(idx, buf->isDirty() ? unsavedIcon() : savedIcon());
+        _tabBar->setTabText(idx, buf->getTabLabel());
+        _tabBar->setTabIcon(idx, buf->isDirty() ? unsavedIcon() : savedIcon());
     }
 }
 
 void DocTabView::sortBuffersByName(bool ascending)
 {
     QList<Buffer*> ordered;
-    for (int i = 0; i < count(); ++i)
+    for (int i = 0; i < _tabBar->count(); ++i)
         ordered.append(bufferAt(i));
 
     QCollator collator;
@@ -246,7 +285,7 @@ void DocTabView::sortBuffersByName(bool ascending)
     for (int target = 0; target < ordered.size(); ++target) {
         const int current = indexOfBuffer(ordered.at(target));
         if (current != target)
-            tabBar()->moveTab(current, target);
+            _tabBar->moveTab(current, target);
     }
 }
 
@@ -257,9 +296,72 @@ void DocTabView::onTabCloseRequested(int index)
         emit bufferCloseRequested(buf);
 }
 
-void DocTabView::onCurrentChanged(int /*index*/)
+int DocTabView::count() const
 {
-    // 预留：切换标签时通知主窗口更新状态
+    return _tabBar->count();
+}
+
+int DocTabView::currentIndex() const
+{
+    return _tabBar->currentIndex();
+}
+
+void DocTabView::setCurrentIndex(int index)
+{
+    _tabBar->setCurrentIndex(index);
+}
+
+QString DocTabView::tabText(int index) const
+{
+    return _tabBar->tabText(index);
+}
+
+QWidget* DocTabView::currentWidget() const
+{
+    return currentIndex() >= 0 ? _editor : nullptr;
+}
+
+QWidget* DocTabView::widget(int index) const
+{
+    return index >= 0 && index < count() ? _editor : nullptr;
+}
+
+void DocTabView::saveCurrentViewState()
+{
+    if (!_attachedBuffer)
+        return;
+    ViewState& state = _viewStates[_attachedBuffer];
+    state.currentPosition = _editor->SendScintillaNpp(SCI_GETCURRENTPOS);
+    state.anchor = _editor->SendScintillaNpp(SCI_GETANCHOR);
+    state.firstVisibleLine = static_cast<int>(
+        _editor->SendScintilla(SCI_GETFIRSTVISIBLELINE));
+    state.xOffset = static_cast<int>(_editor->SendScintilla(SCI_GETXOFFSET));
+}
+
+void DocTabView::attachBuffer(int index)
+{
+    Buffer* buffer = bufferAt(index);
+    if (!buffer || !buffer->document())
+        return;
+    if (_attachedBuffer != buffer) {
+        saveCurrentViewState();
+        _editor->setDocument(buffer->document());
+        _attachedBuffer = buffer;
+        _editor->setLargeFileMode(buffer->isLargeFile());
+        _editor->setReadOnly(buffer->isReadOnly());
+        const ViewState state = _viewStates.value(buffer);
+        _editor->SendScintillaNpp(SCI_SETSEL, state.anchor,
+                                  state.currentPosition);
+        _editor->SendScintilla(SCI_SETFIRSTVISIBLELINE,
+                               state.firstVisibleLine);
+        _editor->SendScintilla(SCI_SETXOFFSET, state.xOffset);
+    }
+}
+
+void DocTabView::onCurrentChanged(int index)
+{
+    attachBuffer(index);
+    emit currentChanged(index);
 }
 
 // NppTabBar 的 Q_OBJECT 在 .cpp 文件内部定义，需要包含 moc 生成文件

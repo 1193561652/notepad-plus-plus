@@ -316,6 +316,10 @@ SHA-256 只采用 x86 JSON，不合并 x64/ARM64 条目。
 - **UI/代理/初评**：仅 About 资源对话框；Base64/URL/quoted-printable/SAML
   逻辑与宿主无关。**A**：同步指针缓冲转发即可覆盖 Windows 原 DLL，跨平台也易于
   重编译。未验证空/矩形/多选择区、超大缓冲、无效编码输入和六导出二进制。
+- **2026-08-02 动态验证**：Qt 兼容层已处理 `NPPM_GETCURRENTSCINTILLA` 及上述九个
+  `SCI_*`。官方 2.8 x64 DLL 的 Base64 Encode 在主/副永久视图通过，URL Encode
+  在主视图通过；六导出、安装收据、插件分配字节缓冲、target replacement 和
+  选择区恢复均已覆盖。空/矩形/多选择区及超大缓冲仍未覆盖。
 
 ### 3.21 MultiClipboard
 

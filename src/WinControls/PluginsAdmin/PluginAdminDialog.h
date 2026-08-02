@@ -1,7 +1,7 @@
 #pragma once
 
 #include "PluginAdminModel.h"
-#include "PluginUpdatePlan.h"
+#include "MISC/PluginsManager/PluginUpdatePlan.h"
 
 #include <QDialog>
 

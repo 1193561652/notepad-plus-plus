@@ -195,8 +195,12 @@ int main(int argc, char** argv)
                                QPointF(bookmarkX, lineY),
                                Qt::NoButton, Qt::NoButton, Qt::NoModifier);
         QApplication::sendEvent(marginView.viewport(), &marginMove);
-        ok &= check(marginView.viewport()->cursor().shape() == Qt::ArrowCursor,
-                    "Pointer did not change over the bookmark margin");
+        const QCursor marginCursor = marginView.viewport()->cursor();
+        ok &= check(marginCursor.shape() == Qt::BitmapCursor
+                        && !marginCursor.pixmap().isNull()
+                        && marginCursor.hotSpot().x()
+                            > marginCursor.pixmap().width() / 2,
+                    "Bookmark margin does not use a right-facing pointer");
         QMouseEvent textMove(QEvent::MouseMove,
             QPointF(marginView.marginWidth(0) + marginView.marginWidth(1)
                     + marginView.marginWidth(2) + 20, lineY),

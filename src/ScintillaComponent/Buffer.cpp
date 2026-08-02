@@ -12,6 +12,11 @@ Buffer::Buffer(int untitledNumber)
     _fullPath = _fileName;
 }
 
+Buffer::~Buffer()
+{
+    releaseDocument();
+}
+
 void Buffer::setFilePath(const QString& path)
 {
     _fullPath = path;
@@ -49,6 +54,30 @@ void Buffer::removeView(ScintillaEditView* view)
 bool Buffer::containsView(ScintillaEditView* view) const
 {
     return _views.contains(view);
+}
+
+void Buffer::captureDocument(
+    qintptr document, ScintillaEditView* owner,
+    std::function<void(qintptr)> releaser)
+{
+    if (_document == document) {
+        addView(owner);
+        return;
+    }
+    releaseDocument();
+    _document = document;
+    _documentOwner = owner;
+    _documentReleaser = std::move(releaser);
+    addView(owner);
+}
+
+void Buffer::releaseDocument()
+{
+    if (_document && _documentReleaser)
+        _documentReleaser(_document);
+    _document = 0;
+    _documentOwner = nullptr;
+    _documentReleaser = {};
 }
 
 void Buffer::clearBackupFile()

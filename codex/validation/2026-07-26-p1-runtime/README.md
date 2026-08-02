@@ -33,7 +33,7 @@
 2. Finder 结果同时绘制 QListWidgetItem 默认文本和富文本匹配标签，产生叠字。
    设置 item widget 后现清空默认显示文本。
 3. 本机没有打印机队列，无法稳定捕获系统打印对话框。打印实现被提取为
-   `NotepadPlusPrinter` 生产组件，并由同一组件输出 PDF 完成视觉验证。
+   `ScintillaComponent/Printer` 生产组件，并由同一组件输出 PDF 完成视觉验证。
 
 ## 环境限制
 

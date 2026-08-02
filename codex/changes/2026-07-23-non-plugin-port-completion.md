@@ -22,7 +22,7 @@
   - 原版 GUIConfig 节点读写。
   - 保守 XML 更新和默认文件权限修复。
   - `UserDefinedCommands` 读取。
-- `./src/Preferences/PreferenceDlg.cpp`
+- `./src/WinControls/Preference/PreferenceDlg.cpp`
   - 19 个偏好页均有实际 UI；不再存在 stub 页。
 - `./src/MISC/PlatformServices.*`
   - 文件管理器、终端、默认应用和回收站的平台隔离。

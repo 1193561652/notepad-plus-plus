@@ -10,7 +10,7 @@
 ## 当前能力
 
 - 宏：使用 `EditorMacro` 记录 Scintilla 通知消息并回放，支持兼容的 `.macro` 文件导入导出。录制对象独立保存在主窗口，切换标签后仍可正确停止。
-- 打印：使用 Qt PrintSupport 和 `NotepadPlusPrinter` 分页格式化 Scintilla 文本，支持打印对话框与直接打印。
+- 打印：使用 Qt PrintSupport 和 `ScintillaComponent/Printer` 分页格式化 Scintilla 文本，支持打印对话框与直接打印。
 - 列编辑：在选中行范围或全文行范围的同一列插入文本或递增数字，整体作为一次撤销操作。
 - 行处理：字典升降序、忽略大小写升降序、反转行序、删除空行/空白行、首尾去空白、TAB 转空格。
 - UDL：只读解析 `userDefineLang.xml`，识别名称、扩展名、大小写、四组关键字、注释、操作符和样式；可从 Language 菜单选择，并可按扩展名自动应用。

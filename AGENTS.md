@@ -69,6 +69,12 @@ git show v8.4.6:PowerEditor/src/Parameters.cpp
 - 插件系统不属于近期实现目标，但必须保留清晰宿主接口和平台适配边界。
 - 动态库扩展名按平台选择：Windows `.dll`、Linux `.so`、macOS `.dylib`。
 - 插件路径、加载和动态库调用不得进入业务层。
+- `src/Win32PluginSystem/` 专用于原版 Windows 插件 ABI 兼容，目录内允许直接
+  使用 Windows API 和 Win32 类型。
+- 顶层 CMake 只能在 `WIN32` 条件内加入该子目录；非 Windows 平台不得配置或
+  编译其中源码，也不要求提供非 Windows 桩实现。
+- Windows 兼容层源码只登记在该目录自己的 `CMakeLists.txt`，不得加入顶层
+  通用源码列表。
 
 ## 编辑器核心
 

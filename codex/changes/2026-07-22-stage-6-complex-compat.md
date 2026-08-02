@@ -8,8 +8,8 @@
 - `./src/MainWindow.cpp`
 - `./src/Parameters.h`
 - `./src/Parameters.cpp`
-- `./src/Preferences/PreferenceDlg.h`
-- `./src/Preferences/PreferenceDlg.cpp`
+- `./src/WinControls/Preference/PreferenceDlg.h`
+- `./src/WinControls/Preference/PreferenceDlg.cpp`
 
 ## 行为变化
 

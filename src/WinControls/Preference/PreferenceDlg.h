@@ -17,6 +17,7 @@
 #include <QComboBox>
 #include <QScrollArea>
 #include <QLineEdit>
+#include <QSlider>
 
 class PreferenceDlg : public QDialog
 {
@@ -104,6 +105,8 @@ private:
     QCheckBox* _currentLineHighlightCB = nullptr;
     QCheckBox* _wrapSymbolShowCB       = nullptr;
     QCheckBox* _edgeShowCB             = nullptr;
+    QCheckBox* _noBorderEdgeCB         = nullptr;
+    QSlider*   _borderWidthSlider      = nullptr;
     QSpinBox*  _edgeColumnSB           = nullptr;
     QLabel*    _edgeColumnLabel        = nullptr;
 

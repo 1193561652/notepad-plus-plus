@@ -25,6 +25,7 @@
 #include <QPaintDevice>
 #include <QPaintEngine>
 #include <QWidget>
+#include <QCursor>
 #include <QPixmap>
 #include <QPainter>
 #include <QPainterPath>
@@ -878,6 +879,30 @@ void Window::InvalidateRectangle(PRectangle rc)
 void Window::SetCursor(Cursor curs)
 {
 	if (wid) {
+		if (curs == cursorLast)
+			return;
+
+		if (curs == Cursor::reverseArrow) {
+			static const QCursor reverseArrowCursor = []() {
+				QPixmap pixmap(24, 24);
+				pixmap.fill(Qt::transparent);
+
+				QPainter painter(&pixmap);
+				painter.setRenderHint(QPainter::Antialiasing, false);
+				painter.setPen(QPen(Qt::black, 1));
+				painter.setBrush(Qt::white);
+				painter.drawPolygon(QPolygon({
+					QPoint(22, 0), QPoint(22, 17), QPoint(18, 13),
+					QPoint(14, 22), QPoint(11, 20), QPoint(15, 12),
+					QPoint(9, 12)
+				}));
+				return QCursor(pixmap, 22, 0);
+			}();
+			window(wid)->setCursor(reverseArrowCursor);
+			cursorLast = curs;
+			return;
+		}
+
 		Qt::CursorShape shape;
 
 		switch (curs) {
@@ -891,12 +916,8 @@ void Window::SetCursor(Cursor curs)
 			default:            shape = Qt::ArrowCursor;        break;
 		}
 
-		QCursor cursor = QCursor(shape);
-
-		if (curs != cursorLast) {
-			window(wid)->setCursor(cursor);
-			cursorLast = curs;
-		}
+		window(wid)->setCursor(QCursor(shape));
+		cursorLast = curs;
 	}
 }
 

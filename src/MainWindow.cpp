@@ -15,17 +15,20 @@
 #include "ScintillaComponent/ScintillaTextSearch.h"
 #include "ScintillaComponent/EditorMacro.h"
 #include "WinControls/DockingWnd/FileBrowserPanel.h"
-#include "Preferences/PreferenceDlg.h"
+#include "WinControls/Preference/PreferenceDlg.h"
 #include "WinControls/DockingWnd/DocumentMapPanel.h"
 #include "WinControls/DockingWnd/FunctionListPanel.h"
 #include "WinControls/ProjectPanel/ProjectPanel.h"
 #include "WinControls/Grid/ShortcutMapper.h"
-#include "PluginSystem/PluginManager.h"
-#include "PluginSystem/PluginAdminDialog.h"
-#include "PluginSystem/PluginAdminModel.h"
-#include "PluginSystem/PluginCatalog.h"
-#include "PluginSystem/PluginUpdatePlan.h"
-#include "Printing/NotepadPlusPrinter.h"
+#include "MISC/PluginsManager/PluginManager.h"
+#include "WinControls/PluginsAdmin/PluginAdminDialog.h"
+#include "WinControls/PluginsAdmin/PluginAdminModel.h"
+#include "MISC/PluginsManager/PluginCatalog.h"
+#include "MISC/PluginsManager/PluginUpdatePlan.h"
+#include "ScintillaComponent/Printer.h"
+#ifdef Q_OS_WIN
+#include "Win32PluginSystem/Win32PluginManager.h"
+#endif
 
 #include "Parameters.h"
 #include "NativeLangSpeaker.h"
@@ -73,6 +76,7 @@
 #include <QClipboard>
 #include <QMimeData>
 #include <QDesktopServices>
+#include <QDebug>
 #include <QProcess>
 #include <QFontDialog>
 #include <QColorDialog>
@@ -106,6 +110,18 @@ static TextEolMode fromScintillaEol(EolMode mode)
         case EolUnix: return TextEolMode::Unix;
     }
     return TextEolMode::Unknown;
+}
+
+static void captureBufferDocument(Buffer* buffer, ScintillaEditView* view)
+{
+    if (!buffer || !view)
+        return;
+    const qintptr document = static_cast<qintptr>(view->document());
+    view->SendScintilla(SCI_ADDREFDOCUMENT, 0, document);
+    buffer->captureDocument(document, view,
+        [view](qintptr pointer) {
+            view->SendScintilla(SCI_RELEASEDOCUMENT, 0, pointer);
+        });
 }
 
 static int sessionEncodingForBuffer(const Buffer* buf)
@@ -255,6 +271,10 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
     resize(900, 600);
 
     setupTabViews();
+#ifdef Q_OS_WIN
+    _win32PluginManager = new Win32PluginManager(
+        this, _mainDocTab->editor(), _subDocTab->editor());
+#endif
     createActions();
     createMenus();
     registerNppCommandIds();
@@ -263,6 +283,8 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
     createToolBars();
     createStatusBar();
     applyDarkMode();
+    applyPreferencesToView(_mainDocTab->editor());
+    applyPreferencesToView(_subDocTab->editor());
 
     _findReplaceDlg = new FindReplaceDlg(this);
     _preferenceDlg  = new PreferenceDlg(this);
@@ -351,6 +373,10 @@ MainWindow::~MainWindow()
     }
     if (_pluginManager)
         _pluginManager->unloadAll(this);
+    for (Buffer* buffer : MainFileManager.buffers()) {
+        if (buffer)
+            buffer->releaseDocument();
+    }
 }
 
 void MainWindow::applyFileCommandLineState(
@@ -358,7 +384,7 @@ void MainWindow::applyFileCommandLineState(
 {
     if (!buffer)
         return;
-    ScintillaEditView* view = buffer->getView();
+    ScintillaEditView* view = activateBufferView(buffer);
     if (!view)
         return;
 
@@ -404,16 +430,16 @@ void MainWindow::applyFileCommandLineState(
     if (options.readOnly) {
         buffer->setCommandLineReadOnly(true);
         buffer->setReadOnly(true);
-        for (ScintillaEditView* bufferView : buffer->views())
-            if (bufferView)
-                bufferView->setReadOnly(true);
+        for (DocTabView* tab : {_mainDocTab, _subDocTab})
+            if (tab->currentBuffer() == buffer)
+                tab->editor()->setReadOnly(true);
     }
     if (options.monitorFiles) {
         buffer->setMonitoring(true);
         buffer->setReadOnly(true);
-        for (ScintillaEditView* bufferView : buffer->views())
-            if (bufferView)
-                bufferView->setReadOnly(true);
+        for (DocTabView* tab : {_mainDocTab, _subDocTab})
+            if (tab->currentBuffer() == buffer)
+                tab->editor()->setReadOnly(true);
         watchBufferFile(buffer);
     }
     updateLangStatus();
@@ -460,7 +486,7 @@ void MainWindow::applyCommandLineInvocation(
             if (!buffer)
                 continue;
             buffer->setFilePath(path);
-            if (ScintillaEditView* view = buffer->getView())
+            if (ScintillaEditView* view = activateBufferView(buffer))
                 view->setLexerForFile(path);
             _activeDocTab->updateTabTitle(buffer);
         }
@@ -475,7 +501,7 @@ void MainWindow::applyCommandLineInvocation(
                 text = QString::fromUtf8(file.readAll());
         }
         Buffer* buffer = doNewBuffer(_activeDocTab);
-        ScintillaEditView* view = buffer ? buffer->getView() : nullptr;
+        ScintillaEditView* view = activateBufferView(buffer);
         if (view) {
             if (options.ghostTypingSpeed < 0) {
                 view->setText(text);
@@ -532,7 +558,14 @@ void MainWindow::setupTabViews()
     _splitter    = new QSplitter(Qt::Horizontal, this);
     _mainDocTab  = new DocTabView(_splitter);
     _subDocTab   = new DocTabView(_splitter);
+    _mainDocTab->setObjectName(QStringLiteral("MainDocTab"));
+    _subDocTab->setObjectName(QStringLiteral("SubDocTab"));
     _activeDocTab = _mainDocTab;
+
+    const int borderWidth =
+        NppParameters::getInstance().getSVP()._borderWidth;
+    _mainDocTab->setEditorBorderWidth(borderWidth);
+    _subDocTab->setEditorBorderWidth(borderWidth);
 
     _splitter->addWidget(_mainDocTab);
     _splitter->addWidget(_subDocTab);
@@ -545,13 +578,15 @@ void MainWindow::setupTabViews()
 
     connectTabView(_mainDocTab);
     connectTabView(_subDocTab);
+    connectModificationSignal(_mainDocTab->editor(), nullptr);
+    connectModificationSignal(_subDocTab->editor(), nullptr);
 }
 
 void MainWindow::connectTabView(DocTabView* tab)
 {
     connect(tab, &DocTabView::bufferCloseRequested,
             this, &MainWindow::onBufferCloseRequested);
-    connect(tab, &QTabWidget::currentChanged,
+    connect(tab, &DocTabView::currentChanged,
             this, &MainWindow::onCurrentTabChanged);
     connect(tab, &DocTabView::newTabRequested,
             this, [this, tab]() { doNewBuffer(tab); });
@@ -603,16 +638,12 @@ void MainWindow::setBufferEolMode(Buffer* buffer, int mode, bool convertText)
 
     const EolMode eolMode =
         static_cast<EolMode>(mode);
-    ScintillaEditView* sourceView = currentActiveView();
-    if (!sourceView || !buffer->containsView(sourceView))
-        sourceView = buffer->getView();
+    ScintillaEditView* sourceView = activateBufferView(buffer);
 
     if (convertText && sourceView)
         sourceView->convertEols(eolMode);
-    for (ScintillaEditView* view : buffer->views()) {
-        if (view)
-            view->setEolMode(eolMode);
-    }
+    if (sourceView)
+        sourceView->setEolMode(eolMode);
     buffer->setEolMode(fromScintillaEol(eolMode));
     updateStatusBar();
     updateActionStates();
@@ -654,8 +685,7 @@ void MainWindow::updateFindReplaceView()
 {
     if (!_findReplaceDlg) return;
     // 使用当前标签页实际显示的视图（可能是克隆视图）
-    ScintillaEditView* view =
-        qobject_cast<ScintillaEditView*>(_activeDocTab->currentWidget());
+    ScintillaEditView* view = _activeDocTab->editor();
     if (view)
         _findReplaceDlg->setCurrentView(view);
 }
@@ -664,7 +694,31 @@ void MainWindow::updateFindReplaceView()
 
 ScintillaEditView* MainWindow::currentActiveView() const
 {
-    return qobject_cast<ScintillaEditView*>(_activeDocTab->currentWidget());
+    return _activeDocTab ? _activeDocTab->editor() : nullptr;
+}
+
+ScintillaEditView* MainWindow::activateBufferView(
+    Buffer* buffer, DocTabView* preferredTab)
+{
+    if (!buffer)
+        return nullptr;
+
+    DocTabView* tab = nullptr;
+    if (preferredTab && preferredTab->indexOfBuffer(buffer) >= 0)
+        tab = preferredTab;
+    else if (_activeDocTab && _activeDocTab->indexOfBuffer(buffer) >= 0)
+        tab = _activeDocTab;
+    else if (_mainDocTab->indexOfBuffer(buffer) >= 0)
+        tab = _mainDocTab;
+    else if (_subDocTab->indexOfBuffer(buffer) >= 0)
+        tab = _subDocTab;
+    if (!tab)
+        return nullptr;
+
+    tab->activateBuffer(buffer);
+    ScintillaEditView* view = tab->editor();
+    return view && static_cast<qintptr>(view->document()) == buffer->document()
+        ? view : nullptr;
 }
 
 void MainWindow::updateStatusBar()
@@ -856,8 +910,10 @@ Buffer* MainWindow::doNewBuffer(DocTabView* targetTab)
     if (!targetTab) targetTab = _activeDocTab;
 
     Buffer* buf = MainFileManager.newBuffer();
-    ScintillaEditView* view = new ScintillaEditView(targetTab);
+    ScintillaEditView* view = targetTab->editor();
+    view->createStandardDocument();
     buf->setView(view);
+    captureBufferDocument(buf, view);
     applyPreferencesToView(view);
 
     const NppGUI& gui = NppParameters::getInstance().getNppGUI();
@@ -905,7 +961,6 @@ Buffer* MainWindow::doNewBuffer(DocTabView* targetTab)
             break;
     }
 
-    connectModificationSignal(view, buf);
     targetTab->addBuffer(buf);
     if (targetTab == _activeDocTab)
         updateWindowTitle(buf);
@@ -940,7 +995,8 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
         return false;
     }
 
-    ScintillaEditView* view = new ScintillaEditView(targetTab);
+    ScintillaEditView* view = targetTab->editor();
+    view->createStandardDocument();
     buf->setView(view);
 
     QString loadError;
@@ -948,13 +1004,13 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
             buf, view, decodingOptionsForPath(filePath), forcedEncoding,
             &loadError)) {
         MainFileManager.closeBuffer(buf);
-        view->deleteLater();
         QMessageBox::warning(this, tr("Open Failed"),
             tr("Cannot open file:\n%1\n\n%2").arg(filePath, loadError));
         return false;
     }
 
     const NppGUI& gui = NppParameters::getInstance().getNppGUI();
+    captureBufferDocument(buf, view);
     EolMode fallbackEol = EolUnix;
     if (gui._newDocDefaultFormat == EolType_windows)
         fallbackEol = EolWindows;
@@ -969,7 +1025,6 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
     view->setLexerForFile(filePath);
     applyPreferencesToView(view);
 
-    connectModificationSignal(view, buf);
     targetTab->addBuffer(buf);
     if (targetTab == _activeDocTab)
         updateWindowTitle(buf);
@@ -982,6 +1037,10 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
 
 bool MainWindow::doSave(Buffer* buf, const QString& filePath)
 {
+    ScintillaEditView* activeBufferView = activateBufferView(buf);
+    if (!activeBufferView)
+        return false;
+
     const NppGUI& gui = NppParameters::getInstance().getNppGUI();
     const bool savingExistingFile =
         buf && !buf->isUntitled() && QFileInfo::exists(buf->getFullPath()) &&
@@ -1025,12 +1084,11 @@ bool MainWindow::doSave(Buffer* buf, const QString& filePath)
     buf->clearBackupFile();
 
     buf->setReadOnly(!QFileInfo(filePath).isWritable());
-    for (ScintillaEditView* view : buf->views()) {
-        if (!view)
-            continue;
-        view->SendScintilla(SCI_SETSAVEPOINT);
-        view->setLexerForFile(filePath);
-        view->setReadOnly(buf->isReadOnly());
+    activeBufferView->SendScintilla(SCI_SETSAVEPOINT);
+    activeBufferView->setLexerForFile(filePath);
+    for (DocTabView* tab : {_mainDocTab, _subDocTab}) {
+        if (tab->currentBuffer() == buf)
+            tab->editor()->setReadOnly(buf->isReadOnly());
     }
 
     // 两个视图都可能显示同一文档，都更新标题
@@ -1086,12 +1144,7 @@ bool MainWindow::closeBufferList(const QList<Buffer*>& buffers)
         const int index = tab ? tab->indexOfBuffer(buffer) : -1;
         if (index < 0)
             return;
-        ScintillaEditView* view =
-            qobject_cast<ScintillaEditView*>(tab->widget(index));
         tab->removeTab(index);
-        buffer->removeView(view);
-        if (view)
-            view->deleteLater();
     };
 
     for (Buffer* buffer : unique) {
@@ -1184,6 +1237,9 @@ void MainWindow::saveFileAs()
 
 void MainWindow::saveAllFiles()
 {
+    DocTabView* const originalActiveTab = _activeDocTab;
+    const int originalMainIndex = _mainDocTab->currentIndex();
+    const int originalSubIndex = _subDocTab->currentIndex();
     auto saveTab = [this](DocTabView* tab) {
         for (int i = 0; i < tab->count(); ++i) {
             Buffer* buf = tab->bufferAt(i);
@@ -1193,6 +1249,11 @@ void MainWindow::saveAllFiles()
     };
     saveTab(_mainDocTab);
     saveTab(_subDocTab);
+    if (originalMainIndex >= 0 && originalMainIndex < _mainDocTab->count())
+        _mainDocTab->setCurrentIndex(originalMainIndex);
+    if (originalSubIndex >= 0 && originalSubIndex < _subDocTab->count())
+        _subDocTab->setCurrentIndex(originalSubIndex);
+    setActiveTab(originalActiveTab);
 }
 
 void MainWindow::closeFile()
@@ -1229,7 +1290,7 @@ void MainWindow::reloadFromDisk()
         if (reply != QMessageBox::Yes) return;
     }
 
-    ScintillaEditView* view = buf->getView();
+    ScintillaEditView* view = activateBufferView(buf, _activeDocTab);
     if (!view) return;
     const qint64 fileSize = QFileInfo(path).size();
     if (!confirmHugeFileOpen(this, fileSize))
@@ -1255,9 +1316,16 @@ void MainWindow::reloadFromDisk()
         ? fromScintillaEol(view->eolMode()) : buf->getEolMode());
     buf->setReadOnly(!QFileInfo(path).isWritable());
     buf->setLastKnownModificationTime(QFileInfo(path).lastModified());
-    for (ScintillaEditView* bufferView : buf->views()) {
+    if (buf->document() != static_cast<qintptr>(view->document())) {
+        buf->releaseDocument();
+        captureBufferDocument(buf, view);
+    }
+    for (DocTabView* tab : {_mainDocTab, _subDocTab}) {
+        if (tab->currentBuffer() != buf)
+            continue;
+        ScintillaEditView* bufferView = tab->editor();
         if (bufferView != view)
-            bufferView->setDocument(view->document());
+            bufferView->setDocument(buf->document());
         bufferView->setLargeFileMode(isLarge);
         bufferView->setEolMode(toScintillaEol(
             buf->getEolMode(), bufferView->eolMode()));
@@ -1281,7 +1349,8 @@ void MainWindow::saveCopyAs()
         buffer->isUntitled() ? QString() : buffer->getFullPath(),
         tr("All Files (*);;Text Files (*.txt)"));
     if (path.isEmpty()) return;
-    if (!MainFileManager.saveBufferCopy(buffer, path)) {
+    if (!activateBufferView(buffer) ||
+        !MainFileManager.saveBufferCopy(buffer, path)) {
         QMessageBox::warning(this, tr("Save Failed"),
             tr("Cannot save file:\n%1").arg(path));
         return;
@@ -1316,7 +1385,8 @@ void MainWindow::renameCurrentFile()
     }
     buffer->setFilePath(newPath);
     buffer->setLastKnownModificationTime(QFileInfo(newPath).lastModified());
-    if (buffer->getView()) buffer->getView()->setLexerForFile(newPath);
+    if (ScintillaEditView* view = activateBufferView(buffer))
+        view->setLexerForFile(newPath);
     _mainDocTab->updateTabTitle(buffer);
     _subDocTab->updateTabTitle(buffer);
     watchBufferFile(buffer);
@@ -1508,15 +1578,8 @@ void MainWindow::toggleIndentGuide()
     bool show = !svp._indentGuideLineShow;
     svp._indentGuideLineShow = show;
 
-    // 应用到所有已打开的视图
-    auto applyToTab = [&](DocTabView* tab) {
-        for (int i = 0; i < tab->count(); ++i) {
-            if (auto* v = qobject_cast<ScintillaEditView*>(tab->widget(i)))
-                v->applyShowIndentGuide(show);
-        }
-    };
-    applyToTab(_mainDocTab);
-    applyToTab(_subDocTab);
+    _mainDocTab->editor()->applyShowIndentGuide(show);
+    _subDocTab->editor()->applyShowIndentGuide(show);
 
     if (_showIndentAction) _showIndentAction->setChecked(show);
 }
@@ -1525,8 +1588,7 @@ void MainWindow::find()
 {
     FindReplaceDlg* findDlg = ensureFindReplaceDialog();
 
-    ScintillaEditView* view =
-        qobject_cast<ScintillaEditView*>(_activeDocTab->currentWidget());
+    ScintillaEditView* view = _activeDocTab->editor();
     if (view) {
         findDlg->setCurrentView(view);
         if (view->hasSelectedText())
@@ -1539,8 +1601,7 @@ void MainWindow::replace()
 {
     FindReplaceDlg* findDlg = ensureFindReplaceDialog();
 
-    ScintillaEditView* view =
-        qobject_cast<ScintillaEditView*>(_activeDocTab->currentWidget());
+    ScintillaEditView* view = _activeDocTab->editor();
     if (view) {
         findDlg->setCurrentView(view);
         if (view->hasSelectedText())
@@ -1582,9 +1643,7 @@ void MainWindow::moveToOtherView()
 {
     DocTabView* source = _activeDocTab;
     Buffer* buf = source->currentBuffer();
-    ScintillaEditView* sourceView =
-        qobject_cast<ScintillaEditView*>(source->currentWidget());
-    if (!buf || !sourceView) return;
+    if (!buf) return;
 
     DocTabView* other = otherTab();
 
@@ -1594,12 +1653,8 @@ void MainWindow::moveToOtherView()
     const int sourceIndex = source->indexOfBuffer(buf);
     source->removeTab(sourceIndex);
 
-    if (other->indexOfBuffer(buf) == -1) {
-        other->addBufferView(buf, sourceView);
-    } else {
-        buf->removeView(sourceView);
-        sourceView->deleteLater();
-    }
+    if (other->indexOfBuffer(buf) == -1)
+        other->addBuffer(buf);
 
     if (source->count() == 0) {
         if (source == _mainDocTab)
@@ -1615,7 +1670,7 @@ void MainWindow::moveToOtherView()
 void MainWindow::cloneToOtherView()
 {
     Buffer* buf = _activeDocTab->currentBuffer();
-    if (!buf || !buf->getView()) return;
+    if (!buf || !buf->document()) return;
 
     DocTabView* other = otherTab();
     if (!other->isVisible()) showSubView();
@@ -1627,19 +1682,7 @@ void MainWindow::cloneToOtherView()
         return;
     }
 
-    // 创建新的编辑器视图，通过 Scintilla document pointer 共享内容。
-    ScintillaEditView* cloneView = new ScintillaEditView(other);
-    cloneView->setDocument(buf->getView()->document());
-    cloneView->setLargeFileMode(buf->isLargeFile());
-
-    // 应用相同的语法高亮
-    if (!buf->isUntitled())
-        cloneView->setLexerForFile(buf->getFullPath());
-
-    // 连接修改通知信号
-    connectModificationSignal(cloneView, buf);
-
-    other->addClone(buf, cloneView);
+    other->addClone(buf, other->editor());
     setActiveTab(other);
 }
 
@@ -1658,8 +1701,6 @@ void MainWindow::onBufferCloseRequested(Buffer* buf)
     }
 
     int idx = srcTab->indexOfBuffer(buf);
-    ScintillaEditView* tabView = (idx >= 0)
-        ? qobject_cast<ScintillaEditView*>(srcTab->widget(idx)) : nullptr;
     DocTabView* otherDocTab = (srcTab == _mainDocTab) ? _subDocTab : _mainDocTab;
     const bool remainsOpen = otherDocTab->indexOfBuffer(buf) >= 0;
     if (!remainsOpen && !checkBufferSave(buf))
@@ -1667,9 +1708,6 @@ void MainWindow::onBufferCloseRequested(Buffer* buf)
 
     if (idx >= 0)
         srcTab->removeTab(idx);
-    buf->removeView(tabView);
-    if (tabView)
-        tabView->deleteLater();
 
     if (srcTab == _subDocTab && srcTab->count() == 0)
         hideSubView();
@@ -1691,7 +1729,11 @@ void MainWindow::onTextChanged()
     ScintillaEditView* view = qobject_cast<ScintillaEditView*>(sender());
     if (!view) return;
 
-    Buffer* buf = MainFileManager.findBufferByView(view);
+    Buffer* buf = view == _mainDocTab->editor()
+        ? _mainDocTab->currentBuffer()
+        : view == _subDocTab->editor()
+            ? _subDocTab->currentBuffer()
+            : MainFileManager.findBufferByView(view);
 
     if (!buf) return;
 
@@ -1781,7 +1823,7 @@ void MainWindow::printDocument()
     Buffer* buffer = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
     const QString path =
         buffer && !buffer->isUntitled() ? buffer->getFullPath() : QString();
-    NotepadPlusPrinter printer(
+    Printer printer(
         NppParameters::getInstance().getNppGUI(), path);
     QPrintDialog dialog(&printer, this);
     if (dialog.exec() == QDialog::Accepted)
@@ -1795,7 +1837,7 @@ void MainWindow::printDocumentNow()
     Buffer* buffer = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
     const QString path =
         buffer && !buffer->isUntitled() ? buffer->getFullPath() : QString();
-    NotepadPlusPrinter printer(
+    Printer printer(
         NppParameters::getInstance().getNppGUI(), path);
     printer.printView(view);
 }
@@ -2282,14 +2324,19 @@ void MainWindow::onBackupTimer()
 
     QString backupDir = params.backupDirPath();
     QSet<Buffer*> visited;
+    DocTabView* const originalActiveTab = _activeDocTab;
 
     auto backupTab = [&](DocTabView* tab) {
+        const int originalIndex = tab->currentIndex();
         for (int i = 0; i < tab->count(); ++i) {
             Buffer* buf = tab->bufferAt(i);
-            if (!buf || !buf->isDirty() || !buf->getView() ||
+            if (!buf || !buf->isDirty() ||
                 buf->isLargeFile()) continue;
             if (visited.contains(buf)) continue;
             visited.insert(buf);
+            ScintillaEditView* view = activateBufferView(buf, tab);
+            if (!view)
+                continue;
 
             // 首次备份时生成路径：filename@timestamp
             if (buf->getBackupFilePath().isEmpty()) {
@@ -2301,7 +2348,7 @@ void MainWindow::onBackupTimer()
             }
 
             QByteArray backupData;
-            const QString backupText = buf->getView()->text();
+            const QString backupText = view->text();
             bool encoded = TextFileCodec::encode(
                 backupText, buf->getEncoding(), buf->hasBom(), &backupData);
             if (!encoded) {
@@ -2316,10 +2363,13 @@ void MainWindow::onBackupTimer()
                 }
             }
         }
+        if (originalIndex >= 0 && originalIndex < tab->count())
+            tab->setCurrentIndex(originalIndex);
     };
 
     backupTab(_mainDocTab);
     backupTab(_subDocTab);
+    setActiveTab(originalActiveTab);
 }
 
 // ─── 关闭事件 ────────────────────────────────────────────────────────────────
@@ -2486,9 +2536,9 @@ void MainWindow::setupAuxiliaryPanels()
                 if (visible)
                     refreshDocuments();
             });
-    connect(_mainDocTab, &QTabWidget::currentChanged, this,
+    connect(_mainDocTab, &DocTabView::currentChanged, this,
             [refreshDocuments](int) { refreshDocuments(); });
-    connect(_subDocTab, &QTabWidget::currentChanged, this,
+    connect(_subDocTab, &DocTabView::currentChanged, this,
             [refreshDocuments](int) { refreshDocuments(); });
     connect(_documentList, &QListWidget::itemActivated, this,
             [this](QListWidgetItem* item) {
@@ -2756,20 +2806,20 @@ void MainWindow::onFindAllOpenedDocsRequested(const QString& searchText,
 {
     QList<FindAllResult> allResults;
     QSet<Buffer*> visited;
+    DocTabView* const originalActiveTab = _activeDocTab;
     QString scintillaSearchText = searchText;
     if (opt._isRegex && opt._dotMatchesNewline)
         scintillaSearchText.prepend("(?s)");
 
     auto scanTab = [&](DocTabView* tab) {
+        const int originalIndex = tab->currentIndex();
         for (int i = 0; tab && i < tab->count(); ++i) {
             Buffer* buf = tab->bufferAt(i);
             if (!buf || buf->isBinary() || visited.contains(buf))
                 continue;
             visited.insert(buf);
 
-            ScintillaEditView* view = qobject_cast<ScintillaEditView*>(tab->widget(i));
-            if (!view)
-                view = buf->getView();
+            ScintillaEditView* view = activateBufferView(buf, tab);
             if (!view)
                 continue;
 
@@ -2822,10 +2872,13 @@ void MainWindow::onFindAllOpenedDocsRequested(const QString& searchText,
             view->SendScintilla(SCI_SETXOFFSET,
                                 static_cast<unsigned long>(originalXOffset));
         }
+        if (originalIndex >= 0 && originalIndex < tab->count())
+            tab->setCurrentIndex(originalIndex);
     };
 
     scanTab(_mainDocTab);
     scanTab(_subDocTab);
+    setActiveTab(originalActiveTab);
     onFindAllResults(searchText, allResults);
 }
 
@@ -2966,19 +3019,19 @@ void MainWindow::onReplaceAllOpenedDocsRequested(const QString& searchText,
     int replacementCount = 0;
     int documentCount = 0;
     QSet<Buffer*> visited;
+    DocTabView* const originalActiveTab = _activeDocTab;
     QString scintillaSearchText = searchText;
     if (opt._isRegex && opt._dotMatchesNewline)
         scintillaSearchText.prepend("(?s)");
     auto replaceInTab = [&](DocTabView* tab) {
+        const int originalIndex = tab->currentIndex();
         for (int i = 0; tab && i < tab->count(); ++i) {
             Buffer* buffer = tab->bufferAt(i);
             if (!buffer || buffer->isReadOnly() || buffer->isBinary() ||
                 visited.contains(buffer))
                 continue;
             visited.insert(buffer);
-            ScintillaEditView* view = buffer->getView();
-            if (!view)
-                view = qobject_cast<ScintillaEditView*>(tab->widget(i));
+            ScintillaEditView* view = activateBufferView(buffer, tab);
             if (!view)
                 continue;
 
@@ -3026,10 +3079,13 @@ void MainWindow::onReplaceAllOpenedDocsRequested(const QString& searchText,
                 replacementCount += count;
             }
         }
+        if (originalIndex >= 0 && originalIndex < tab->count())
+            tab->setCurrentIndex(originalIndex);
     };
 
     replaceInTab(_mainDocTab);
     replaceInTab(_subDocTab);
+    setActiveTab(originalActiveTab);
     updateActionStates();
     statusBar()->showMessage(
         tr("%1 replacement(s) made in %2 document(s).")
@@ -3085,6 +3141,9 @@ void MainWindow::onReplaceInFilesRequested(const QString& searchText,
     int skippedDirtyCount = 0;
     int skippedReadOnlyCount = 0;
     int errorCount = 0;
+    DocTabView* const originalActiveTab = _activeDocTab;
+    const int originalMainIndex = _mainDocTab->currentIndex();
+    const int originalSubIndex = _subDocTab->currentIndex();
     QSet<QString> visitedPaths;
     QDirIterator it(root.absolutePath(), nameFilters, dirFilters, iteratorFlags);
     while (it.hasNext()) {
@@ -3125,8 +3184,12 @@ void MainWindow::onReplaceInFilesRequested(const QString& searchText,
             continue;
         }
 
-        if (opened && opened->getView()) {
-            ScintillaEditView* view = opened->getView();
+        if (opened) {
+            ScintillaEditView* view = activateBufferView(opened);
+            if (!view) {
+                ++errorCount;
+                continue;
+            }
             view->beginUndoAction();
             view->selectAll();
             view->replaceSelectedText(text);
@@ -3154,6 +3217,12 @@ void MainWindow::onReplaceInFilesRequested(const QString& searchText,
         replacementCount += count;
         ++changedFileCount;
     }
+
+    if (originalMainIndex >= 0 && originalMainIndex < _mainDocTab->count())
+        _mainDocTab->setCurrentIndex(originalMainIndex);
+    if (originalSubIndex >= 0 && originalSubIndex < _subDocTab->count())
+        _subDocTab->setCurrentIndex(originalSubIndex);
+    setActiveTab(originalActiveTab);
 
     QMessageBox::information(this, tr("Replace in Files"),
         tr("%1 replacement(s) made in %2 file(s).\n"
@@ -3194,6 +3263,9 @@ void MainWindow::onReplaceInProjectsRequested(const QString& searchText,
     int changedFiles = 0;
     int skipped = 0;
     int errors = 0;
+    DocTabView* const originalActiveTab = _activeDocTab;
+    const int originalMainIndex = _mainDocTab->currentIndex();
+    const int originalSubIndex = _subDocTab->currentIndex();
     for (const QString& path : selectedFiles) {
         if (!QDir::match(nameFilters, QFileInfo(path).fileName()))
             continue;
@@ -3220,8 +3292,12 @@ void MainWindow::onReplaceInProjectsRequested(const QString& searchText,
                 ++errors;
             continue;
         }
-        if (opened && opened->getView()) {
-            ScintillaEditView* view = opened->getView();
+        if (opened) {
+            ScintillaEditView* view = activateBufferView(opened);
+            if (!view) {
+                ++errors;
+                continue;
+            }
             view->beginUndoAction();
             view->selectAll();
             view->replaceSelectedText(changed);
@@ -3249,6 +3325,11 @@ void MainWindow::onReplaceInProjectsRequested(const QString& searchText,
         replacements += count;
         ++changedFiles;
     }
+    if (originalMainIndex >= 0 && originalMainIndex < _mainDocTab->count())
+        _mainDocTab->setCurrentIndex(originalMainIndex);
+    if (originalSubIndex >= 0 && originalSubIndex < _subDocTab->count())
+        _subDocTab->setCurrentIndex(originalSubIndex);
+    setActiveTab(originalActiveTab);
     QMessageBox::information(
         this, tr("Replace in Projects"),
         tr("%1 replacement(s) made in %2 file(s).\n"
@@ -3258,9 +3339,20 @@ void MainWindow::onReplaceInProjectsRequested(const QString& searchText,
 
 void MainWindow::setupPluginSystem()
 {
+    const QString pluginDir =
+        QDir(NppParameters::getInstance().getNppPath())
+            .filePath(QStringLiteral("plugins"));
+#ifdef Q_OS_WIN
+    // Temporary compatibility-test filter. Remove it after the Win32 message
+    // router supports the broader plugin corpus.
+    QStringList win32PluginErrors;
+    _win32PluginManager->loadPlugins(
+        pluginDir, {QStringLiteral("mimeTools")}, &win32PluginErrors);
+    for (const QString& error : win32PluginErrors)
+        qWarning() << "Win32 plugin load failed:" << error;
+#endif
 #ifdef ENABLE_PLUGIN_SYSTEM
     _pluginManager = new PluginManager(this);
-    QString pluginDir = QCoreApplication::applicationDirPath() + "/plugins";
     _pluginManager->loadPlugins(pluginDir, this);
 #endif
 }
@@ -3343,7 +3435,6 @@ bool MainWindow::launchPendingPluginUpdater(QString* error)
         }
         return false;
     }
-
     QString planError;
     const PluginUpdatePlan plan = PluginUpdatePlan::read(
         _pendingPluginUpdatePlan, &planError);
@@ -3488,9 +3579,9 @@ void MainWindow::onWatchedFileChanged(const QString& path)
         buf->isMonitoring();
     if (buf->isReadOnly() != readOnly) {
         buf->setReadOnly(readOnly);
-        for (ScintillaEditView* view : buf->views())
-            if (view)
-                view->setReadOnly(readOnly);
+        for (DocTabView* tab : {_mainDocTab, _subDocTab})
+            if (tab->currentBuffer() == buf)
+                tab->editor()->setReadOnly(readOnly);
         _mainDocTab->updateTabTitle(buf);
         _subDocTab->updateTabTitle(buf);
         statusBar()->showMessage(
@@ -3517,14 +3608,14 @@ void MainWindow::onWatchedFileChanged(const QString& path)
         }
         const bool wasReadOnly = buf->isReadOnly();
         buf->setReadOnly(false);
-        for (ScintillaEditView* view : buf->views())
-            if (view)
-                view->setReadOnly(false);
+        for (DocTabView* tab : {_mainDocTab, _subDocTab})
+            if (tab->currentBuffer() == buf)
+                tab->editor()->setReadOnly(false);
         reloadFromDisk();
         buf->setReadOnly(wasReadOnly);
-        for (ScintillaEditView* view : buf->views())
-            if (view)
-                view->setReadOnly(wasReadOnly);
+        for (DocTabView* tab : {_mainDocTab, _subDocTab})
+            if (tab->currentBuffer() == buf)
+                tab->editor()->setReadOnly(wasReadOnly);
         return;
     }
 
@@ -3706,16 +3797,18 @@ void MainWindow::saveSession()
 {
     NppParameters& params = NppParameters::getInstance();
     Session session;
+    DocTabView* const originalActiveTab = _activeDocTab;
 
     if (_documentMapBuffer && _docMapPanel)
         _documentMapBuffer->setMapState(_docMapPanel->sessionState());
 
     // 主视图
     session._activeView = (_activeDocTab == _mainDocTab) ? 0 : 1;
-    auto collectFiles = [](DocTabView* tab,
+    auto collectFiles = [this](DocTabView* tab,
                            std::vector<sessionFileInfo>& out) -> size_t
     {
         size_t activeOutputIndex = 0;
+        const int originalIndex = tab->currentIndex();
         for (int i = 0; i < tab->count(); ++i) {
             Buffer* buf = tab->bufferAt(i);
             if (!buf) continue;
@@ -3725,8 +3818,7 @@ void MainWindow::saveSession()
             sessionFileInfo sfi(buf->isUntitled()
                 ? buf->getFileName()      // "new 1" 等虚拟名
                 : buf->getFullPath());
-            ScintillaEditView* view =
-                qobject_cast<ScintillaEditView*>(tab->widget(i));
+            ScintillaEditView* view = activateBufferView(buf, tab);
             const QString language = view ? view->lexerLanguage() : QString();
             sfi._langName = language.isEmpty() ? "Normal Text" : language;
             sfi._encoding = sessionEncodingForBuffer(buf);
@@ -3798,6 +3890,8 @@ void MainWindow::saveSession()
                 activeOutputIndex = out.size();
             out.push_back(std::move(sfi));
         }
+        if (originalIndex >= 0 && originalIndex < tab->count())
+            tab->setCurrentIndex(originalIndex);
         return activeOutputIndex;
     };
 
@@ -3810,6 +3904,8 @@ void MainWindow::saveSession()
         session._fileBrowserRoots.push_back(_fileBrowserPanel->rootPath());
     if (_fileBrowserPanel)
         session._fileBrowserSelectedItem = _fileBrowserPanel->selectedPath();
+
+    setActiveTab(originalActiveTab);
 
     params.getSession() = session;
     params.writeSession(session);
@@ -3846,14 +3942,8 @@ void MainWindow::restoreSession()
         if (fileExists) {
             // 正常打开磁盘文件
             Buffer* existing = MainFileManager.findBufferByPath(sfi._fileName);
-            if (existing && tab->indexOfBuffer(existing) == -1 && existing->getView()) {
-                ScintillaEditView* cloneView = new ScintillaEditView(tab);
-                cloneView->setDocument(existing->getView()->document());
-                cloneView->setLargeFileMode(existing->isLargeFile());
-                cloneView->setLexerForFile(existing->getFullPath());
-                applyPreferencesToView(cloneView);
-                connectModificationSignal(cloneView, existing);
-                tab->addClone(existing, cloneView);
+            if (existing && tab->indexOfBuffer(existing) == -1) {
+                tab->addClone(existing, tab->editor());
                 buf = existing;
             } else {
                 const QString sessionCodec =
@@ -3871,9 +3961,7 @@ void MainWindow::restoreSession()
                         decodeSessionBackup(f.readAll(), sfi);
                     f.close();
                     ScintillaEditView* backupView =
-                        qobject_cast<ScintillaEditView*>(tab->currentWidget());
-                    if (!backupView)
-                        backupView = buf->getView();
+                        activateBufferView(buf, tab);
                     const bool readOnly = backupView && backupView->isReadOnly();
                     if (backupView)
                         backupView->setReadOnly(false);
@@ -3909,10 +3997,16 @@ void MainWindow::restoreSession()
             const QString sessionCodec =
                 EncodingMapper::codecNameForCodePage(sfi._encoding);
             QString loadError;
-            if (MainFileManager.loadBufferContent(
-                    buf, buf->getView(),
+            ScintillaEditView* backupView = activateBufferView(buf, tab);
+            if (backupView && MainFileManager.loadBufferContent(
+                    buf, backupView,
                     decodingOptionsForPath(sfi._fileName), sessionCodec,
                     &loadError, sfi._backupFilePath)) {
+                if (buf->document() !=
+                    static_cast<qintptr>(backupView->document())) {
+                    buf->releaseDocument();
+                    captureBufferDocument(buf, backupView);
+                }
                 buf->setDirty(true);
                 tab->updateTabTitle(buf);
             }
@@ -3938,8 +4032,7 @@ void MainWindow::restoreSession()
         buf->setMapState(mapState);
 
         // 恢复光标位置
-        ScintillaEditView* view =
-            qobject_cast<ScintillaEditView*>(tab->currentWidget());
+        ScintillaEditView* view = activateBufferView(buf, tab);
         if (view) {
             const qintptr documentLength = view->documentLengthNpp();
             const qintptr selectionStart = qBound<qintptr>(
@@ -4028,6 +4121,7 @@ void MainWindow::applyPreferencesToView(ScintillaEditView* view)
     Buffer* buffer = MainFileManager.findBufferByView(view);
     const bool largeFile = buffer && buffer->isLargeFile();
     view->setLargeFileMode(largeFile);
+    view->setBorderEdge(svp._showBorderEdge, gui._darkModeEnabled);
     view->applyFont(gui._editorFontName, gui._editorFontSize);
     view->applyTabSettings(gui._tabSize, gui._tabReplacedBySpace);
     view->setAutoIndent(gui._autoIndent);
@@ -4046,18 +4140,13 @@ void MainWindow::applyPreferencesToAllViews()
 {
     applyDarkMode();
 
-    // 遍历主视图所有标签
-    for (int i = 0; i < _mainDocTab->count(); ++i) {
-        Buffer* buf = _mainDocTab->bufferAt(i);
-        if (buf && buf->getView())
-            applyPreferencesToView(buf->getView());
-    }
-    // 遍历副视图（包括克隆视图）
-    for (int i = 0; i < _subDocTab->count(); ++i) {
-        ScintillaEditView* v =
-            qobject_cast<ScintillaEditView*>(_subDocTab->widget(i));
-        if (v) applyPreferencesToView(v);
-    }
+    const ScintillaViewParams& svp =
+        NppParameters::getInstance().getSVP();
+    _mainDocTab->setEditorBorderWidth(svp._borderWidth);
+    _subDocTab->setEditorBorderWidth(svp._borderWidth);
+
+    applyPreferencesToView(_mainDocTab->editor());
+    applyPreferencesToView(_subDocTab->editor());
     updateStatusBar();
 
     const NppGUI& gui = NppParameters::getInstance().getNppGUI();
@@ -5384,8 +5473,9 @@ void MainWindow::createMenus()
         const bool readOnly = enabled || buffer->isCommandLineReadOnly() ||
             !QFileInfo(buffer->getFullPath()).isWritable();
         buffer->setReadOnly(readOnly);
-        for (ScintillaEditView* view : buffer->views())
-            if (view) view->setReadOnly(readOnly);
+        for (DocTabView* tab : {_mainDocTab, _subDocTab})
+            if (tab->currentBuffer() == buffer)
+                tab->editor()->setReadOnly(readOnly);
         if (enabled) watchBufferFile(buffer);
     });
     monitoringAction->setCheckable(true);
@@ -5402,10 +5492,8 @@ void MainWindow::createMenus()
         for (QMetaObject::Connection& connection :
              _syncVerticalConnections)
             QObject::disconnect(connection);
-        ScintillaEditView* mainView = qobject_cast<ScintillaEditView*>(
-            _mainDocTab->currentWidget());
-        ScintillaEditView* subView = qobject_cast<ScintillaEditView*>(
-            _subDocTab->currentWidget());
+        ScintillaEditView* mainView = _mainDocTab->editor();
+        ScintillaEditView* subView = _subDocTab->editor();
         if (enabled && mainView && subView) {
             QScrollBar* first =
                 mainView->verticalScrollBar();
@@ -5430,10 +5518,8 @@ void MainWindow::createMenus()
         for (QMetaObject::Connection& connection :
              _syncHorizontalConnections)
             QObject::disconnect(connection);
-        ScintillaEditView* mainView = qobject_cast<ScintillaEditView*>(
-            _mainDocTab->currentWidget());
-        ScintillaEditView* subView = qobject_cast<ScintillaEditView*>(
-            _subDocTab->currentWidget());
+        ScintillaEditView* mainView = _mainDocTab->editor();
+        ScintillaEditView* subView = _subDocTab->editor();
         if (enabled && mainView && subView) {
             QScrollBar* first =
                 mainView->horizontalScrollBar();
@@ -6701,8 +6787,7 @@ void MainWindow::convertTo(const QString& codec, bool hasBom)
 void MainWindow::reinterpretAs(const QString& codec)
 {
     Buffer* buf = _activeDocTab->currentBuffer();
-    ScintillaEditView* activeView =
-        qobject_cast<ScintillaEditView*>(_activeDocTab->currentWidget());
+    ScintillaEditView* activeView = _activeDocTab->editor();
     if (!buf || !activeView)
         return;
 
@@ -6735,15 +6820,17 @@ void MainWindow::reinterpretAs(const QString& codec)
     const int firstVisibleLine = activeView->firstVisibleLine();
     const bool readOnly = buf->isReadOnly();
 
-    for (ScintillaEditView* view : buf->views())
-        view->setReadOnly(false);
+    for (DocTabView* tab : {_mainDocTab, _subDocTab})
+        if (tab->currentBuffer() == buf)
+            tab->editor()->setReadOnly(false);
 
     QString loadError;
     if (!MainFileManager.loadBufferContent(
             buf, activeView, decodingOptionsForPath(buf->getFullPath()),
             normalized, &loadError)) {
-        for (ScintillaEditView* view : buf->views())
-            view->setReadOnly(readOnly);
+        for (DocTabView* tab : {_mainDocTab, _subDocTab})
+            if (tab->currentBuffer() == buf)
+                tab->editor()->setReadOnly(readOnly);
         QMessageBox::warning(
             this, tr("Encoding"),
             tr("The file cannot be decoded as %1.\n\n%2")
@@ -6754,9 +6841,16 @@ void MainWindow::reinterpretAs(const QString& codec)
 
     const EolMode eolMode =
         toScintillaEol(buf->getEolMode(), activeView->eolMode());
-    for (ScintillaEditView* view : buf->views()) {
+    if (buf->document() != static_cast<qintptr>(activeView->document())) {
+        buf->releaseDocument();
+        captureBufferDocument(buf, activeView);
+    }
+    for (DocTabView* tab : {_mainDocTab, _subDocTab}) {
+        if (tab->currentBuffer() != buf)
+            continue;
+        ScintillaEditView* view = tab->editor();
         if (view != activeView)
-            view->setDocument(activeView->document());
+            view->setDocument(buf->document());
         view->setLargeFileMode(buf->isLargeFile());
         view->setEolMode(eolMode);
         view->setLexerForFile(buf->getFullPath());

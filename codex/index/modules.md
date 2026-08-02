@@ -6,21 +6,25 @@
 
 - `src/main.cpp`：程序入口。
 - `src/MainWindow.h|cpp`：主窗口、菜单、工具栏、状态栏、多视图、停靠窗口、会话、最近文件、插件入口等集中协调逻辑。
-- `src/ScintillaComponent/`：编辑器组件、Buffer、查找替换对话框和 UDL 自定义词法器。
+- `src/ScintillaComponent/`：编辑器组件、Buffer、查找替换、打印和 UDL 自定义词法器。
 - `src/MISC/FileManager.*`：Buffer 生命周期和文件加载保存管理。
 - `src/WinControls/TabBar/DocTabView.*`：标签页管理。
 - `src/WinControls/DockingWnd/`：文件浏览、文档地图、函数列表等停靠面板。
-- `src/Preferences/PreferenceDlg.*`：偏好设置对话框。
+- `src/WinControls/Preference/PreferenceDlg.*`：偏好设置对话框，与原版 `WinControls/Preference` 职责对齐。
 - `src/Parameters.*`：配置管理。
 - `src/NativeLangSpeaker.*`：本地化/语言切换。
 - `src/TinyXml/`：XML 配置解析。
-- `src/PluginSystem/`：插件清单、管理 UI、事务更新器，以及隔离的运行 ABI 预留边界。
+- `src/MISC/PluginsManager/`：插件运行边界、清单、更新计划和独立更新器。
+- `src/WinControls/PluginsAdmin/`：插件管理 UI 与展示模型。
+- `src/Win32PluginSystem/`：原版 Windows DLL 插件 ABI、消息和窗口语义兼容层。
 
 ## 关键关系
 
 - `MainWindow` 继承 `QMainWindow`，同时实现 `IPluginHost`。
-- `MainWindow` 通过 `DocTabView` 管理主/副视图。
-- `Buffer` 保存文件路径、脏状态、编码、BOM 和备份路径，并关联 `ScintillaEditView`。
+- `MainWindow` 通过两个 `DocTabView` 管理主/副视图，每个视图永久持有一个
+  `ScintillaEditView`。
+- `Buffer` 保存文件状态并拥有一个 addref 后的 Scintilla document pointer；标签只映射
+  Buffer，永久编辑器在标签切换时通过 `SCI_SETDOCPOINTER` 切换文档。
 - `FileManager` 是单例，负责创建、加载、保存和关闭 `Buffer`。
 - `PluginAdminModel` 与独立更新器负责包管理；`PluginManager` 的 Qt 动态库接口仍是未冻结的运行 ABI 预留。
 
@@ -65,6 +69,7 @@
 - `codex/changes/2026-07-22-stage-7-final-features.md`
 - `codex/changes/2026-07-23-menu-localization-coverage.md`
 - `codex/changes/2026-07-26-p0-functional-compatibility.md`
+- `codex/changes/2026-08-02-original-module-layout-and-margin-cursor.md`
 
 ## 2026-07-26 P0 索引增量
 
@@ -152,7 +157,8 @@
 
 - `src/MISC/TextFileCodec.*`：统一文本文件检测、显式代码页解码和可逆编码校验。
 - `Buffer::views()` / `FileManager::findBufferByView()`：共享文档的 view 注册和反向查找。
-- `DocTabView::addBufferView()`：跨主/副视图移动实际 editor widget。
+- `DocTabView::addBufferView()`：向主/副视图注册 Buffer 标签；不移动或创建 editor
+  widget，跨视图移动和 clone 都复用对应视图的永久编辑器。
 - `MainWindow::saveSession()` / `restoreSession()`：会话 UI 状态与原版 FILETIME 字段。
 - `FindReplaceDlg::onReplaceAll()`：选区、Extended 和零长度正则前进。
 
@@ -187,3 +193,12 @@
 - 模块索引：`codex/modules/notepad-plus-plus/scintilla5-qt.md`。
 - 迁移已完成；计划文件保留为历史设计依据，当前状态见
   `codex/cache/2026-08-01-scintilla5-qt-migration.md`。
+
+## 2026-08-01 插件调查索引
+
+- `codex/analysis/plugins-v846/inventory.md`：v8.4.6 x86 169 项身份、版本、源码、
+  重要度和兼容等级总索引。
+- `codex/analysis/plugins-v846/api-dependency-matrix.md`：六导出、NPPM/NPPN/SCI、
+  平台依赖、线程/运行时和双代理 HWND 风险统一入口。
+- `codex/analysis/plugins-v846/batch-*.md`：逐插件静态证据和未验证项。
+- `tests/PluginInvestigationTests.cpp`：调查数据与 x86 JSON 基线的一致性校验。

@@ -21,7 +21,7 @@
 #include "MISC/FileManager.h"
 #include "MISC/UiFont.h"
 #include "Parameters.h"
-#include "Printing/NotepadPlusPrinter.h"
+#include "ScintillaComponent/Printer.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
 #include "ScintillaComponent/ScintillaEditView.h"
 
@@ -318,7 +318,7 @@ int main(int argc, char* argv[])
     printGui._printFooterRight = QStringLiteral("FOOTER_RIGHT");
     printGui._printLineNumber = true;
     const QString pdfPath = output + QStringLiteral("/print-output.pdf");
-    NotepadPlusPrinter printer(
+    Printer printer(
         printGui, output + QStringLiteral("/sample.txt"));
     printer.setOutputFormat(QPrinter::PdfFormat);
     printer.setOutputFileName(pdfPath);

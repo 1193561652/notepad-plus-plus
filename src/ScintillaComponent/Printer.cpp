@@ -1,4 +1,4 @@
-#include "Printing/NotepadPlusPrinter.h"
+#include "ScintillaComponent/Printer.h"
 
 #include "ScintillaComponent/ScintillaEditView.h"
 
@@ -7,13 +7,13 @@
 #include <QLocale>
 #include <QPainter>
 
-NotepadPlusPrinter::NotepadPlusPrinter(
+Printer::Printer(
     const NppGUI& gui, const QString& filePath)
     : QPrinter(QPrinter::HighResolution), _gui(gui), _filePath(filePath)
 {
 }
 
-void NotepadPlusPrinter::printView(ScintillaEditView* view)
+void Printer::printView(ScintillaEditView* view)
 {
     if (!view)
         return;
@@ -58,7 +58,7 @@ void NotepadPlusPrinter::printView(ScintillaEditView* view)
         static_cast<unsigned long>(previousColourMode));
 }
 
-void NotepadPlusPrinter::formatPage(
+void Printer::formatPage(
     QPainter& painter, bool drawing, QRect& area, int pageNumber)
 {
     const int lineHeight = painter.fontMetrics().height() + 6;
@@ -80,7 +80,7 @@ void NotepadPlusPrinter::formatPage(
                 pageNumber);
 }
 
-QString NotepadPlusPrinter::expand(QString text, int pageNumber) const
+QString Printer::expand(QString text, int pageNumber) const
 {
     const QFileInfo info(_filePath);
     const QDateTime now = QDateTime::currentDateTime();
@@ -100,7 +100,7 @@ QString NotepadPlusPrinter::expand(QString text, int pageNumber) const
     return text;
 }
 
-void NotepadPlusPrinter::drawTriplet(
+void Printer::drawTriplet(
     QPainter& painter, const QRect& rect,
     const QString& left, const QString& middle, const QString& right,
     int pageNumber) const

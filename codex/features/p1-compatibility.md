@@ -20,7 +20,7 @@
 
 ## 打印
 
-- `NotepadPlusPrinter` 在页面正文外渲染左右中三段页眉页脚。
+- `ScintillaComponent/Printer` 在页面正文外渲染左右中三段页眉页脚。
 - 支持路径、文件名、日期、时间和当前打印页等 v8.4.6 变量。
 - 打印颜色模式使用 Scintilla 配置；行号按配置临时控制 margin 0。
 

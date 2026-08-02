@@ -116,7 +116,7 @@ add_compile_definitions(TIXML_USE_STL UNICODE _UNICODE)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/src/MISC)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/src/WinControls/TabBar)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/src/WinControls/DockingWnd)
-file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/src/Preferences)
+file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/src/WinControls/Preference)
 
 file(GLOB UCHARDET_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/src/uchardet/*.cpp
@@ -149,21 +149,21 @@ set(SOURCES
     src/MISC/AutoCompletionParser.cpp
     src/MISC/FunctionListParser.cpp
     src/MISC/ToolbarIconTheme.cpp
-    src/Printing/NotepadPlusPrinter.cpp
+    src/ScintillaComponent/Printer.cpp
     src/WinControls/TabBar/DocTabView.cpp
     src/WinControls/DockingWnd/FileBrowserPanel.cpp
-    src/Preferences/PreferenceDlg.cpp
+    src/WinControls/Preference/PreferenceDlg.cpp
     src/WinControls/DockingWnd/DocumentMapPanel.cpp
     src/WinControls/DockingWnd/FunctionListPanel.cpp
     src/WinControls/Grid/ShortcutMapper.cpp
     src/WinControls/ProjectPanel/WorkspaceDocument.cpp
     src/WinControls/ProjectPanel/ProjectPanel.cpp
-    src/PluginSystem/PluginArtifactResolver.cpp
-    src/PluginSystem/PluginCatalog.cpp
-    src/PluginSystem/PluginAdminModel.cpp
-    src/PluginSystem/PluginAdminDialog.cpp
-    src/PluginSystem/PluginUpdatePlan.cpp
-    src/PluginSystem/PluginManager.cpp
+    src/MISC/PluginsManager/PluginArtifactResolver.cpp
+    src/MISC/PluginsManager/PluginCatalog.cpp
+    src/WinControls/PluginsAdmin/PluginAdminModel.cpp
+    src/WinControls/PluginsAdmin/PluginAdminDialog.cpp
+    src/MISC/PluginsManager/PluginUpdatePlan.cpp
+    src/MISC/PluginsManager/PluginManager.cpp
 )
 
 set(HEADERS
@@ -188,23 +188,27 @@ set(HEADERS
     src/MISC/AutoCompletionParser.h
     src/MISC/FunctionListParser.h
     src/MISC/ToolbarIconTheme.h
-    src/Printing/NotepadPlusPrinter.h
+    src/ScintillaComponent/Printer.h
     src/WinControls/TabBar/DocTabView.h
     src/WinControls/DockingWnd/FileBrowserPanel.h
-    src/Preferences/PreferenceDlg.h
+    src/WinControls/Preference/PreferenceDlg.h
     src/WinControls/DockingWnd/DocumentMapPanel.h
     src/WinControls/DockingWnd/FunctionListPanel.h
     src/WinControls/Grid/ShortcutMapper.h
     src/WinControls/ProjectPanel/WorkspaceDocument.h
     src/WinControls/ProjectPanel/ProjectPanel.h
-    src/PluginSystem/PluginArtifactResolver.h
-    src/PluginSystem/PluginCatalog.h
-    src/PluginSystem/PluginAdminModel.h
-    src/PluginSystem/PluginAdminDialog.h
-    src/PluginSystem/PluginUpdatePlan.h
-    src/PluginSystem/IPlugin.h
-    src/PluginSystem/PluginManager.h
+    src/MISC/PluginsManager/PluginArtifactResolver.h
+    src/MISC/PluginsManager/PluginCatalog.h
+    src/WinControls/PluginsAdmin/PluginAdminModel.h
+    src/WinControls/PluginsAdmin/PluginAdminDialog.h
+    src/MISC/PluginsManager/PluginUpdatePlan.h
+    src/MISC/PluginsManager/IPlugin.h
+    src/MISC/PluginsManager/PluginManager.h
 )
+
+if(WIN32)
+    add_subdirectory(src/Win32PluginSystem)
+endif()
 
 # 资源文件
 set(RESOURCES
@@ -266,15 +270,15 @@ add_custom_command(TARGET notepadpp-qt POST_BUILD
 )
 
 if(WIN32)
-    target_link_libraries(notepadpp-qt shell32 advapi32 version)
+    target_link_libraries(notepadpp-qt shell32 advapi32 version comctl32)
 endif()
 
 add_executable(npp-plugin-updater
-    src/PluginSystem/PluginUpdaterMain.cpp
-    src/PluginSystem/PluginArchiveExtractor.cpp
-    src/PluginSystem/PluginArtifactResolver.cpp
-    src/PluginSystem/PluginUpdateExecutor.cpp
-    src/PluginSystem/PluginUpdatePlan.cpp
+    src/MISC/PluginsManager/updater/PluginUpdaterMain.cpp
+    src/MISC/PluginsManager/updater/PluginArchiveExtractor.cpp
+    src/MISC/PluginsManager/PluginArtifactResolver.cpp
+    src/MISC/PluginsManager/updater/PluginUpdateExecutor.cpp
+    src/MISC/PluginsManager/PluginUpdatePlan.cpp
 )
 target_link_libraries(npp-plugin-updater Qt5::Core Qt5::Network)
 if(WIN32)
@@ -347,10 +351,10 @@ if(BUILD_TESTING)
 
     add_executable(plugin-admin-tests
         tests/PluginAdminTests.cpp
-        src/PluginSystem/PluginArtifactResolver.cpp
-        src/PluginSystem/PluginCatalog.cpp
-        src/PluginSystem/PluginAdminModel.cpp
-        src/PluginSystem/PluginUpdatePlan.cpp
+        src/MISC/PluginsManager/PluginArtifactResolver.cpp
+        src/MISC/PluginsManager/PluginCatalog.cpp
+        src/WinControls/PluginsAdmin/PluginAdminModel.cpp
+        src/MISC/PluginsManager/PluginUpdatePlan.cpp
         ${RESOURCES}
     )
     target_link_libraries(plugin-admin-tests Qt5::Core)
@@ -361,16 +365,35 @@ if(BUILD_TESTING)
 
     add_executable(plugin-updater-tests
         tests/PluginUpdaterTests.cpp
-        src/PluginSystem/PluginArchiveExtractor.cpp
-        src/PluginSystem/PluginArtifactResolver.cpp
-        src/PluginSystem/PluginUpdateExecutor.cpp
-        src/PluginSystem/PluginUpdatePlan.cpp
+        src/MISC/PluginsManager/updater/PluginArchiveExtractor.cpp
+        src/MISC/PluginsManager/PluginArtifactResolver.cpp
+        src/MISC/PluginsManager/updater/PluginUpdateExecutor.cpp
+        src/MISC/PluginsManager/PluginUpdatePlan.cpp
     )
     target_link_libraries(plugin-updater-tests Qt5::Core Qt5::Network)
     target_compile_definitions(plugin-updater-tests PRIVATE
         NPP_PLUGIN_UPDATER_PATH="$<TARGET_FILE:npp-plugin-updater>")
     add_dependencies(plugin-updater-tests npp-plugin-updater)
     add_test(NAME plugin-updater-tests COMMAND plugin-updater-tests)
+
+    add_executable(plugin-investigation-tests
+        tests/PluginInvestigationTests.cpp
+    )
+    target_compile_definitions(plugin-investigation-tests PRIVATE
+        NPP_PLUGIN_CATALOG="${CMAKE_SOURCE_DIR}/resources/pluginList/windows/pl.x86.json"
+        NPP_PLUGIN_INVENTORY="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/inventory.md"
+        NPP_PLUGIN_IMPORTANCE="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/importance.md"
+        NPP_PLUGIN_BATCH_A_C="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/batch-a-c.md"
+        NPP_PLUGIN_BATCH_D_H="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/batch-d-h.md"
+        NPP_PLUGIN_BATCH_I_M="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/batch-i-m.md"
+        NPP_PLUGIN_BATCH_N="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/batch-n.md"
+        NPP_PLUGIN_BATCH_O_S="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/batch-o-s.md"
+        NPP_PLUGIN_BATCH_T_Z="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/batch-t-z.md"
+        NPP_PLUGIN_API_MATRIX="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/api-dependency-matrix.md"
+    )
+    target_link_libraries(plugin-investigation-tests Qt5::Core)
+    add_test(NAME plugin-investigation-tests
+        COMMAND plugin-investigation-tests)
 
     add_executable(config-path-resolver-tests
         tests/ConfigPathResolverTests.cpp
@@ -431,7 +454,7 @@ if(BUILD_TESTING)
     target_compile_definitions(find-dialog-localization-tests PRIVATE
         NPP_MAINWINDOW_SOURCE="${CMAKE_SOURCE_DIR}/src/MainWindow.cpp"
         NPP_FIND_DIALOG_SOURCE="${CMAKE_SOURCE_DIR}/src/ScintillaComponent/FindReplaceDlg.cpp"
-        NPP_PREFERENCES_SOURCE="${CMAKE_SOURCE_DIR}/src/Preferences/PreferenceDlg.cpp"
+        NPP_PREFERENCES_SOURCE="${CMAKE_SOURCE_DIR}/src/WinControls/Preference/PreferenceDlg.cpp"
         NPP_FIND_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/chineseSimplified.xml"
     )
     target_link_libraries(find-dialog-localization-tests Qt5::Core Qt5::Xml)
@@ -457,8 +480,42 @@ if(BUILD_TESTING)
         Qt5::PrintSupport
         Qt5::Xml
     )
+    set(NPP_MIMETOOLS_MANAGED_FIXTURE FALSE)
     if(WIN32)
-        target_link_libraries(ui-parity-capture shell32 advapi32 version)
+        target_link_libraries(ui-parity-capture shell32 advapi32 version comctl32)
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND
+           NOT CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
+            set(NPP_MIMETOOLS_ARCHIVE
+                "${CMAKE_SOURCE_DIR}/third_party/win32-plugins/mimeTools/2.8/x64/mimetools.v2.8.x64.zip")
+            if(NOT EXISTS "${NPP_MIMETOOLS_ARCHIVE}")
+                message(FATAL_ERROR "The mimeTools test archive is missing")
+            endif()
+            file(SHA256 "${NPP_MIMETOOLS_ARCHIVE}"
+                 NPP_MIMETOOLS_ARCHIVE_SHA256)
+            if(NOT NPP_MIMETOOLS_ARCHIVE_SHA256 STREQUAL
+                   "ed5133f8a0552e974135ada78a0260581be979f916ddbcd45697d2a1a1b8f280")
+                message(FATAL_ERROR "The mimeTools test archive hash is invalid")
+            endif()
+            file(TO_CMAKE_PATH "${NPP_MIMETOOLS_ARCHIVE}"
+                 NPP_MIMETOOLS_ARCHIVE_URL_PATH)
+            file(TO_CMAKE_PATH "${CMAKE_BINARY_DIR}/notepadpp-qt.exe"
+                 NPP_MIMETOOLS_TEST_APPLICATION)
+            file(TO_CMAKE_PATH "${CMAKE_BINARY_DIR}/plugins"
+                 NPP_MIMETOOLS_TEST_PLUGIN_ROOT)
+            configure_file(
+                tests/MimeToolsInstallPlan.json.in
+                "${CMAKE_BINARY_DIR}/mimetools-ctest-install-plan.json"
+                @ONLY)
+            target_compile_definitions(ui-parity-capture PRIVATE
+                NPP_MIMETOOLS_MANAGED_TEST=1)
+            add_test(NAME mimetools-managed-install
+                COMMAND npp-plugin-updater
+                    --plan "${CMAKE_BINARY_DIR}/mimetools-ctest-install-plan.json"
+                    --no-restart)
+            set_tests_properties(mimetools-managed-install PROPERTIES
+                FIXTURES_SETUP mimetools-managed-plugin)
+            set(NPP_MIMETOOLS_MANAGED_FIXTURE TRUE)
+        endif()
     endif()
     add_test(NAME ui-localization-runtime-100
         COMMAND ui-parity-capture
@@ -491,6 +548,14 @@ if(BUILD_TESTING)
         ENVIRONMENT "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM}")
     set_tests_properties(ui-localization-dark-runtime-150 PROPERTIES
         ENVIRONMENT "QT_SCALE_FACTOR=1.5;${UI_TEST_PLATFORM}")
+    if(NPP_MIMETOOLS_MANAGED_FIXTURE)
+        set_tests_properties(
+            ui-localization-runtime-100
+            ui-localization-runtime-150
+            ui-localization-dark-runtime-100
+            ui-localization-dark-runtime-150
+            PROPERTIES FIXTURES_REQUIRED mimetools-managed-plugin)
+    endif()
 
     add_executable(p1-runtime-capture
         tests/P1RuntimeCapture.cpp
@@ -510,7 +575,7 @@ if(BUILD_TESTING)
         Qt5::Xml
     )
     if(WIN32)
-        target_link_libraries(p1-runtime-capture shell32 advapi32 version)
+        target_link_libraries(p1-runtime-capture shell32 advapi32 version comctl32)
     endif()
 
     add_executable(core-behavior-tests

@@ -396,10 +396,13 @@ QWidget* PreferenceDlg::makePage_MarginsBorderEdge()
 
     QGroupBox* border = placePreferenceControl(
         new QGroupBox(tr("Border Width"), w), 22, 112, 83, 45);
-    QSlider* borderWidth = placePreferenceControl(
+    _borderWidthSlider = placePreferenceControl(
         new QSlider(Qt::Horizontal, border), 7, 13, 60, 14);
-    borderWidth->setRange(0, 4);
-    placePreferenceControl(new QCheckBox(tr("No edge"), border), 7, 28, 65, 12);
+    _borderWidthSlider->setObjectName("sldBorderWidth");
+    _borderWidthSlider->setRange(0, 30);
+    _noBorderEdgeCB = placePreferenceControl(
+        new QCheckBox(tr("No edge"), border), 7, 28, 65, 12);
+    _noBorderEdgeCB->setObjectName("chkNoBorderEdge");
 
     QGroupBox* lineNumber = placePreferenceControl(
         new QGroupBox(tr("Line Number"), w), 274, 21, 135, 66);
@@ -1475,6 +1478,8 @@ void PreferenceDlg::loadSettings()
     _currentLineHighlightCB->setChecked(svp._currentLineHilitingShow);
     _wrapSymbolShowCB->setChecked(svp._wrapSymbolShow);
     _edgeShowCB->setChecked(svp._edgeShow);
+    _noBorderEdgeCB->setChecked(!svp._showBorderEdge);
+    _borderWidthSlider->setValue(svp._borderWidth);
     _edgeColumnSB->setValue(svp._edgeNbColumn);
     _edgeColumnSB->setEnabled(svp._edgeShow);
 
@@ -1649,6 +1654,8 @@ void PreferenceDlg::saveSettings()
     svp._currentLineHilitingShow = _currentLineHighlightCB->isChecked();
     svp._wrapSymbolShow          = _wrapSymbolShowCB->isChecked();
     svp._edgeShow                = _edgeShowCB->isChecked();
+    svp._showBorderEdge          = !_noBorderEdgeCB->isChecked();
+    svp._borderWidth             = _borderWidthSlider->value();
     svp._edgeNbColumn            = _edgeColumnSB->value();
 
     // ── New Document ─────────────────────────────────────────────────────────

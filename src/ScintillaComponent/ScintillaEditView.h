@@ -91,6 +91,7 @@ public:
     void setIndentationsUseTabs(bool value) { send(SCI_SETUSETABS, value); }
     void setAutoIndent(bool value) { _autoIndent = value; }
     void setBraceMatching(BraceMatch mode) { _braceMatch = mode; }
+    void setBorderEdge(bool enabled, bool darkMode);
     void setMarginWidth(int margin, int width) { send(SCI_SETMARGINWIDTHN, margin, width); }
     void setMarginWidth(int margin, const QString& sample);
     int marginWidth(int margin) const { return static_cast<int>(send(SCI_GETMARGINWIDTHN, margin)); }

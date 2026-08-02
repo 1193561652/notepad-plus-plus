@@ -2,7 +2,7 @@
 
 ## 入口
 
-- `src/Preferences/PreferenceDlg.h|cpp`：Preferences 总对话框、19 个页面构建器、设置装载与写回。
+- `src/WinControls/Preference/PreferenceDlg.h|cpp`：Preferences 总对话框、19 个页面构建器、设置装载与写回。
 - `src/WinControls/Grid/ShortcutMapper.h|cpp`：快捷键管理 UI、过滤、冲突检测和 `shortcuts.xml` 模型写回。
 - `src/WinControls/ProjectPanel/ProjectPanel.h|cpp`：Workspace/Edit UI 与工程树编辑。
 - `src/WinControls/ProjectPanel/WorkspaceDocument.h|cpp`：workspace XML 数据模型。

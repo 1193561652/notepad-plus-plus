@@ -7,6 +7,7 @@
 #include <QString>
 #include <QDateTime>
 #include <QList>
+#include <functional>
 #include <limits>
 #include "MISC/TextFileCodec.h"
 
@@ -32,7 +33,7 @@ public:
         qint64(200) * 1024 * 1024;
 
     explicit Buffer(int untitledNumber);
-    ~Buffer() = default;
+    ~Buffer();
 
     // 路径管理
     const QString& getFullPath() const { return _fullPath; }
@@ -57,6 +58,10 @@ public:
     void addView(ScintillaEditView* view);
     void removeView(ScintillaEditView* view);
     bool containsView(ScintillaEditView* view) const;
+    qintptr document() const { return _document; }
+    void captureDocument(qintptr document, ScintillaEditView* owner,
+                         std::function<void(qintptr)> releaser);
+    void releaseDocument();
 
     // 标签页显示文本（脏状态时加 *）
     QString getTabLabel() const;
@@ -113,6 +118,9 @@ private:
     bool _metadataDirty = false;
     bool _isUntitled = true;
     QList<ScintillaEditView*> _views;
+    qintptr _document = 0;
+    ScintillaEditView* _documentOwner = nullptr;
+    std::function<void(qintptr)> _documentReleaser;
     int _untitledNumber;
     QString _encoding = "UTF-8";
     bool    _hasBom   = false;

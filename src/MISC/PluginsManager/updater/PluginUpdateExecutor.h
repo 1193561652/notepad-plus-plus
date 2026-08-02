@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PluginUpdatePlan.h"
+#include "MISC/PluginsManager/PluginUpdatePlan.h"
 
 class PluginUpdateExecutor
 {

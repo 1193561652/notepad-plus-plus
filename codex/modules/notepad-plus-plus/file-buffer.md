@@ -39,7 +39,8 @@
 
 ## 缓存结论
 
-文件/Buffer 模块已经形成基础三层：Buffer 持状态，FileManager 管生命周期，MainWindow 协调 UI 流程。后续需要继续核验文件读取、编码检测、EOL 保持和克隆视图所有权。
+文件/Buffer 模块形成三层：Buffer 持状态和 Scintilla document 引用，FileManager 管
+Buffer 生命周期，MainWindow 协调两个永久编辑器与 UI 流程。
 
 ## 2026-07-22 阶段二更新
 
@@ -62,10 +63,10 @@
 ## 2026-07-25 索引更新
 
 - 新增 `src/MISC/TextFileCodec.*`，作为打开、reload、保存、文件搜索替换的统一编码入口。
-- `Buffer` 现在维护 `QList<ScintillaEditView*>`，`getView()`只返回当前首选 view；
-  涉及同步时必须遍历 `views()`。
-- `DocTabView::addBufferView()`用于移动现有 editor widget；`addClone()`使用
-  Scintilla document pointer 注册共享文档的新 view。
+- `Buffer` 维护所属主/副永久视图列表，并持有 addref 后的 Scintilla document pointer；
+  `getView()` 不代表该视图此刻显示该 Buffer。
+- `DocTabView` 自身永久拥有一个 editor；`addBufferView()` 和 `addClone()`只增加
+  Buffer 标签，激活标签时使用 `SCI_SETDOCPOINTER`。
 - 关闭单个 clone 只调用 `Buffer::removeView()`；仅最后一个 view 关闭时才调用
   `FileManager::closeBuffer()`。
 - 文本脏状态与编码/BOM/EOL 元数据脏状态分开记录，`Buffer::isDirty()`合并两者。
@@ -84,3 +85,12 @@
 - lexer、Wrap、自动完成、匹配、Smart Highlight、Function List 和周期备份
   通过 Buffer 大文件状态统一降级。
 - 位置、长度、搜索替换和 Session 选择区使用指针宽度消息接口。
+
+## 2026-08-02 永久视图更新
+
+- `MainDocTab` 和 `SubDocTab` 各创建一次 `ScintillaEditView`，文档页不再创建 widget。
+- `DocTabView` 按 Buffer 保存 current position、anchor、first visible line 和 xOffset。
+- `MainWindow::activateBufferView()` 是保存、备份、批量搜索替换和 Session 操作访问
+  非当前 Buffer 的统一入口。
+- reload、编码重解释或大文件文档重建后必须更新 Buffer 持有的 document 引用，并
+  同步当前正在显示同一 Buffer 的另一个永久视图。

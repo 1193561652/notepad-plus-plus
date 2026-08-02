@@ -29,6 +29,6 @@ ctest --test-dir build --output-on-failure
 - 后续获得用户授权，P1 专用运行验证最终退出码 0。
 - 修复全文排序处理末尾占位行导致的额外空行。
 - 修复 Finder 默认文本与匹配高亮标签叠绘。
-- 打印实现提取到 `src/Printing/NotepadPlusPrinter.*`，并使用生产组件生成
+- 打印实现位于 `src/ScintillaComponent/Printer.*`，并使用生产组件生成
   PDF 完成页眉页脚、变量、页码和行号验证。
 - UDL 隔离写回、外部修改/重命名/删除和只读状态均验证通过。

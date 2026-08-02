@@ -1,5 +1,5 @@
 #include "PluginAdminModel.h"
-#include "PluginArtifactResolver.h"
+#include "MISC/PluginsManager/PluginArtifactResolver.h"
 
 #include <QDir>
 #include <QFile>

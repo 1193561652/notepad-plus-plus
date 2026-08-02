@@ -32,8 +32,8 @@ Qt 版重点：
 - `./src/ScintillaComponent/FindReplaceDlg.*`
 - `./src/WinControls/TabBar/DocTabView.*`
 - `./src/WinControls/DockingWnd/*`
-- `./src/Preferences/PreferenceDlg.*`
-- `./src/PluginSystem/*`
+- `./src/WinControls/Preference/PreferenceDlg.*`
+- `./src/MISC/PluginsManager/*` 与 `./src/WinControls/PluginsAdmin/*`
 
 ## 差异摘要
 
