@@ -1,4 +1,4 @@
-#include "MISC/FileAssociationModel.h"
+#include "MISC/RegExt/FileAssociationModel.h"
 
 #include <QSet>
 

@@ -1,5 +1,5 @@
 // DocTabView.h - 文档标签页视图
-// 移植自: v8.4.6:PowerEditor/src/WinControls/TabBar/DocTabView.h
+// 移植自: v8.4.6:PowerEditor/src/ScintillaComponent/DocTabView.h
 
 #ifndef DOCTABVIEW_H
 #define DOCTABVIEW_H

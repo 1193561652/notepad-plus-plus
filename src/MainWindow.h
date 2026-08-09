@@ -59,20 +59,20 @@ public:
     QMainWindow* mainWindow() override { return this; }
     DockingManager& dockingManager() { return _dockingManager; }
     const DockingManager& dockingManager() const { return _dockingManager; }
-    QString currentPathForWin32Plugin() const;
-    bool executeMenuCommandFromWin32Plugin(int commandId);
-    bool openFileFromWin32Plugin(const QString& path);
+    QString currentPathForPlugin() const;
+    bool executePluginMenuCommand(int commandId);
+    bool openFileForPlugin(const QString& path);
     bool setCurrentLanguageTypeFromPlugin(int languageType);
-    quintptr currentBufferIdForWin32Plugin() const;
-    QString pathForWin32PluginBuffer(quintptr bufferId) const;
-    int openFileCountForWin32Plugin(int scope) const;
-    int currentDocumentIndexForWin32Plugin(int view) const;
-    bool activateDocumentFromWin32Plugin(int view, int index);
-    int currentLineForWin32Plugin() const;
-    int bufferEncodingForWin32Plugin(quintptr bufferId) const;
-    bool setBufferEncodingFromWin32Plugin(quintptr bufferId, int encoding);
-    void setStatusBarTextFromWin32Plugin(int section, const QString& text);
-    bool addToolbarCommandFromWin32Plugin(int commandId);
+    quintptr currentBufferIdForPlugin() const;
+    QString pathForPluginBuffer(quintptr bufferId) const;
+    int openFileCountForPlugin(int scope) const;
+    int currentDocumentIndexForPlugin(int view) const;
+    bool activateDocumentForPlugin(int view, int index);
+    int currentLineForPlugin() const;
+    int bufferEncodingForPlugin(quintptr bufferId) const;
+    bool setBufferEncodingForPlugin(quintptr bufferId, int encoding);
+    void setPluginStatusBarText(int section, const QString& text);
+    bool addPluginToolbarCommand(int commandId);
 #ifdef Q_OS_WIN
     Win32PluginManager* win32PluginManager() const
     {

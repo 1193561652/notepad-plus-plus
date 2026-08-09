@@ -8,7 +8,7 @@ UI 层应尽量保持原版 Notepad++ 用户体验，包括菜单、工具栏、
 
 - `./src/MainWindow.h`
 - `./src/MainWindow.cpp`
-- `./src/WinControls/TabBar/DocTabView.*`
+- `./src/ScintillaComponent/DocTabView.*`
 - `./src/WinControls/DockingWnd/*.h|cpp`
 - `./resources/resources.qrc`
 - `./resources/icons/`

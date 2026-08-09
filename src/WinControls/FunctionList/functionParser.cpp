@@ -1,4 +1,4 @@
-#include "FunctionListParser.h"
+#include "functionParser.h"
 
 #include <QDir>
 #include <QDomDocument>

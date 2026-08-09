@@ -128,7 +128,7 @@ set(SOURCES
     src/CommandLineOptions.cpp
     src/NppCommandRegistry.cpp
     src/Parameters.cpp
-    src/NativeLangSpeaker.cpp
+    src/localization.cpp
     src/MainWindow.cpp
     src/TinyXml/tinyxml.cpp
     src/TinyXml/tinyxmlerror.cpp
@@ -139,23 +139,23 @@ set(SOURCES
     src/ScintillaComponent/ScintillaTextSearch.cpp
     src/ScintillaComponent/UserDefinedLexer.cpp
     src/ScintillaComponent/EditorMacro.cpp
-    src/MISC/FileManager.cpp
-    src/MISC/EncodingMapper.cpp
+    src/ScintillaComponent/FileManager.cpp
+    src/EncodingMapper.cpp
     src/MISC/TextFileCodec.cpp
     src/MISC/PlatformServices.cpp
-    src/MISC/FileAssociationModel.cpp
+    src/MISC/RegExt/FileAssociationModel.cpp
     src/MISC/ConfigPathResolver.cpp
     src/MISC/ClosedFileHistory.cpp
-    src/MISC/AutoCompletionParser.cpp
-    src/MISC/FunctionListParser.cpp
-    src/MISC/ToolbarIconTheme.cpp
+    src/ScintillaComponent/AutoCompletionParser.cpp
+    src/WinControls/FunctionList/functionParser.cpp
+    src/WinControls/ToolBar/ToolbarIconTheme.cpp
     src/ScintillaComponent/Printer.cpp
-    src/WinControls/TabBar/DocTabView.cpp
-    src/WinControls/DockingWnd/FileBrowserPanel.cpp
+    src/ScintillaComponent/DocTabView.cpp
+    src/WinControls/FileBrowser/fileBrowser.cpp
     src/WinControls/DockingWnd/DockingManager.cpp
-    src/WinControls/Preference/PreferenceDlg.cpp
-    src/WinControls/DockingWnd/DocumentMapPanel.cpp
-    src/WinControls/DockingWnd/FunctionListPanel.cpp
+    src/WinControls/Preference/preferenceDlg.cpp
+    src/WinControls/DocumentMap/documentMap.cpp
+    src/WinControls/FunctionList/functionListPanel.cpp
     src/WinControls/Grid/ShortcutMapper.cpp
     src/WinControls/ProjectPanel/WorkspaceDocument.cpp
     src/WinControls/ProjectPanel/ProjectPanel.cpp
@@ -172,7 +172,7 @@ set(HEADERS
     src/Parameters.h
     src/CommandLineOptions.h
     src/NppCommandRegistry.h
-    src/NativeLangSpeaker.h
+    src/localization.h
     src/MainWindow.h
     src/ScintillaComponent/ScintillaEditView.h
     src/ScintillaComponent/Buffer.h
@@ -180,23 +180,23 @@ set(HEADERS
     src/ScintillaComponent/ScintillaTextSearch.h
     src/ScintillaComponent/UserDefinedLexer.h
     src/ScintillaComponent/EditorMacro.h
-    src/MISC/FileManager.h
-    src/MISC/EncodingMapper.h
+    src/ScintillaComponent/FileManager.h
+    src/EncodingMapper.h
     src/MISC/TextFileCodec.h
     src/MISC/PlatformServices.h
-    src/MISC/FileAssociationModel.h
+    src/MISC/RegExt/FileAssociationModel.h
     src/MISC/ConfigPathResolver.h
     src/MISC/ClosedFileHistory.h
-    src/MISC/AutoCompletionParser.h
-    src/MISC/FunctionListParser.h
-    src/MISC/ToolbarIconTheme.h
+    src/ScintillaComponent/AutoCompletionParser.h
+    src/WinControls/FunctionList/functionParser.h
+    src/WinControls/ToolBar/ToolbarIconTheme.h
     src/ScintillaComponent/Printer.h
-    src/WinControls/TabBar/DocTabView.h
-    src/WinControls/DockingWnd/FileBrowserPanel.h
+    src/ScintillaComponent/DocTabView.h
+    src/WinControls/FileBrowser/fileBrowser.h
     src/WinControls/DockingWnd/DockingManager.h
-    src/WinControls/Preference/PreferenceDlg.h
-    src/WinControls/DockingWnd/DocumentMapPanel.h
-    src/WinControls/DockingWnd/FunctionListPanel.h
+    src/WinControls/Preference/preferenceDlg.h
+    src/WinControls/DocumentMap/documentMap.h
+    src/WinControls/FunctionList/functionListPanel.h
     src/WinControls/Grid/ShortcutMapper.h
     src/WinControls/ProjectPanel/WorkspaceDocument.h
     src/WinControls/ProjectPanel/ProjectPanel.h
@@ -341,14 +341,14 @@ if(BUILD_TESTING)
 
     add_executable(file-association-model-tests
         tests/FileAssociationModelTests.cpp
-        src/MISC/FileAssociationModel.cpp
+        src/MISC/RegExt/FileAssociationModel.cpp
     )
     target_link_libraries(file-association-model-tests Qt5::Core)
     add_test(NAME file-association-model-tests COMMAND file-association-model-tests)
 
     add_executable(toolbar-icon-theme-tests
         tests/ToolbarIconThemeTests.cpp
-        src/MISC/ToolbarIconTheme.cpp
+        src/WinControls/ToolBar/ToolbarIconTheme.cpp
     )
     target_compile_definitions(toolbar-icon-theme-tests PRIVATE
         NPP_TEST_ICON_SOURCE="${CMAKE_SOURCE_DIR}/resources/icons/userDefineDlg_off.ico")
@@ -365,7 +365,7 @@ if(BUILD_TESTING)
     if(WIN32)
         add_executable(file-association-runtime-test
             tests/FileAssociationRuntimeTest.cpp
-            src/MISC/FileAssociationModel.cpp
+            src/MISC/RegExt/FileAssociationModel.cpp
             src/MISC/PlatformServices.cpp
         )
         target_link_libraries(file-association-runtime-test
@@ -449,7 +449,7 @@ if(BUILD_TESTING)
 
     add_executable(auto-completion-parser-tests
         tests/AutoCompletionParserTests.cpp
-        src/MISC/AutoCompletionParser.cpp
+        src/ScintillaComponent/AutoCompletionParser.cpp
     )
     target_link_libraries(auto-completion-parser-tests Qt5::Core)
     add_test(NAME auto-completion-parser-tests
@@ -459,7 +459,7 @@ if(BUILD_TESTING)
         tests/ParametersStyleUdlTests.cpp
         src/Parameters.cpp
         src/MISC/ConfigPathResolver.cpp
-        src/NativeLangSpeaker.cpp
+        src/localization.cpp
         src/TinyXml/tinyxml.cpp
         src/TinyXml/tinyxmlerror.cpp
         src/TinyXml/tinyxmlparser.cpp
@@ -479,7 +479,7 @@ if(BUILD_TESTING)
 
     add_executable(function-list-parser-tests
         tests/FunctionListParserTests.cpp
-        src/MISC/FunctionListParser.cpp
+        src/WinControls/FunctionList/functionParser.cpp
     )
     target_compile_definitions(function-list-parser-tests PRIVATE
         NPP_FUNCTION_LIST_SOURCE="${CMAKE_SOURCE_DIR}/resources/functionList")
@@ -492,7 +492,7 @@ if(BUILD_TESTING)
     target_compile_definitions(find-dialog-localization-tests PRIVATE
         NPP_MAINWINDOW_SOURCE="${CMAKE_SOURCE_DIR}/src/MainWindow.cpp"
         NPP_FIND_DIALOG_SOURCE="${CMAKE_SOURCE_DIR}/src/ScintillaComponent/FindReplaceDlg.cpp"
-        NPP_PREFERENCES_SOURCE="${CMAKE_SOURCE_DIR}/src/WinControls/Preference/PreferenceDlg.cpp"
+        NPP_PREFERENCES_SOURCE="${CMAKE_SOURCE_DIR}/src/WinControls/Preference/preferenceDlg.cpp"
         NPP_FIND_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/chineseSimplified.xml"
     )
     target_link_libraries(find-dialog-localization-tests Qt5::Core Qt5::Xml)
@@ -762,7 +762,7 @@ if(BUILD_TESTING)
 
     add_executable(core-behavior-tests
         tests/CoreBehaviorTests.cpp
-        src/MISC/EncodingMapper.cpp
+        src/EncodingMapper.cpp
         src/MISC/TextFileCodec.cpp
         src/ScintillaComponent/Buffer.cpp
         ${UCHARDET_SOURCES}
@@ -787,17 +787,17 @@ if(BUILD_TESTING)
         tests/LargeFileModeTests.cpp
         src/Parameters.cpp
         src/MISC/ConfigPathResolver.cpp
-        src/NativeLangSpeaker.cpp
+        src/localization.cpp
         src/TinyXml/tinyxml.cpp
         src/TinyXml/tinyxmlerror.cpp
         src/TinyXml/tinyxmlparser.cpp
         src/ScintillaComponent/ScintillaEditView.cpp
         src/ScintillaComponent/Buffer.cpp
         src/ScintillaComponent/UserDefinedLexer.cpp
-        src/MISC/FileManager.cpp
-        src/MISC/EncodingMapper.cpp
+        src/ScintillaComponent/FileManager.cpp
+        src/EncodingMapper.cpp
         src/MISC/TextFileCodec.cpp
-        src/MISC/AutoCompletionParser.cpp
+        src/ScintillaComponent/AutoCompletionParser.cpp
         resources/resources.qrc
         ${UCHARDET_SOURCES}
     )
@@ -843,7 +843,7 @@ if(BUILD_TESTING)
         tests/ConfigCorpusTests.cpp
         src/Parameters.cpp
         src/MISC/ConfigPathResolver.cpp
-        src/NativeLangSpeaker.cpp
+        src/localization.cpp
         src/TinyXml/tinyxml.cpp
         src/TinyXml/tinyxmlerror.cpp
         src/TinyXml/tinyxmlparser.cpp

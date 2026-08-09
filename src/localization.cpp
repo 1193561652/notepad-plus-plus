@@ -1,7 +1,7 @@
-// NativeLangSpeaker.cpp - Qt 移植版本
+// localization.cpp - NativeLangSpeaker 的 Qt 平台实现
 // 对应原版 localization.cpp
 
-#include "NativeLangSpeaker.h"
+#include "localization.h"
 #include "TinyXml/tinyxml.h"
 
 #include <QMainWindow>

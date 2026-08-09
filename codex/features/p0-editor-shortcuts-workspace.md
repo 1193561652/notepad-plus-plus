@@ -21,11 +21,11 @@
 
 - `src/Parameters.h|cpp`
   - 配置、项目面板路径和 `shortcuts.xml` 数据模型。
-- `src/WinControls/Preference/PreferenceDlg.h|cpp`
+- `src/WinControls/Preference/preferenceDlg.h|cpp`
   - 备份、自定义 URI、标签匹配和自动插入偏好设置。
 - `src/ScintillaComponent/ScintillaEditView.h|cpp`
   - URL、标签匹配和自动插入行为。
-- `src/MISC/FileManager.h|cpp`
+- `src/ScintillaComponent/FileManager.h|cpp`
   - 保存前备份路径和复制策略。
 - `src/MainWindow.h|cpp`
   - command ID 注册、快捷键应用、宏回放、项目面板和项目范围搜索替换。

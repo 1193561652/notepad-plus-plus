@@ -18,7 +18,7 @@
 #include <QTimer>
 
 #include "MainWindow.h"
-#include "MISC/FileManager.h"
+#include "ScintillaComponent/FileManager.h"
 #include "MISC/UiFont.h"
 #include "Parameters.h"
 #include "ScintillaComponent/Printer.h"

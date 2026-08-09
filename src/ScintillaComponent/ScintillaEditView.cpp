@@ -4,7 +4,7 @@
 #include "ScintillaEditView.h"
 #include "UserDefinedLexer.h"
 #include "../Parameters.h"
-#include "../MISC/AutoCompletionParser.h"
+#include "AutoCompletionParser.h"
 #include <ILexer.h>
 #include <Lexilla.h>
 #include <QFileInfo>

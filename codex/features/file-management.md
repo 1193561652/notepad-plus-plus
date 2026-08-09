@@ -8,12 +8,12 @@
 
 - `./src/ScintillaComponent/Buffer.h`
 - `./src/ScintillaComponent/Buffer.cpp`
-- `./src/MISC/FileManager.h`
-- `./src/MISC/FileManager.cpp`
+- `./src/ScintillaComponent/FileManager.h`
+- `./src/ScintillaComponent/FileManager.cpp`
 - `./src/MainWindow.h`
 - `./src/MainWindow.cpp`
-- `./src/WinControls/TabBar/DocTabView.h`
-- `./src/WinControls/TabBar/DocTabView.cpp`
+- `./src/ScintillaComponent/DocTabView.h`
+- `./src/ScintillaComponent/DocTabView.cpp`
 
 ## 当前职责划分
 

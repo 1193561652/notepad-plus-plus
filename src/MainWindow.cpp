@@ -5,20 +5,20 @@
 #include "NppCommandRegistry.h"
 #include "ScintillaComponent/ScintillaEditView.h"
 #include "ScintillaComponent/Buffer.h"
-#include "WinControls/TabBar/DocTabView.h"
-#include "MISC/FileManager.h"
-#include "MISC/EncodingMapper.h"
+#include "ScintillaComponent/DocTabView.h"
+#include "ScintillaComponent/FileManager.h"
+#include "EncodingMapper.h"
 #include "MISC/PlatformServices.h"
 #include "MISC/TextFileCodec.h"
-#include "MISC/ToolbarIconTheme.h"
+#include "WinControls/ToolBar/ToolbarIconTheme.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
 #include "ScintillaComponent/ScintillaTextSearch.h"
 #include "ScintillaComponent/EditorMacro.h"
-#include "WinControls/DockingWnd/FileBrowserPanel.h"
+#include "WinControls/FileBrowser/fileBrowser.h"
 #include "WinControls/DockingWnd/DockingManager.h"
-#include "WinControls/Preference/PreferenceDlg.h"
-#include "WinControls/DockingWnd/DocumentMapPanel.h"
-#include "WinControls/DockingWnd/FunctionListPanel.h"
+#include "WinControls/Preference/preferenceDlg.h"
+#include "WinControls/DocumentMap/documentMap.h"
+#include "WinControls/FunctionList/functionListPanel.h"
 #include "WinControls/ProjectPanel/ProjectPanel.h"
 #include "WinControls/Grid/ShortcutMapper.h"
 #include "MISC/PluginsManager/PluginManager.h"
@@ -32,7 +32,7 @@
 #endif
 
 #include "Parameters.h"
-#include "NativeLangSpeaker.h"
+#include "localization.h"
 #include <QDockWidget>
 #include <QTextCodec>
 #include <QFileDialog>
@@ -2558,18 +2558,18 @@ QString MainWindow::currentFilePath() const
     return (buf && !buf->isUntitled()) ? buf->getFullPath() : QString();
 }
 
-QString MainWindow::currentPathForWin32Plugin() const
+QString MainWindow::currentPathForPlugin() const
 {
     Buffer* buf = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
     return buf ? buf->getFullPath() : QString();
 }
 
-bool MainWindow::executeMenuCommandFromWin32Plugin(int commandId)
+bool MainWindow::executePluginMenuCommand(int commandId)
 {
     return executeNppCommand(commandId);
 }
 
-bool MainWindow::openFileFromWin32Plugin(const QString& path)
+bool MainWindow::openFileForPlugin(const QString& path)
 {
     return !path.isEmpty() && doOpenFile(path, _activeDocTab);
 }
@@ -2593,13 +2593,13 @@ bool MainWindow::setCurrentLanguageTypeFromPlugin(int languageType)
     return true;
 }
 
-quintptr MainWindow::currentBufferIdForWin32Plugin() const
+quintptr MainWindow::currentBufferIdForPlugin() const
 {
     Buffer* buffer = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
     return reinterpret_cast<quintptr>(buffer);
 }
 
-QString MainWindow::pathForWin32PluginBuffer(quintptr bufferId) const
+QString MainWindow::pathForPluginBuffer(quintptr bufferId) const
 {
     Buffer* requested = reinterpret_cast<Buffer*>(bufferId);
     for (Buffer* buffer : MainFileManager.buffers()) {
@@ -2609,7 +2609,7 @@ QString MainWindow::pathForWin32PluginBuffer(quintptr bufferId) const
     return QString();
 }
 
-int MainWindow::openFileCountForWin32Plugin(int scope) const
+int MainWindow::openFileCountForPlugin(int scope) const
 {
     if (scope == 1)
         return _mainDocTab ? _mainDocTab->count() : 0;
@@ -2619,13 +2619,13 @@ int MainWindow::openFileCountForWin32Plugin(int scope) const
         + (_subDocTab ? _subDocTab->count() : 0);
 }
 
-int MainWindow::currentDocumentIndexForWin32Plugin(int view) const
+int MainWindow::currentDocumentIndexForPlugin(int view) const
 {
     const DocTabView* tab = view == SUB_VIEW ? _subDocTab : _mainDocTab;
     return tab ? tab->currentIndex() : -1;
 }
 
-bool MainWindow::activateDocumentFromWin32Plugin(int view, int index)
+bool MainWindow::activateDocumentForPlugin(int view, int index)
 {
     DocTabView* tab = view == SUB_VIEW ? _subDocTab : _mainDocTab;
     if (!tab || index < 0 || index >= tab->count())
@@ -2637,14 +2637,14 @@ bool MainWindow::activateDocumentFromWin32Plugin(int view, int index)
     return true;
 }
 
-int MainWindow::currentLineForWin32Plugin() const
+int MainWindow::currentLineForPlugin() const
 {
     ScintillaEditView* view = currentActiveView();
     return view ? static_cast<int>(view->SendScintillaNpp(
         SCI_LINEFROMPOSITION, view->SendScintillaNpp(SCI_GETCURRENTPOS))) : -1;
 }
 
-int MainWindow::bufferEncodingForWin32Plugin(quintptr bufferId) const
+int MainWindow::bufferEncodingForPlugin(quintptr bufferId) const
 {
     Buffer* requested = reinterpret_cast<Buffer*>(bufferId);
     for (Buffer* buffer : MainFileManager.buffers()) {
@@ -2662,7 +2662,7 @@ int MainWindow::bufferEncodingForWin32Plugin(quintptr bufferId) const
     return -1;
 }
 
-bool MainWindow::setBufferEncodingFromWin32Plugin(
+bool MainWindow::setBufferEncodingForPlugin(
     quintptr bufferId, int encoding)
 {
     Buffer* requested = reinterpret_cast<Buffer*>(bufferId);
@@ -2701,7 +2701,7 @@ bool MainWindow::setBufferEncodingFromWin32Plugin(
     return false;
 }
 
-void MainWindow::setStatusBarTextFromWin32Plugin(
+void MainWindow::setPluginStatusBarText(
     int section, const QString& text)
 {
     QLabel* labels[] = {_docTypeLabel, _docSizeLabel, _posLabel,
@@ -2710,7 +2710,7 @@ void MainWindow::setStatusBarTextFromWin32Plugin(
         labels[section]->setText(text);
 }
 
-bool MainWindow::addToolbarCommandFromWin32Plugin(int commandId)
+bool MainWindow::addPluginToolbarCommand(int commandId)
 {
     if (!_fileToolBar)
         return false;

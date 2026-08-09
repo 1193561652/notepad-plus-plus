@@ -1,4 +1,4 @@
-#include "MISC/ToolbarIconTheme.h"
+#include "WinControls/ToolBar/ToolbarIconTheme.h"
 
 #include <QDir>
 #include <QFile>

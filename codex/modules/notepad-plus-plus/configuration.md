@@ -61,7 +61,7 @@
 
 2026-07-30 补充：`stylers.xml` 已支持保守写回，Style Configurator 可编辑全局
 和 lexer 样式；未知节点与属性保留。UDL 已支持创建、重命名、删除、导入和
-单语言导出。`autoCompletion/*.xml` 由 `MISC/AutoCompletionParser` 读取，
+单语言导出。`autoCompletion/*.xml` 由 `ScintillaComponent/AutoCompletionParser` 读取，
 用户目录优先于程序目录。
 
 ## 本地化索引

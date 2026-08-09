@@ -33,8 +33,8 @@
 #include "MISC/UiFont.h"
 #include "MISC/PluginsManager/PluginLoadJournal.h"
 #include "Parameters.h"
-#include "WinControls/Preference/PreferenceDlg.h"
-#include "WinControls/TabBar/DocTabView.h"
+#include "WinControls/Preference/preferenceDlg.h"
+#include "ScintillaComponent/DocTabView.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
 #include "ScintillaComponent/ScintillaEditView.h"
 #ifdef Q_OS_WIN
@@ -527,7 +527,7 @@ int main(int argc, char* argv[])
             return 86;
         }
         lifecycleFile.close();
-        if (!mainWindow.openFileFromWin32Plugin(lifecyclePath)) {
+        if (!mainWindow.openFileForPlugin(lifecyclePath)) {
             QFile::remove(lifecyclePath);
             FreeLibrary(probeModule);
             return 86;
@@ -1470,9 +1470,9 @@ int main(int argc, char* argv[])
                          reinterpret_cast<LPARAM>(currentName))
         || QString::fromWCharArray(currentPath)
             != QDir::toNativeSeparators(
-                mainWindow.currentPathForWin32Plugin())
+                mainWindow.currentPathForPlugin())
         || QString::fromWCharArray(currentName)
-            != QFileInfo(mainWindow.currentPathForWin32Plugin()).fileName()) {
+            != QFileInfo(mainWindow.currentPathForPlugin()).fileName()) {
         return 95;
     }
 

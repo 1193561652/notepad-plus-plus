@@ -14,7 +14,7 @@
 #include <QVector>
 #include <vector>
 #include <cstdint>
-#include "NativeLangSpeaker.h"
+#include "localization.h"
 #include "MISC/ConfigPathResolver.h"
 
 // ── 语言描述符（对应原版 langs.xml <Language> 元素） ─────────────────────────

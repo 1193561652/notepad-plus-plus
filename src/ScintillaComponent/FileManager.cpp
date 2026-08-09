@@ -1,5 +1,5 @@
 // FileManager.cpp - 文件管理器实现
-// 移植自: v8.4.6:PowerEditor/src/MISC/
+// 对应原版 ScintillaComponent/Buffer.cpp 中的 FileManager 实现
 
 #include "FileManager.h"
 #include "ScintillaComponent/ScintillaEditView.h"

@@ -1,6 +1,6 @@
 // DocumentMapPanel.cpp - 文档地图面板实现
 
-#include "DocumentMapPanel.h"
+#include "documentMap.h"
 #include <QPainter>
 #include <QVBoxLayout>
 #include <QMouseEvent>

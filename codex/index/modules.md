@@ -9,16 +9,14 @@
 
 - `src/main.cpp`：程序入口。
 - `src/MainWindow.h|cpp`：主窗口、菜单、工具栏、状态栏、多视图、停靠窗口、会话、最近文件、插件入口等集中协调逻辑。
-- `src/ScintillaComponent/`：编辑器组件、Buffer、查找替换、打印和 UDL 自定义词法器。
-- `src/MISC/FileManager.*`：Buffer 生命周期和文件加载保存管理。
-- `src/WinControls/TabBar/DocTabView.*`：标签页管理。
+- `src/ScintillaComponent/`：编辑器组件、Buffer/FileManager、DocTabView、自动完成、查找替换、打印和 UDL 自定义词法器。
 - `src/WinControls/DockingWnd/DockingManager.*`：对应原版同名管理类，统一管理四侧
   Dock 容器、面板注册、标签化、显示/隐藏、尺寸和状态。
-- `src/WinControls/DockingWnd/`：文件浏览、文档地图、函数列表等停靠面板；面板由
-  `MainWindow` 创建业务对象后交给 `DockingManager` 注册。
-- `src/WinControls/Preference/PreferenceDlg.*`：偏好设置对话框，与原版 `WinControls/Preference` 职责对齐。
+- `src/WinControls/DocumentMap/`、`FileBrowser/`、`FunctionList/`：各业务面板；
+  `MainWindow` 创建后交给 `DockingManager` 注册。
+- `src/WinControls/Preference/preferenceDlg.*`：偏好设置对话框，与原版路径和大小写对齐。
 - `src/Parameters.*`：配置管理。
-- `src/NativeLangSpeaker.*`：本地化/语言切换。
+- `src/localization.*`：本地化和 `NativeLangSpeaker` 语言切换。
 - `src/TinyXml/`：XML 配置解析。
 - `src/MISC/PluginsManager/`：插件运行边界、清单、更新计划和独立更新器。
 - `src/WinControls/PluginsAdmin/`：插件管理 UI 与展示模型。
@@ -92,11 +90,11 @@
 # 2026-07-23 索引增量
 
 - `src/MISC/PlatformServices.*`：跨平台文件管理器、终端、默认应用和回收站边界。
-- `src/MISC/FileAssociationModel.*`：v8.4.6 文件关联分类和扩展名规范化。
-- `src/MISC/ToolbarIconTheme.*`：解析 `toolbarIcons.xml` 并按原版固定名称加载
+- `src/MISC/RegExt/FileAssociationModel.*`：v8.4.6 文件关联分类和扩展名规范化。
+- `src/WinControls/ToolBar/ToolbarIconTheme.*`：解析 `toolbarIcons.xml` 并按原版固定名称加载
 - `src/MISC/ConfigPathResolver.*`：跨平台配置根目录决策、规范化与可写性验证
 - `src/MISC/ClosedFileHistory.*`：最近关闭文件 LIFO、去重和失效路径过滤
-- `src/MISC/FunctionListParser.*`：v8.4.6 Function List XML 加载和规则执行
+- `src/WinControls/FunctionList/functionParser.*`：v8.4.6 Function List XML 加载和规则执行
 - `codex/changes/2026-07-28-cross-platform-config-path.md`
 - `codex/analysis/2026-07-28-automatic-backlog-audit.md`
 - `codex/changes/2026-07-28-automatic-backlog-completion.md`
@@ -181,7 +179,7 @@
 
 ## 2026-07-25 编码与会话索引增量
 
-- `src/MISC/EncodingMapper.*`：Notepad++ 代码页与 Qt codec 名称映射。
+- `src/EncodingMapper.*`：Notepad++ 代码页与 Qt codec 名称映射。
 - `src/uchardet/`：无 BOM 传统编码探测，作为主程序和核心测试的内部源码。
 - `TextFileCodec::decode(data, TextDecodingOptions)`：BOM、声明、UTF-8、
   uchardet、fallback 的统一检测入口。

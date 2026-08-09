@@ -643,3 +643,18 @@
 - 原版 v8.4.6 成功回读 Qt 写出的亮色和暗色配置。
 - 验证报告：`codex/validation/2026-08-09-full-regression/README.md`。
 - 修改记录：`codex/changes/2026-08-09-dark-mode-config-compatibility.md`。
+
+## 2026-08-09 原版结构与接口审计
+
+- 以 `v8.4.6:PowerEditor/src` 为基线完成目录、所有者、核心接口和调用逻辑审计。
+- EncodingMapper、localization、FileManager、DocTabView、自动完成、文件关联、
+  ToolBar、DocumentMap、FileBrowser、FunctionList 和 preferenceDlg 已归位到原版职责目录。
+- `DockingWnd` 只保留 DockingManager，业务面板不再混入布局管理目录。
+- MainWindow 的插件宿主方法改为平台中性命名；`NPPM_*` 解释继续只存在于
+  `Win32PluginSystem`。
+- `MainWindow.cpp` 仍合并原版 Notepad_plus/NppCommands/NppIO/NppNotification 职责，
+  已记录为需要独立测试保护的纯结构重构，不在本批次冒险机械拆分。
+- 审计：`codex/analysis/2026-08-09-original-structure-interface-audit.md`。
+- 修改：`codex/changes/2026-08-09-original-structure-alignment.md`。
+- Release 全目标构建和 CTest `37/37` 通过；验证见
+  `codex/validation/2026-08-09-original-structure-alignment/README.md`。

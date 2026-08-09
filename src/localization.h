@@ -1,4 +1,4 @@
-// NativeLangSpeaker.h - Qt 移植版本
+// localization.h - NativeLangSpeaker 的 Qt 平台接口
 // 对应原版 localization.h 的 NativeLangSpeaker 类
 // 原版：Win32 HMENU/HWND + 整数命令 ID
 // Qt版：objectName 字符串 + QAction/QMenu/QWidget

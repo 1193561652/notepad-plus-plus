@@ -4,10 +4,10 @@
 
 - `src/ScintillaComponent/Buffer.h`
 - `src/ScintillaComponent/Buffer.cpp`
-- `src/MISC/FileManager.h`
-- `src/MISC/FileManager.cpp`
-- `src/WinControls/TabBar/DocTabView.h`
-- `src/WinControls/TabBar/DocTabView.cpp`
+- `src/ScintillaComponent/FileManager.h`
+- `src/ScintillaComponent/FileManager.cpp`
+- `src/ScintillaComponent/DocTabView.h`
+- `src/ScintillaComponent/DocTabView.cpp`
 - `src/MainWindow.h`
 - `src/MainWindow.cpp`
 

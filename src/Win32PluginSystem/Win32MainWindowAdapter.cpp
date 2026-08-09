@@ -123,7 +123,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         || message == NppMessageGetCurrentDirectory) {
         if (handled)
             *handled = true;
-        QString path = nppWindow->currentPathForWin32Plugin();
+        QString path = nppWindow->currentPathForPlugin();
         if (message == NppMessageGetFileName)
             path = QFileInfo(path).fileName();
         else if (message == NppMessageGetCurrentDirectory)
@@ -134,7 +134,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
     if (message == NppMessageMenuCommand) {
         if (handled)
             *handled = true;
-        return nppWindow->executeMenuCommandFromWin32Plugin(
+        return nppWindow->executePluginMenuCommand(
             static_cast<int>(lParam)) ? TRUE : FALSE;
     }
     if (message == NppMessageDoOpen) {
@@ -144,53 +144,53 @@ LRESULT Win32MainWindowAdapter::handleMessage(
             return FALSE;
         const QString path = QString::fromWCharArray(
             reinterpret_cast<const wchar_t*>(lParam));
-        return nppWindow->openFileFromWin32Plugin(path) ? TRUE : FALSE;
+        return nppWindow->openFileForPlugin(path) ? TRUE : FALSE;
     }
     if (message == NppMessageGetCurrentBufferId) {
         if (handled)
             *handled = true;
-        return static_cast<LRESULT>(nppWindow->currentBufferIdForWin32Plugin());
+        return static_cast<LRESULT>(nppWindow->currentBufferIdForPlugin());
     }
     if (message == NppMessageGetFullPathFromBufferId) {
         if (handled)
             *handled = true;
         return copyLegacyPathString(
-            QDir::toNativeSeparators(nppWindow->pathForWin32PluginBuffer(
+            QDir::toNativeSeparators(nppWindow->pathForPluginBuffer(
                 static_cast<quintptr>(wParam))), MAX_PATH, lParam);
     }
     if (message == NppMessageGetNbOpenFiles) {
         if (handled)
             *handled = true;
-        return nppWindow->openFileCountForWin32Plugin(
+        return nppWindow->openFileCountForPlugin(
             static_cast<int>(lParam));
     }
     if (message == NppMessageGetCurrentDocIndex) {
         if (handled)
             *handled = true;
-        return nppWindow->currentDocumentIndexForWin32Plugin(
+        return nppWindow->currentDocumentIndexForPlugin(
             static_cast<int>(lParam));
     }
     if (message == NppMessageActivateDoc) {
         if (handled)
             *handled = true;
-        return nppWindow->activateDocumentFromWin32Plugin(
+        return nppWindow->activateDocumentForPlugin(
             static_cast<int>(wParam), static_cast<int>(lParam));
     }
     if (message == NppMessageGetCurrentLine) {
         if (handled)
             *handled = true;
-        return nppWindow->currentLineForWin32Plugin();
+        return nppWindow->currentLineForPlugin();
     }
     if (message == NppMessageGetBufferEncoding) {
         if (handled)
             *handled = true;
-        return nppWindow->bufferEncodingForWin32Plugin(
+        return nppWindow->bufferEncodingForPlugin(
             static_cast<quintptr>(wParam));
     }
     if (message == NppMessageSetBufferEncoding) {
         if (handled)
             *handled = true;
-        return nppWindow->setBufferEncodingFromWin32Plugin(
+        return nppWindow->setBufferEncodingForPlugin(
             static_cast<quintptr>(wParam), static_cast<int>(lParam));
     }
     if (message == NppMessageSetStatusBar) {
@@ -198,7 +198,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
             *handled = true;
         if (!lParam)
             return FALSE;
-        nppWindow->setStatusBarTextFromWin32Plugin(
+        nppWindow->setPluginStatusBarText(
             static_cast<int>(wParam), QString::fromWCharArray(
                 reinterpret_cast<const wchar_t*>(lParam)));
         return TRUE;
@@ -206,7 +206,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
     if (message == NppMessageAddToolbarIconForDarkMode) {
         if (handled)
             *handled = true;
-        return nppWindow->addToolbarCommandFromWin32Plugin(
+        return nppWindow->addPluginToolbarCommand(
             static_cast<int>(wParam));
     }
     if (message == NppMessageGetPluginHomePath) {

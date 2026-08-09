@@ -1,5 +1,5 @@
 #include "PlatformServices.h"
-#include "FileAssociationModel.h"
+#include "RegExt/FileAssociationModel.h"
 
 #include <QDesktopServices>
 #include <QDir>

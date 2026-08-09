@@ -2,13 +2,13 @@
 
 ## 入口
 
-- `src/WinControls/Preference/PreferenceDlg.h|cpp`：Preferences 总对话框、19 个页面构建器、设置装载与写回。
+- `src/WinControls/Preference/preferenceDlg.h|cpp`：Preferences 总对话框、19 个页面构建器、设置装载与写回。
 - `src/WinControls/Grid/ShortcutMapper.h|cpp`：快捷键管理 UI、过滤、冲突检测和 `shortcuts.xml` 模型写回。
 - `src/WinControls/ProjectPanel/ProjectPanel.h|cpp`：Workspace/Edit UI 与工程树编辑。
 - `src/WinControls/ProjectPanel/WorkspaceDocument.h|cpp`：workspace XML 数据模型。
 - `src/MainWindow.cpp::setupAuxiliaryPanels()`：三个 Project Dock 的创建与信号连接。
 - `src/MainWindow.cpp::createMenus()`：Shortcut Mapper 和 Project Panel 菜单入口。
-- `src/NativeLangSpeaker.cpp::changeDlgLang()`：标签、按钮、表格表头和树顶层条目本地化。
+- `src/localization.cpp::changeDlgLang()`：标签、按钮、表格表头和树顶层条目本地化。
 - `resources/nativeLang/chineseSimplified.xml`：三个区域的简体中文资源。
 
 ## 修改约束

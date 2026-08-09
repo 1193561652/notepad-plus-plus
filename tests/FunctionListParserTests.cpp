@@ -1,4 +1,4 @@
-#include "MISC/FunctionListParser.h"
+#include "WinControls/FunctionList/functionParser.h"
 
 #include <QCoreApplication>
 #include <QDir>

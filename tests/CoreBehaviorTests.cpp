@@ -1,5 +1,5 @@
 #include "MISC/TextFileCodec.h"
-#include "MISC/EncodingMapper.h"
+#include "EncodingMapper.h"
 #include "ScintillaComponent/Buffer.h"
 
 #include <QCoreApplication>

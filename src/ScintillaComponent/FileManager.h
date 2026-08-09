@@ -1,12 +1,12 @@
 // FileManager.h - 文件管理器（单例）
-// 移植自: v8.4.6:PowerEditor/src/MISC/
+// 对应原版 ScintillaComponent/Buffer.h 中的 FileManager 接口
 
 #ifndef FILEMANAGER_H
 #define FILEMANAGER_H
 
 #include <QVector>
 #include <QString>
-#include "ScintillaComponent/Buffer.h"
+#include "Buffer.h"
 
 class FileManager
 {

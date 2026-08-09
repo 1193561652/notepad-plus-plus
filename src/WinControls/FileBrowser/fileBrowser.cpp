@@ -1,7 +1,7 @@
 // FileBrowserPanel.cpp - 文件浏览器面板实现
 // 移植自: v8.4.6:PowerEditor/src/WinControls/FileBrowser/
 
-#include "FileBrowserPanel.h"
+#include "fileBrowser.h"
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QDir>

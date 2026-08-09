@@ -1,4 +1,4 @@
-#include "MISC/FileManager.h"
+#include "ScintillaComponent/FileManager.h"
 #include "MISC/TextFileCodec.h"
 #include "ScintillaComponent/ScintillaEditView.h"
 #include "Parameters.h"

@@ -1,5 +1,5 @@
 #include "PluginAdminDialog.h"
-#include "NativeLangSpeaker.h"
+#include "localization.h"
 
 #include <QAbstractItemView>
 #include <QDialogButtonBox>

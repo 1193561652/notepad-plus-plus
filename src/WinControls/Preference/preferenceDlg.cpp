@@ -1,8 +1,8 @@
 // PreferenceDlg.cpp - 偏好设置对话框实现（19 个分类页面，与原版对应）
 
-#include "PreferenceDlg.h"
+#include "preferenceDlg.h"
 #include "Parameters.h"
-#include "MISC/FileAssociationModel.h"
+#include "MISC/RegExt/FileAssociationModel.h"
 #include "MISC/PlatformServices.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>

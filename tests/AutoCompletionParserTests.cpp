@@ -1,4 +1,4 @@
-#include "../src/MISC/AutoCompletionParser.h"
+#include "ScintillaComponent/AutoCompletionParser.h"
 
 #include <QCoreApplication>
 #include <QDir>

@@ -1,6 +1,6 @@
 // FunctionListPanel.cpp - 函数列表面板实现
 
-#include "FunctionListPanel.h"
+#include "functionListPanel.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QRegExp>
@@ -9,7 +9,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include "MISC/FunctionListParser.h"
+#include "functionParser.h"
 #include "Parameters.h"
 
 FunctionListPanel::FunctionListPanel(QWidget* parent)
