@@ -632,3 +632,14 @@
   完整 Qt 布局继续保存在 `qtState.ini`。
 - `AGENTS.md` 已将原版逻辑、类职责、生命周期和调用关系提升为强制移植基线。
 - 详细记录：`codex/changes/2026-08-08-qt-docking-manager-structure.md`。
+
+## 2026-08-09 全量回归与 DarkMode 兼容
+
+- Release 全量构建通过，CTest `37/37` 通过。
+- 重新采集原版 v8.4.6 亮/暗 100% 和 Qt 版亮/暗 100%/150% UI 矩阵，
+  覆盖 Find 与 Preferences 全部页面。
+- Qt 版改为读写原版 `DarkMode@enable`；旧的
+  `qtState.ini/Editor/darkMode` 不再覆盖公共配置，并会在写入时删除。
+- 原版 v8.4.6 成功回读 Qt 写出的亮色和暗色配置。
+- 验证报告：`codex/validation/2026-08-09-full-regression/README.md`。
+- 修改记录：`codex/changes/2026-08-09-dark-mode-config-compatibility.md`。

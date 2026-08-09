@@ -1912,6 +1912,9 @@ void NppParameters::feedGUIConfig(const TiXmlElement* el)
         _nppGUI._showOnlyOneEntryPerFoundLine =
             parseBool(attr(L"showOnlyOneEntryPerFoundLine"), true);
     }
+    else if (name == "DarkMode") {
+        _nppGUI._darkModeEnabled = parseBool(attr(L"enable"), false);
+    }
     // ── Qt 移植扩展配置 ────────────────────────────────────────────────────────
     else if (name == "EditorFont") {
         QString fn = attr(L"fontName");
@@ -2192,8 +2195,6 @@ void NppParameters::loadQtState()
         state.value("showEol", _nppGUI._showEol).toBool();
     _nppGUI._restoreSession =
         state.value("restoreSession", _nppGUI._restoreSession).toBool();
-    _nppGUI._darkModeEnabled =
-        state.value("darkMode", _nppGUI._darkModeEnabled).toBool();
     state.endGroup();
     _nppGUI._windowState =
         state.value("Window/state", _nppGUI._windowState).toByteArray();
@@ -2211,7 +2212,7 @@ bool NppParameters::writeQtState() const
     state.setValue("showWhitespace", _nppGUI._showWhitespace);
     state.setValue("showEol", _nppGUI._showEol);
     state.setValue("restoreSession", _nppGUI._restoreSession);
-    state.setValue("darkMode", _nppGUI._darkModeEnabled);
+    state.remove("darkMode");
     state.endGroup();
     state.setValue("Window/state", _nppGUI._windowState);
     state.sync();
@@ -2579,6 +2580,10 @@ bool NppParameters::writeConfigXml(const QString& filePath)
         el->SetAttribute(L"searchEngineChoice", _nppGUI._searchEngineChoice);
         el->SetAttribute(L"searchEngineCustom",
                          _nppGUI._searchEngineCustom.toStdWString().c_str());
+    }
+    {
+        TiXmlElement* el = makeCfgEl(guiConfigs, L"DarkMode");
+        el->SetAttribute(L"enable", bw(_nppGUI._darkModeEnabled));
     }
     if (TiXmlElement* el = findCfgEl(guiConfigs, L"Searching")) {
         el->SetAttribute(L"monospacedFontFindDlg",

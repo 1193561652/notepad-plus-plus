@@ -411,16 +411,13 @@ $oldScale = $env:QT_SCALE_FACTOR
 
 $process = $null
 try {
-    $arguments = @()
-    if ($ApplicationKind -eq "original") {
-        $arguments = @(
-            "-multiInst",
-            "-nosession",
-            "-noPlugin",
-            "-settingsDir=`"$resolvedSettings`""
-        )
-    }
-    else {
+    $arguments = @(
+        "-multiInst",
+        "-nosession",
+        "-noPlugin",
+        "-settingsDir=`"$resolvedSettings`""
+    )
+    if ($ApplicationKind -eq "qt") {
         $appDataRoot = Split-Path -Parent $resolvedSettings
         $env:APPDATA = $appDataRoot
         $env:LOCALAPPDATA = Join-Path $appDataRoot "Local"
@@ -430,18 +427,15 @@ try {
         Remove-Item Env:NPPQT_SMOKE_TEST -ErrorAction SilentlyContinue
     }
 
-    if ($arguments.Count -gt 0) {
-        $process = Start-Process -FilePath $resolvedExecutable `
-            -ArgumentList $arguments -PassThru
-    }
-    else {
-        $process = Start-Process -FilePath $resolvedExecutable -PassThru
-    }
+    $argumentLine = $arguments -join " "
+    $process = Start-Process -FilePath $resolvedExecutable `
+        -ArgumentList $argumentLine -PassThru
     $mainHandle = Wait-ForMainWindow $process
     [void][UiCaptureNative]::MoveWindow(
         $mainHandle, 80, 60, 1100, 760, $true)
     [void][UiCaptureNative]::ForceForegroundWindow($mainHandle)
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds $(
+        if ($ApplicationKind -eq "original") { 2000 } else { 500 })
 
     Save-WindowImage $mainHandle "main" | Out-Null
 
@@ -502,8 +496,18 @@ try {
         }
     }
     $preferencesHandle = Wait-ForProcessDialog $process $mainHandle
+    if ($ApplicationKind -eq "original") {
+        $listHandle = [UiCaptureNative]::GetDlgItem($preferencesHandle, 6002)
+        if ($listHandle -ne [IntPtr]::Zero) {
+            [void][UiCaptureNative]::SendMessage(
+                $listHandle, 0x0186, [UIntPtr]::Zero, [IntPtr]::Zero)
+            [void][UiCaptureNative]::SendMessage(
+                $preferencesHandle, 0x0111,
+                [UIntPtr]::new(71538), $listHandle)
+        }
+    }
     Start-Sleep -Milliseconds $(
-        if ($ApplicationKind -eq "original") { 1800 } else { 500 })
+        if ($ApplicationKind -eq "original") { 5000 } else { 500 })
     Save-WindowImage $preferencesHandle "preferences-dialog" | Out-Null
     $preferenceItemCount = Select-And-CaptureAutomationItems $preferencesHandle `
         ([System.Windows.Automation.ControlType]::ListItem) "preferences-page" 19
@@ -513,6 +517,13 @@ try {
     if ($preferenceItemCount -eq 0 -and
         $ApplicationKind -eq "original") {
         Capture-OriginalPreferencePagesFallback $preferencesHandle
+    }
+    if ($ApplicationKind -eq "original") {
+        $firstPage = Join-Path $OutputDirectory "preferences-page-00.png"
+        if (Test-Path -LiteralPath $firstPage) {
+            Copy-Item -LiteralPath $firstPage -Destination (
+                Join-Path $OutputDirectory "preferences-dialog.png") -Force
+        }
     }
     Send-Key $preferencesHandle 0x1B
     Start-Sleep -Milliseconds 200

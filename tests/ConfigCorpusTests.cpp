@@ -6,6 +6,7 @@
 #include <QDomDocument>
 #include <QFile>
 #include <QFileInfo>
+#include <QSettings>
 #include <QTemporaryDir>
 #include <algorithm>
 #include <cstdio>
@@ -103,6 +104,31 @@ bool addPreservationSentinels(const QString& path, QString* error)
         file.appendChild(fileChild);
     }
 
+    return saveDom(path, document, error);
+}
+
+bool setDarkMode(const QString& path, bool enabled, QString* error)
+{
+    QDomDocument document;
+    if (!loadDom(path, &document, error))
+        return false;
+    const QDomNodeList configs = document.elementsByTagName("GUIConfig");
+    for (int i = 0; i < configs.count(); ++i) {
+        QDomElement element = configs.at(i).toElement();
+        if (element.attribute("name") == "DarkMode") {
+            element.setAttribute("enable", enabled ? "yes" : "no");
+            return saveDom(path, document, error);
+        }
+    }
+    const QDomNodeList containers = document.elementsByTagName("GUIConfigs");
+    if (containers.isEmpty()) {
+        *error = "GUIConfigs container is missing";
+        return false;
+    }
+    QDomElement element = document.createElement("GUIConfig");
+    element.setAttribute("name", "DarkMode");
+    element.setAttribute("enable", enabled ? "yes" : "no");
+    containers.at(0).appendChild(element);
     return saveDom(path, document, error);
 }
 
@@ -216,6 +242,19 @@ int main(int argc, char** argv)
         std::fprintf(stderr, "could not prepare corpus: %s\n", qPrintable(error));
         return 2;
     }
+    if (mode == "config") {
+        if (!setDarkMode(targetPath, true, &error)) {
+            std::fprintf(stderr, "could not enable original DarkMode: %s\n",
+                         qPrintable(error));
+            return 2;
+        }
+        QFile staleQtState(userPath + "/qtState.ini");
+        if (!staleQtState.open(QFile::WriteOnly | QFile::Truncate)
+            || staleQtState.write("[Editor]\ndarkMode=false\n") < 0) {
+            std::fprintf(stderr, "could not create stale Qt state\n");
+            return 2;
+        }
+    }
     const QString expectedPath = temporary.path() + "/expected.xml";
     if (!QFile::copy(targetPath, expectedPath)) {
         std::fprintf(stderr, "could not preserve expected corpus\n");
@@ -253,6 +292,20 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    if (mode == "config") {
+        if (!parameters.getNppGUI()._darkModeEnabled) {
+            std::fprintf(stderr,
+                         "original DarkMode setting was not loaded\n");
+            return 1;
+        }
+        parameters.getNppGUI()._darkModeEnabled = false;
+        if (!setDarkMode(expectedPath, false, &error)) {
+            std::fprintf(stderr, "could not update expected DarkMode: %s\n",
+                         qPrintable(error));
+            return 2;
+        }
+    }
+
     bool written = true;
     if (mode == "config")
         written = parameters.writeNppGUI() && parameters.writeFindHistory();
@@ -273,6 +326,14 @@ int main(int argc, char** argv)
         std::fprintf(stderr, "%s\ncorpus: %s\n", qPrintable(error),
                      qPrintable(sourcePath));
         return 1;
+    }
+    if (mode == "config") {
+        QSettings qtState(userPath + "/qtState.ini", QSettings::IniFormat);
+        if (qtState.contains("Editor/darkMode")) {
+            std::fprintf(stderr,
+                         "legacy Qt darkMode key was not removed\n");
+            return 1;
+        }
     }
 
     return 0;

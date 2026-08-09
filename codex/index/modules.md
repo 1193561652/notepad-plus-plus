@@ -107,7 +107,7 @@
 - `MainWindow::onReplaceAllOpenedDocsRequested()`：按 Buffer 去重替换打开文档。
 - `MainWindow::onReplaceInFilesRequested()`：目录批量替换、二进制跳过、脏文档保护、编码/BOM 保持和 QSaveFile 原子写回。
 - `MainWindow::setupAuxiliaryPanels()`：Document List、Project Panels、Clipboard History、Character Panel。
-- `NppParameters::feedGUIConfig()` / `writeConfigXml()`：新增 openSaveDir、Print、SmartHighLight、DateTime、delimiterSelection、multiInst、URL、searchEngine。
+- `NppParameters::feedGUIConfig()` / `writeConfigXml()`：管理 openSaveDir、Print、SmartHighLight、DateTime、delimiterSelection、multiInst、URL、searchEngine，并通过原版 `DarkMode@enable` 共享暗色模式；Qt 私有状态不再覆盖该值。
 
 ## 命令行与实例边界
 

@@ -144,3 +144,13 @@
 - `shortcuts.xml` 的 UserDefinedCommands 已加载到 Run 菜单；Macros 仍按既有保守替换策略写回。
 - `contextMenu.xml` 已由编辑器右键菜单动态消费；插件条目按当前范围忽略。
 - 已通过便携模式往返测试验证未知属性和 FutureFeature 节点保留。
+
+## 2026-08-09 DarkMode 兼容更新
+
+- 暗色模式改为读取和写回原版
+  `GUIConfig name="DarkMode" enable="yes|no"` 节点。
+- Qt 写回时保留该节点已有的原版颜色属性；当前模型只管理 `enable`。
+- `qtState.ini/Editor/darkMode` 已废弃，不再读取，并在下次写入 Qt 状态时删除，
+  因此不会覆盖公共 `config.xml`。
+- 配置语料覆盖已有 DarkMode 节点和缺失节点后创建两种情况。
+- 原版 v8.4.6 对 Qt 写回的亮色和暗色配置回读均通过。
