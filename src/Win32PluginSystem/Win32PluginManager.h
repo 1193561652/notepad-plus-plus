@@ -26,6 +26,7 @@ class QMainWindow;
 class QWidget;
 class ScintillaEditView;
 class DockingManager;
+namespace Scintilla { struct NotificationData; }
 
 class Win32PluginManager final : public QObject
 {
@@ -76,7 +77,24 @@ public:
     bool executePluginCommand(int pluginIndex, int functionIndex,
                               QString* errorMessage = nullptr);
     LRESULT relayMessage(UINT message, WPARAM wParam, LPARAM lParam) const;
+    void notifyScintilla(const Scintilla::NotificationData& notification,
+                         bool fromMainEditor);
+    void notifyReady();
+    void notifyFileBeforeLoad();
+    void notifyFileBeforeOpen(quintptr bufferId);
+    void notifyFileOpened(quintptr bufferId);
+    void notifyFileLoadFailed(quintptr bufferId);
     void notifyFileBeforeClose(quintptr bufferId);
+    void notifyFileClosed(quintptr bufferId);
+    void notifyFileBeforeSave(quintptr bufferId);
+    void notifyFileSaved(quintptr bufferId);
+    void notifyBufferActivated(quintptr bufferId);
+    void notifyLanguageChanged(quintptr bufferId);
+    void notifyWordStylesUpdated(quintptr bufferId);
+    void notifyReadOnlyChanged(quintptr bufferId, bool readOnly, bool dirty);
+    void notifyDarkModeChanged();
+    void notifyBeforeShutdown();
+    void notifyCancelShutdown();
 
 private:
     struct LoadedPlugin {
@@ -90,7 +108,8 @@ private:
     };
 
     void unloadPlugins();
-    void notifyPlugins(unsigned int code, quintptr idFrom = 0) const;
+    void notifyPlugins(unsigned int code, quintptr idFrom = 0,
+                       HWND hwndFrom = nullptr) const;
     bool executeMimeToolsSamlDecode(QString* errorMessage);
     void showMimeToolsAbout();
     void showJsonViewerAbout();

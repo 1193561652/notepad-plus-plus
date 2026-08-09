@@ -9,6 +9,7 @@
 #include <zlib.h>
 #include "MISC/PluginsManager/PluginArtifactResolver.h"
 #include "ScintillaComponent/ScintillaEditView.h"
+#include "ScintillaStructures.h"
 #include "Win32PluginSystem/Win32EditorMessageAdapter.h"
 #include "WinControls/DockingWnd/DockingManager.h"
 
@@ -399,12 +400,132 @@ void Win32PluginManager::notifyFileBeforeClose(quintptr bufferId)
     notifyPlugins(NppNotificationFileBeforeClose, bufferId);
 }
 
+void Win32PluginManager::notifyScintilla(
+    const Scintilla::NotificationData& source, bool fromMainEditor)
+{
+    SCNotification notification{};
+    notification.nmhdr.hwndFrom = fromMainEditor
+        ? mainEditorHandle() : secondaryEditorHandle();
+    notification.nmhdr.idFrom = source.nmhdr.idFrom;
+    notification.nmhdr.code = static_cast<unsigned int>(source.nmhdr.code);
+    notification.position = source.position;
+    notification.ch = source.ch;
+    notification.modifiers = static_cast<int>(source.modifiers);
+    notification.modificationType = static_cast<int>(source.modificationType);
+    notification.text = source.text;
+    notification.length = source.length;
+    notification.linesAdded = source.linesAdded;
+    notification.message = static_cast<int>(source.message);
+    notification.wParam = source.wParam;
+    notification.lParam = source.lParam;
+    notification.line = source.line;
+    notification.foldLevelNow = static_cast<int>(source.foldLevelNow);
+    notification.foldLevelPrev = static_cast<int>(source.foldLevelPrev);
+    notification.margin = source.margin;
+    notification.listType = source.listType;
+    notification.x = source.x;
+    notification.y = source.y;
+    notification.token = source.token;
+    notification.annotationLinesAdded = source.annotationLinesAdded;
+    notification.updated = static_cast<int>(source.updated);
+    notification.listCompletionMethod =
+        static_cast<int>(source.listCompletionMethod);
+    notification.characterSource = static_cast<int>(source.characterSource);
+
+    for (const LoadedPlugin& plugin : _loadedPlugins) {
+        if (plugin.beNotified)
+            plugin.beNotified(&notification);
+    }
+}
+
+void Win32PluginManager::notifyReady()
+{
+    notifyPlugins(NppNotificationReady);
+}
+
+void Win32PluginManager::notifyFileBeforeLoad()
+{
+    notifyPlugins(NppNotificationFileBeforeLoad);
+}
+
+void Win32PluginManager::notifyFileBeforeOpen(quintptr bufferId)
+{
+    notifyPlugins(NppNotificationFileBeforeOpen, bufferId);
+}
+
+void Win32PluginManager::notifyFileOpened(quintptr bufferId)
+{
+    notifyPlugins(NppNotificationFileOpened, bufferId);
+}
+
+void Win32PluginManager::notifyFileLoadFailed(quintptr bufferId)
+{
+    notifyPlugins(NppNotificationFileLoadFailed, bufferId);
+}
+
+void Win32PluginManager::notifyFileClosed(quintptr bufferId)
+{
+    notifyPlugins(NppNotificationFileClosed, bufferId);
+}
+
+void Win32PluginManager::notifyFileBeforeSave(quintptr bufferId)
+{
+    notifyPlugins(NppNotificationFileBeforeSave, bufferId);
+}
+
+void Win32PluginManager::notifyFileSaved(quintptr bufferId)
+{
+    notifyPlugins(NppNotificationFileSaved, bufferId);
+}
+
+void Win32PluginManager::notifyBufferActivated(quintptr bufferId)
+{
+    notifyPlugins(NppNotificationBufferActivated, bufferId);
+}
+
+void Win32PluginManager::notifyLanguageChanged(quintptr bufferId)
+{
+    notifyPlugins(NppNotificationLanguageChanged, bufferId);
+}
+
+void Win32PluginManager::notifyWordStylesUpdated(quintptr bufferId)
+{
+    notifyPlugins(NppNotificationWordStylesUpdated, bufferId);
+}
+
+void Win32PluginManager::notifyReadOnlyChanged(
+    quintptr bufferId, bool readOnly, bool dirty)
+{
+    quintptr status = 0;
+    if (readOnly)
+        status |= NppDocumentStatusReadOnly;
+    if (dirty)
+        status |= NppDocumentStatusBufferDirty;
+    notifyPlugins(NppNotificationReadOnlyChanged, status,
+                  reinterpret_cast<HWND>(bufferId));
+}
+
+void Win32PluginManager::notifyDarkModeChanged()
+{
+    notifyPlugins(NppNotificationDarkModeChanged);
+}
+
+void Win32PluginManager::notifyBeforeShutdown()
+{
+    notifyPlugins(NppNotificationBeforeShutdown);
+}
+
+void Win32PluginManager::notifyCancelShutdown()
+{
+    notifyPlugins(NppNotificationCancelShutdown);
+}
+
 void Win32PluginManager::notifyPlugins(
-    unsigned int code, quintptr idFrom) const
+    unsigned int code, quintptr idFrom, HWND hwndFrom) const
 {
     SCNotification notification{};
     notification.nmhdr.code = code;
-    notification.nmhdr.hwndFrom = mainWindowHandle();
+    notification.nmhdr.hwndFrom = hwndFrom ? hwndFrom : mainWindowHandle();
     notification.nmhdr.idFrom = static_cast<uptr_t>(idFrom);
     for (const LoadedPlugin& plugin : _loadedPlugins) {
         if (plugin.beNotified)

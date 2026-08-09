@@ -631,6 +631,21 @@ if(BUILD_TESTING)
             npp_prepare_plugin_archive(NPP_PLUGIN_DEMO_ARCHIVE
                 "third_party/win32-plugins/NppPluginDemo/4.2/x64/pluginDemo.v4.2.bin.x64.zip"
                 "afa33fe958a907c2b80c0e8ae26deaea533455a2a2826f30a9b46fba0ba59941")
+            npp_prepare_plugin_archive(NPP_GOTO_LINE_COL_ARCHIVE
+                "third_party/win32-plugins/GotoLineCol/2.4.2.0/x64/GotoLineCol_x64.zip"
+                "afaa08a53ec8482875454cb1270ab4faf870e2fcefbed9c4e628ae0058920a12")
+            npp_prepare_plugin_archive(NPP_RANDOM_VALUES_ARCHIVE
+                "third_party/win32-plugins/RandomValuesNppPlugin/0.2.1/x64/RandomValuesNppPlugin_x64.zip"
+                "b404204c47e5eccf621701c529499bf989b8a8adfb69a6d2cdfbcb5ff60ab3be")
+            npp_prepare_plugin_archive(NPP_MERGE_FILES_ARCHIVE
+                "third_party/win32-plugins/Merge files in one/1.2.0.0/x64/Merge.files.in.one_x64.zip"
+                "eab174d0f5926a64a75978c7efe2ff508c9bb7c13f7c97eb8bb410afa8604fed")
+            npp_prepare_plugin_archive(NPP_SELECT_TO_CLIPBOARD_ARCHIVE
+                "third_party/win32-plugins/SelectToClipboard/1.0.3/x64/SelectToClipboard_x64_v1.0.3.zip"
+                "b5dfc0dbfea79cb609d7f6a522e824a1b3ea9ecc471c215eaf28a846906e93c5")
+            npp_prepare_plugin_archive(NPP_URL_PLUGIN_ARCHIVE
+                "third_party/win32-plugins/urlPlugin/1.2.0.0/x64/urlPlugin_x64.zip"
+                "3bab2b9494d6fbdaac17be5b410a18c074dec5e7dc440e2c1c5c61aaecb57588")
             file(TO_CMAKE_PATH "${CMAKE_BINARY_DIR}/notepadpp-qt.exe"
                  NPP_MIMETOOLS_TEST_APPLICATION)
             file(TO_CMAKE_PATH "${CMAKE_BINARY_DIR}/plugins"

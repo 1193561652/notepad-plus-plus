@@ -451,30 +451,177 @@ int main(int argc, char* argv[])
         HMODULE probeModule = LoadLibraryW(
             reinterpret_cast<LPCWSTR>(
                 QString::fromUtf8(NPP_VALID_REGISTRATION_PLUGIN).utf16()));
-        using CountFunction = LONG (*)();
-        using BufferIdFunction = ULONG_PTR (*)();
-        const auto closeCount = probeModule
-            ? reinterpret_cast<CountFunction>(
-                  GetProcAddress(probeModule, "getFileBeforeCloseCount"))
+        using ResetFunction = void (*)();
+        using CountFunction = LONG (*)(UINT);
+        using ValueFunction = ULONG_PTR (*)(UINT);
+        using PointerFunction = ULONG_PTR (*)();
+        using SequenceCountFunction = LONG (*)();
+        using SequenceCodeFunction = UINT (*)(int);
+        const auto resetNotifications = probeModule
+            ? reinterpret_cast<ResetFunction>(
+                  GetProcAddress(probeModule, "resetNotifications"))
             : nullptr;
-        const auto closedBufferId = probeModule
-            ? reinterpret_cast<BufferIdFunction>(
-                  GetProcAddress(probeModule, "getLastClosedBufferId"))
+        const auto notificationCount = probeModule
+            ? reinterpret_cast<CountFunction>(
+                  GetProcAddress(probeModule, "getNotificationCount"))
+            : nullptr;
+        const auto lastNotificationId = probeModule
+            ? reinterpret_cast<ValueFunction>(
+                  GetProcAddress(probeModule, "getLastNotificationId"))
+            : nullptr;
+        const auto lastNotificationWindow = probeModule
+            ? reinterpret_cast<ValueFunction>(
+                  GetProcAddress(probeModule, "getLastNotificationWindow"))
+            : nullptr;
+        const auto notificationSequenceCount = probeModule
+            ? reinterpret_cast<SequenceCountFunction>(GetProcAddress(
+                  probeModule, "getNotificationSequenceCount"))
+            : nullptr;
+        const auto notificationSequenceCode = probeModule
+            ? reinterpret_cast<SequenceCodeFunction>(GetProcAddress(
+                  probeModule, "getNotificationSequenceCode"))
+            : nullptr;
+        const auto scintillaNotificationCount = probeModule
+            ? reinterpret_cast<CountFunction>(GetProcAddress(
+                  probeModule, "getScintillaNotificationCount"))
+            : nullptr;
+        const auto lastScintillaNotificationWindow = probeModule
+            ? reinterpret_cast<PointerFunction>(GetProcAddress(
+                  probeModule, "getLastScintillaNotificationWindow"))
             : nullptr;
         QAction* closeAction = mainWindow.findChild<QAction*>(
             QStringLiteral("closeAction"));
-        if (!probeModule || !closeCount || !closedBufferId || !closeAction) {
+        QAction* saveAction = mainWindow.findChild<QAction*>(
+            QStringLiteral("saveAction"));
+        QAction* readOnlyAction = mainWindow.findChild<QAction*>(
+            QStringLiteral("readOnlyAction"));
+        if (!probeModule || !resetNotifications || !notificationCount
+            || !lastNotificationId || !lastNotificationWindow
+            || !notificationSequenceCount || !notificationSequenceCode
+            || !scintillaNotificationCount
+            || !lastScintillaNotificationWindow
+            || !closeAction || !saveAction || !readOnlyAction) {
             if (probeModule)
                 FreeLibrary(probeModule);
             return 84;
         }
+
+        resetNotifications();
+        mainTabs->editor()->setText(QStringLiteral("SCN probe"));
+        SendMessageW(win32Plugins->mainEditorHandle(), SCI_SETSEL, 0, 3);
+        QApplication::processEvents();
+        const bool scintillaNotificationsReceived =
+            scintillaNotificationCount(SCN_MODIFIED) >= 1
+            && scintillaNotificationCount(SCN_UPDATEUI) >= 1
+            && lastScintillaNotificationWindow()
+                == reinterpret_cast<ULONG_PTR>(
+                    win32Plugins->mainEditorHandle());
+        resetNotifications();
+        const QString lifecyclePath = QDir::temp().filePath(
+            QStringLiteral("npp-qt-plugin-notification-%1.txt")
+                .arg(GetCurrentProcessId()));
+        QFile lifecycleFile(lifecyclePath);
+        if (!lifecycleFile.open(QFile::WriteOnly | QFile::Truncate)
+            || lifecycleFile.write("initial\n") < 0) {
+            FreeLibrary(probeModule);
+            return 86;
+        }
+        lifecycleFile.close();
+        if (!mainWindow.openFileFromWin32Plugin(lifecyclePath)) {
+            QFile::remove(lifecyclePath);
+            FreeLibrary(probeModule);
+            return 86;
+        }
+        QApplication::processEvents();
+        const ULONG_PTR openedBufferId =
+            lastNotificationId(NppNotificationFileOpened);
+        const bool openNotificationsReceived =
+            notificationCount(NppNotificationFileBeforeLoad) == 1
+            && notificationCount(NppNotificationFileBeforeOpen) == 1
+            && notificationCount(NppNotificationFileOpened) == 1
+            && openedBufferId != 0
+            && lastNotificationId(NppNotificationFileBeforeOpen)
+                == openedBufferId
+            && notificationCount(NppNotificationBufferActivated) >= 1;
+
+        mainTabs->editor()->setText(QStringLiteral("updated\n"));
+        saveAction->trigger();
+        QApplication::processEvents();
+        const bool saveNotificationsReceived =
+            notificationCount(NppNotificationFileBeforeSave) == 1
+            && notificationCount(NppNotificationFileSaved) == 1
+            && lastNotificationId(NppNotificationFileBeforeSave)
+                == openedBufferId
+            && lastNotificationId(NppNotificationFileSaved)
+                == openedBufferId;
+
+        const bool languageChanged =
+            mainWindow.setCurrentLanguageTypeFromPlugin(57)
+            && notificationCount(NppNotificationLanguageChanged) == 1
+            && lastNotificationId(NppNotificationLanguageChanged)
+                == openedBufferId;
+        readOnlyAction->trigger();
+        readOnlyAction->trigger();
+        QApplication::processEvents();
+        const bool readOnlyNotificationsReceived =
+            notificationCount(NppNotificationReadOnlyChanged) == 2
+            && lastNotificationWindow(NppNotificationReadOnlyChanged)
+                == openedBufferId
+            && lastNotificationId(NppNotificationReadOnlyChanged) == 0;
+
+        win32Plugins->notifyWordStylesUpdated(openedBufferId);
+        win32Plugins->notifyDarkModeChanged();
+        win32Plugins->notifyBeforeShutdown();
+        win32Plugins->notifyCancelShutdown();
+        const bool commonNotificationsReceived =
+            notificationCount(NppNotificationWordStylesUpdated) == 1
+            && notificationCount(NppNotificationDarkModeChanged) == 1
+            && notificationCount(NppNotificationBeforeShutdown) == 1
+            && notificationCount(NppNotificationCancelShutdown) == 1;
+
         closeAction->trigger();
         QApplication::processEvents();
-        const bool closeNotificationReceived = closeCount() == 1
-            && closedBufferId() != 0;
+        const bool closeNotificationsReceived =
+            notificationCount(NppNotificationFileBeforeClose) == 1
+            && notificationCount(NppNotificationFileClosed) == 1
+            && lastNotificationId(NppNotificationFileBeforeClose)
+                == openedBufferId
+            && lastNotificationId(NppNotificationFileClosed)
+                == openedBufferId;
+        auto firstSequenceIndex = [&](UINT code) {
+            for (int i = 0; i < notificationSequenceCount(); ++i) {
+                if (notificationSequenceCode(i) == code)
+                    return i;
+            }
+            return -1;
+        };
+        const int beforeLoadIndex =
+            firstSequenceIndex(NppNotificationFileBeforeLoad);
+        const int beforeOpenIndex =
+            firstSequenceIndex(NppNotificationFileBeforeOpen);
+        const int openedIndex = firstSequenceIndex(NppNotificationFileOpened);
+        const int beforeSaveIndex =
+            firstSequenceIndex(NppNotificationFileBeforeSave);
+        const int savedIndex = firstSequenceIndex(NppNotificationFileSaved);
+        const int beforeCloseIndex =
+            firstSequenceIndex(NppNotificationFileBeforeClose);
+        const int closedIndex = firstSequenceIndex(NppNotificationFileClosed);
+        const bool lifecycleOrderCorrect = beforeLoadIndex >= 0
+            && beforeLoadIndex < beforeOpenIndex
+            && beforeOpenIndex < openedIndex
+            && openedIndex < beforeSaveIndex
+            && beforeSaveIndex < savedIndex
+            && savedIndex < beforeCloseIndex
+            && beforeCloseIndex < closedIndex;
+        QFile::remove(lifecyclePath);
         FreeLibrary(probeModule);
-        if (!closeNotificationReceived)
+        if (!scintillaNotificationsReceived
+            || !openNotificationsReceived || !saveNotificationsReceived
+            || !languageChanged || !readOnlyNotificationsReceived
+            || !commonNotificationsReceived || !closeNotificationsReceived
+            || !lifecycleOrderCorrect) {
             return 86;
+        }
         return 0;
     }
 #endif
@@ -701,7 +848,12 @@ int main(int argc, char* argv[])
         {"NPPJSONViewer", "1.41"},
         {"JsonTools", "3.2.0"},
         {"nppConverter", "4.4.0"},
-        {"NppPluginDemo", "4.2"}
+        {"NppPluginDemo", "4.2"},
+        {"GotoLineCol", "2.4.2.0"},
+        {"RandomValuesNppPlugin", "0.2.1"},
+        {"Merge files in one", "1.2.0.0"},
+        {"SelectToClipboard", "1.0.3"},
+        {"urlPlugin", "1.2.0.0"}
     };
     const QDir pluginRoot(QDir(QCoreApplication::applicationDirPath())
                               .filePath(QStringLiteral("plugins")));
@@ -725,11 +877,16 @@ int main(int argc, char* argv[])
         QStringLiteral("BracketsCheck"),
         QStringLiteral("Code alignment"),
         QStringLiteral("Converter"),
+        QStringLiteral("Goto Line, Column"),
+        QStringLiteral("Merge files in one"),
         QStringLiteral("Notepad++ plugin demo"),
+        QStringLiteral("Random values"),
         QStringLiteral("Reverse Lines"),
         QStringLiteral("Remove Duplicate lines"),
         QStringLiteral("SecurePad"),
-        QStringLiteral("SelectQuotedText")
+        QStringLiteral("SelectQuotedText"),
+        QStringLiteral("Selection to Clipboard"),
+        QStringLiteral("URL Plugin")
     };
     QFile jsonViewerDiagnostic(
         output + QStringLiteral("/json-viewer-commands.txt"));
@@ -806,6 +963,40 @@ int main(int argc, char* argv[])
         || runSelectedCommand(QStringLiteral("Converter"), 1,
                               QByteArray("4E7070")) != QByteArray("Npp")) {
         return 108;
+    }
+
+    struct PluginCommandTableExpectation {
+        const char* name;
+        int count;
+        int separatorIndex;
+    };
+    const PluginCommandTableExpectation addedPluginTables[] = {
+        {"Goto Line, Column", 4, 2},
+        {"Random values", 11, 5},
+        {"Merge files in one", 2, -1},
+        {"Selection to Clipboard", 2, -1},
+        {"URL Plugin", 5, 3}
+    };
+    for (const PluginCommandTableExpectation& expectation
+         : addedPluginTables) {
+        const int index = loadedPluginNames.indexOf(
+            QString::fromLatin1(expectation.name));
+        if (index < 0
+            || win32Plugins->loadedPluginFunctionCount(index)
+                != expectation.count
+            || (expectation.separatorIndex >= 0
+                && !win32Plugins->isLoadedPluginFunctionSeparator(
+                    index, expectation.separatorIndex))) {
+            return 110;
+        }
+    }
+    const QString randomGuid = QString::fromUtf8(
+        runSelectedCommand(QStringLiteral("Random values"), 2, QByteArray()))
+        .trimmed();
+    if (!QRegExp(QStringLiteral(
+            "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"))
+             .exactMatch(randomGuid)) {
+        return 110;
     }
 
     wchar_t pluginConfigPath[MAX_PATH]{};

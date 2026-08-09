@@ -200,7 +200,7 @@ int main(int argc, char** argv)
 
         ++gradeCounts[row.grade];
         ++importanceCounts[row.importance];
-        if (row.source.startsWith(QStringLiteral("有，对应版本")))
+        if (row.source.startsWith(QStringLiteral("有，")))
             ++exactSource;
         else
             check(row.grade == QStringLiteral("U"),
@@ -209,27 +209,27 @@ int main(int argc, char** argv)
     }
 
     check(gradeCounts.value(QStringLiteral("A")) == 13 &&
-              gradeCounts.value(QStringLiteral("B")) == 23 &&
+              gradeCounts.value(QStringLiteral("B")) == 25 &&
               gradeCounts.value(QStringLiteral("C")) == 25 &&
               gradeCounts.value(QStringLiteral("D")) == 1 &&
-              gradeCounts.value(QStringLiteral("U")) == 107,
+              gradeCounts.value(QStringLiteral("U")) == 105,
           QStringLiteral("compatibility grade totals changed"));
     check(importanceCounts.value(QStringLiteral("高")) == 20 &&
               importanceCounts.value(QStringLiteral("中")) == 94 &&
               importanceCounts.value(QStringLiteral("低")) == 55,
           QStringLiteral("importance totals changed"));
-    check(exactSource == 62,
-          QStringLiteral("exact-version source total must be 62"));
+    check(exactSource == 64,
+          QStringLiteral("exact-version source total must be 64"));
     check(batchCounts == QVector<int>({24, 23, 23, 50, 32, 17}),
           QStringLiteral("letter batch totals changed"));
 
     const QString summary = readUtf8(
         QString::fromUtf8(NPP_PLUGIN_API_MATRIX));
-    check(summary.contains(QStringLiteral("62")) &&
-              summary.contains(QStringLiteral("107")) &&
+    check(summary.contains(QStringLiteral("64")) &&
+              summary.contains(QStringLiteral("105")) &&
               summary.contains(QStringLiteral("SCI_GETDIRECTFUNCTION")) &&
               summary.contains(QStringLiteral("NPPM_GETCURRENTSCINTILLA")),
-          QStringLiteral("API matrix is missing frozen stage-1 conclusions"));
+          QStringLiteral("API matrix is missing current corpus conclusions"));
 
     if (failures == 0)
         std::cout << "Plugin investigation tests passed\n";

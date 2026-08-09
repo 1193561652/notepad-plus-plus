@@ -1,5 +1,12 @@
 # 插件系统功能索引
 
+## 2026-08-09 高、中优先级真实插件批次
+
+- 白名单新增 GotoLineCol 2.4.2.0、RandomValuesNppPlugin 0.2.1、Merge files in one 1.2.0.0、SelectToClipboard 1.0.3、urlPlugin 1.2.0.0；插件 DLL 未修改。
+- `Win32PluginManager` 现在把两个永久编辑器的 `SCN_*` 逐字段转换为插件 ABI，并保留主/副代理 HWND 来源。
+- 本批次新增的 `NPPM_*` / `SCI_*` 仅来自上述插件的对应版本源码调用证据。
+- XMLTools、DoxyIt、SurroundSelection、ElasticTabstops、SessionMgr、Linter、WakaTime 的跳过边界见 `codex/changes/2026-08-09-priority-plugin-compatibility.md`。
+
 ## 范围
 
 插件系统分为两个独立范围：
@@ -54,6 +61,12 @@
   兼容层使用。
 - 当前 Qt 版与原版一样拥有永久的主/副编辑器，插件可长期保存这两个稳定 HWND；
   标签切换只更换其 Scintilla document pointer。
+- 常用 v8.4.6 通知已由 `Win32PluginManager` 统一构造：启动/退出协商、Buffer 激活、
+  打开/保存/关闭、加载失败、语言、样式、只读状态和暗色模式。主窗口只在拥有相应
+  生命周期的代码路径触发通知，适配层保持原版 `hwndFrom`、`idFrom` 和状态位语义。
+- `NPPN_READONLYCHANGED` 按原版把 Buffer ID 放在 `hwndFrom`，把
+  `DOCSTATUS_READONLY` / `DOCSTATUS_BUFFERDIRTY` 放在 `idFrom`；双视图只读状态通过
+  `MainWindow::setBufferReadOnly()` 同步。
 
 ## 当前行为
 
@@ -95,14 +108,16 @@
 - Windows 构建已验证 PowerShell ZIP 实际执行路径。
 - `plugin-investigation-tests`：核对 v8.4.6 x86 清单与 169 项 inventory、importance、
   六个字母批次、兼容等级和 API/依赖统一矩阵。
+- `ui-plugin-registration-rollback` 使用真实测试 DLL 记录通知，验证打开、保存、关闭的
+  顺序和 Buffer ID，以及激活、语言、只读、样式、主题和退出协商通知的 ABI 参数。
 - 真实公网下载、UAC 交互确认和非 Windows 原生插件包仍属于发布环境/人工矩阵，
   不是代码逻辑缺口。
 
 ## 仍延期的插件工作
 
 - 安全加载剩余项：PE 架构和依赖预检；本轮按决策暂不实现。
-- Windows v8.4.6 原版插件 ABI 已形成有限兼容层；当前继续补齐真实语料需要的通知和
-  Host Services，不承诺任意旧插件通用兼容。
+- Windows v8.4.6 原版插件 ABI 已形成有限兼容层；常用 NPPN 和 `SCN_*` 转换基线已完成，
+  后续继续补齐真实语料需要的 Host Services 和插件专属通知语义，不承诺任意旧插件通用兼容。
 - 跨平台稳定插件 ABI 及 SDK。
 - Linux/macOS 原生插件生态清单、签名、公证和发布策略。
 

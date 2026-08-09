@@ -1,5 +1,8 @@
 # 模块索引
 
+- `codex/changes/2026-08-09-priority-plugin-compatibility.md`：高、中优先级插件真实 DLL 接入结果、SCN 桥接和跳过边界。
+- `codex/cache/2026-08-09-priority-plugin-compatibility.md`：上述批次的快速本地缓存入口。
+
 ## Notepad++ Qt 主线
 
 当前主线实现已包含以下模块：
@@ -205,6 +208,12 @@
   平台依赖、线程/运行时和双代理 HWND 风险统一入口。
 - `codex/analysis/plugins-v846/batch-*.md`：逐插件静态证据和未验证项。
 - `tests/PluginInvestigationTests.cpp`：调查数据与 x86 JSON 基线的一致性校验。
+- `src/Win32PluginSystem/Win32PluginManager.*`：Windows 原版插件六导出加载、三个稳定
+  HWND、常用 `NPPN_*` 构造与派发入口。
+- `MainWindow::notifyCurrentLanguageChanged()` / `setBufferReadOnly()`：语言和 Buffer
+  只读状态的双视图同步及插件通知所有者。
+- `tests/plugins/Win32ValidRegistrationPlugin.cpp` 与 `ui-plugin-registration-rollback`：
+  文件生命周期顺序、Buffer ID、只读状态位及常用通知 ABI 回归。
 - `codex/analysis/plugins-v846/jsontools-v320-compatibility-evaluation.md`：
   JsonTools 3.2.0 官方包、CLR/WinForms 边界、精确消息缺口和实施顺序。
 - `codex/changes/2026-08-09-jsontools-deep-and-simple-plugins.md`：

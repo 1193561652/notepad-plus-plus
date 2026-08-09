@@ -63,6 +63,16 @@ public:
     bool executeMenuCommandFromWin32Plugin(int commandId);
     bool openFileFromWin32Plugin(const QString& path);
     bool setCurrentLanguageTypeFromPlugin(int languageType);
+    quintptr currentBufferIdForWin32Plugin() const;
+    QString pathForWin32PluginBuffer(quintptr bufferId) const;
+    int openFileCountForWin32Plugin(int scope) const;
+    int currentDocumentIndexForWin32Plugin(int view) const;
+    bool activateDocumentFromWin32Plugin(int view, int index);
+    int currentLineForWin32Plugin() const;
+    int bufferEncodingForWin32Plugin(quintptr bufferId) const;
+    bool setBufferEncodingFromWin32Plugin(quintptr bufferId, int encoding);
+    void setStatusBarTextFromWin32Plugin(int section, const QString& text);
+    bool addToolbarCommandFromWin32Plugin(int commandId);
 #ifdef Q_OS_WIN
     Win32PluginManager* win32PluginManager() const
     {
@@ -141,6 +151,8 @@ private:
     void applyPreferencesToAllViews();
     void applyPreferencesToView(ScintillaEditView* view);
     void applyDarkMode();
+    void notifyCurrentLanguageChanged();
+    void setBufferReadOnly(Buffer* buffer, bool readOnly);
     void registerNppCommandIds();
     void applyConfiguredShortcuts();
     void applyScintillaShortcuts(ScintillaEditView* view);
@@ -312,6 +324,9 @@ private:
 #endif
     QString _pendingPluginUpdatePlan;
     bool _pluginUpdaterStarted = false;
+    bool _hasAppliedDarkMode = false;
+    bool _appliedDarkMode = false;
+    bool _shutdownNotificationPending = false;
 
     // 宏
     QString   _macroStr;

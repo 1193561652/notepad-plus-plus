@@ -18,11 +18,27 @@ LRESULT Win32EditorMessageAdapter::handleMessage(
 
     switch (message) {
         case SCI_BEGINUNDOACTION:
+        case SCI_ANNOTATIONCLEARALL:
+        case SCI_ANNOTATIONGETSTYLES:
+        case SCI_ANNOTATIONGETTEXT:
+        case SCI_ANNOTATIONSETSTYLES:
+        case SCI_ANNOTATIONSETTEXT:
+        case SCI_ANNOTATIONSETVISIBLE:
         case SCI_ADDTEXT:
         case SCI_APPENDTEXT:
+        case SCI_BRACEHIGHLIGHT:
+        case SCI_CALLTIPCANCEL:
+        case SCI_CALLTIPSHOW:
+        case SCI_CLEARALL:
         case SCI_CLEARSELECTIONS:
+        case SCI_EMPTYUNDOBUFFER:
         case SCI_ENDUNDOACTION:
         case SCI_ENSUREVISIBLE:
+        case SCI_FINDCOLUMN:
+        case SCI_GETANCHOR:
+        case SCI_GETCARETSTYLE:
+        case SCI_GETCHARAT:
+        case SCI_GETCODEPAGE:
         case SCI_GETCOLUMN:
         case SCI_GETCURRENTPOS:
         case SCI_GETEOLMODE:
@@ -31,6 +47,12 @@ LRESULT Win32EditorMessageAdapter::handleMessage(
         case SCI_GETLINE:
         case SCI_GETLINECOUNT:
         case SCI_GETLINEENDPOSITION:
+        case SCI_GETLINESELENDPOSITION:
+        case SCI_GETLINESELSTARTPOSITION:
+        case SCI_GETMARGINS:
+        case SCI_GETMARGINWIDTHN:
+        case SCI_GETMAXLINESTATE:
+        case SCI_GETREADONLY:
         case SCI_GETSELECTIONNEND:
         case SCI_GETSELECTIONNSTART:
         case SCI_GETSELECTIONSTART:
@@ -44,12 +66,22 @@ LRESULT Win32EditorMessageAdapter::handleMessage(
         case SCI_GETTEXTLENGTH:
         case SCI_GETTEXTRANGE:
         case SCI_GETUSETABS:
+        case SCI_GETWRAPMODE:
+        case SCI_GRABFOCUS:
         case SCI_GOTOLINE:
         case SCI_GOTOPOS:
         case SCI_INSERTTEXT:
         case SCI_LINEFROMPOSITION:
+        case SCI_LINELENGTH:
+        case SCI_NEWLINE:
         case SCI_POSITIONFROMLINE:
         case SCI_REPLACESEL:
+        case SCI_SELECTIONISRECTANGLE:
+        case SCI_SETANCHOR:
+        case SCI_SETCARETSTYLE:
+        case SCI_SETCURRENTPOS:
+        case SCI_SETFIRSTVISIBLELINE:
+        case SCI_SETSCROLLWIDTH:
         case SCI_SETTARGETSTART:
         case SCI_SETTARGETEND:
         case SCI_REPLACETARGET:
@@ -57,7 +89,13 @@ LRESULT Win32EditorMessageAdapter::handleMessage(
         case SCI_SETSEL:
         case SCI_SETSELECTIONEND:
         case SCI_SETSELECTIONSTART:
+        case SCI_SETXCARETPOLICY:
+        case SCI_SETXOFFSET:
+        case SCI_SETYCARETPOLICY:
+        case SCI_SHOWLINES:
         case SCI_SETTEXT:
+        case SCI_TEXTHEIGHT:
+        case SCI_TEXTWIDTH:
         case SCI_WORDENDPOSITION:
         case SCI_WORDSTARTPOSITION:
         {

@@ -8,6 +8,7 @@
 #include <QAction>
 #include <QFileInfo>
 #include <QMainWindow>
+#include <QPalette>
 #include <commctrl.h>
 
 #include "Parameters.h"
@@ -109,13 +110,24 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         return copyPluginString(QDir::toNativeSeparators(path),
                                 wParam, lParam);
     }
+    if (message == NppMessageGetEnableThemeTextureFunc) {
+        if (handled)
+            *handled = true;
+        static HMODULE themeLibrary = LoadLibraryW(L"uxtheme.dll");
+        return reinterpret_cast<LRESULT>(themeLibrary
+            ? GetProcAddress(themeLibrary, "EnableThemeDialogTexture")
+            : nullptr);
+    }
     if (message == NppMessageGetFullCurrentPath
-        || message == NppMessageGetFileName) {
+        || message == NppMessageGetFileName
+        || message == NppMessageGetCurrentDirectory) {
         if (handled)
             *handled = true;
         QString path = nppWindow->currentPathForWin32Plugin();
         if (message == NppMessageGetFileName)
             path = QFileInfo(path).fileName();
+        else if (message == NppMessageGetCurrentDirectory)
+            path = QFileInfo(path).absolutePath();
         return copyLegacyPathString(
             QDir::toNativeSeparators(path), wParam, lParam);
     }
@@ -133,6 +145,133 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         const QString path = QString::fromWCharArray(
             reinterpret_cast<const wchar_t*>(lParam));
         return nppWindow->openFileFromWin32Plugin(path) ? TRUE : FALSE;
+    }
+    if (message == NppMessageGetCurrentBufferId) {
+        if (handled)
+            *handled = true;
+        return static_cast<LRESULT>(nppWindow->currentBufferIdForWin32Plugin());
+    }
+    if (message == NppMessageGetFullPathFromBufferId) {
+        if (handled)
+            *handled = true;
+        return copyLegacyPathString(
+            QDir::toNativeSeparators(nppWindow->pathForWin32PluginBuffer(
+                static_cast<quintptr>(wParam))), MAX_PATH, lParam);
+    }
+    if (message == NppMessageGetNbOpenFiles) {
+        if (handled)
+            *handled = true;
+        return nppWindow->openFileCountForWin32Plugin(
+            static_cast<int>(lParam));
+    }
+    if (message == NppMessageGetCurrentDocIndex) {
+        if (handled)
+            *handled = true;
+        return nppWindow->currentDocumentIndexForWin32Plugin(
+            static_cast<int>(lParam));
+    }
+    if (message == NppMessageActivateDoc) {
+        if (handled)
+            *handled = true;
+        return nppWindow->activateDocumentFromWin32Plugin(
+            static_cast<int>(wParam), static_cast<int>(lParam));
+    }
+    if (message == NppMessageGetCurrentLine) {
+        if (handled)
+            *handled = true;
+        return nppWindow->currentLineForWin32Plugin();
+    }
+    if (message == NppMessageGetBufferEncoding) {
+        if (handled)
+            *handled = true;
+        return nppWindow->bufferEncodingForWin32Plugin(
+            static_cast<quintptr>(wParam));
+    }
+    if (message == NppMessageSetBufferEncoding) {
+        if (handled)
+            *handled = true;
+        return nppWindow->setBufferEncodingFromWin32Plugin(
+            static_cast<quintptr>(wParam), static_cast<int>(lParam));
+    }
+    if (message == NppMessageSetStatusBar) {
+        if (handled)
+            *handled = true;
+        if (!lParam)
+            return FALSE;
+        nppWindow->setStatusBarTextFromWin32Plugin(
+            static_cast<int>(wParam), QString::fromWCharArray(
+                reinterpret_cast<const wchar_t*>(lParam)));
+        return TRUE;
+    }
+    if (message == NppMessageAddToolbarIconForDarkMode) {
+        if (handled)
+            *handled = true;
+        return nppWindow->addToolbarCommandFromWin32Plugin(
+            static_cast<int>(wParam));
+    }
+    if (message == NppMessageGetPluginHomePath) {
+        if (handled)
+            *handled = true;
+        const QString path = QDir(NppParameters::getInstance().getNppPath())
+            .filePath(QStringLiteral("plugins"));
+        return copyPluginString(QDir::toNativeSeparators(path), wParam, lParam);
+    }
+    if (message == NppMessageGetNppVersion) {
+        if (handled)
+            *handled = true;
+        return MAKELONG(46, 8);
+    }
+    if (message == NppMessageGetWindowsVersion) {
+        if (handled)
+            *handled = true;
+        return 14;
+    }
+    if (message == NppMessageGetEditorDefaultForegroundColor
+        || message == NppMessageGetEditorDefaultBackgroundColor) {
+        if (handled)
+            *handled = true;
+        const QColor color = _window->palette().color(
+            message == NppMessageGetEditorDefaultForegroundColor
+                ? QPalette::Text : QPalette::Base);
+        return RGB(color.red(), color.green(), color.blue());
+    }
+    if (message == NppMessageIsDarkModeEnabled) {
+        if (handled)
+            *handled = true;
+        return NppParameters::getInstance().getNppGUI()._darkModeEnabled;
+    }
+    if (message == NppMessageGetDarkModeColors) {
+        if (handled)
+            *handled = true;
+        if (wParam != sizeof(Win32NppDarkModeColors) || !lParam)
+            return FALSE;
+        Win32NppDarkModeColors* colors =
+            reinterpret_cast<Win32NppDarkModeColors*>(lParam);
+        auto nativeColor = [](const QColor& color) {
+            return RGB(color.red(), color.green(), color.blue());
+        };
+        const QPalette palette = _window->palette();
+        colors->background = nativeColor(palette.color(QPalette::Window));
+        colors->softerBackground = nativeColor(palette.color(QPalette::Button));
+        colors->hotBackground = nativeColor(palette.color(QPalette::Highlight));
+        colors->pureBackground = nativeColor(palette.color(QPalette::Base));
+        colors->errorBackground = RGB(176, 32, 37);
+        colors->text = nativeColor(palette.color(QPalette::WindowText));
+        colors->darkerText = nativeColor(palette.color(QPalette::Text));
+        colors->disabledText = nativeColor(
+            palette.color(QPalette::Disabled, QPalette::Text));
+        colors->linkText = nativeColor(palette.color(QPalette::Link));
+        colors->edge = nativeColor(palette.color(QPalette::Mid));
+        colors->hotEdge = nativeColor(palette.color(QPalette::Highlight));
+        colors->disabledEdge = nativeColor(
+            palette.color(QPalette::Disabled, QPalette::Mid));
+        return TRUE;
+    }
+    if (message == NppMessageGetCurrentCommandLine) {
+        if (handled)
+            *handled = true;
+        return copyPluginString(
+            QString::fromWCharArray(GetCommandLineW()), wParam, lParam);
     }
     if (message == NppMessageSetMenuItemCheck) {
         if (handled)

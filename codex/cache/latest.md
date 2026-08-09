@@ -1,5 +1,26 @@
 # 本地缓存：最新分析
 
+## 2026-08-09 高、中优先级插件兼容
+
+- 新增 5 个未经修改的官方插件 DLL：GotoLineCol、Random Values、Merge files in one、SelectToClipboard、urlPlugin。
+- 主/副永久编辑器现在把原始 `SCN_*` 通知转换并同步发送给插件；测试探针验证了通知码与来源代理 HWND。
+- XMLTools 因线程键盘 Hook 导致真实矩阵卡死而跳过；direct-call/Hook、Session Host Services、外部进程/网络类候选均按约束记录后暂缓。
+- 记录：`codex/changes/2026-08-09-priority-plugin-compatibility.md`；缓存：`codex/cache/2026-08-09-priority-plugin-compatibility.md`。
+
+## 当前插件通知基线
+
+- Windows v8.4.6 常用 `NPPN_*` 已统一进入 `Win32PluginManager`：`READY`、
+  `TBMODIFICATION`、文件加载/打开/保存/关闭、`BUFFERACTIVATED`、`LANGCHANGED`、
+  `WORDSTYLESUPDATED`、`READONLYCHANGED`、`DARKMODECHANGED`、退出协商和 `SHUTDOWN`。
+- 文件通知由实际文件生命周期代码触发并保持原版顺序；关闭 clone 时发送
+  `FILEBEFORECLOSE`，仅在 Buffer 真正销毁后发送 `FILECLOSED`。
+- 语言切换和只读状态由主窗口统一助手同步主/副永久编辑器；只读通知保持原版特殊
+  ABI：Buffer ID 位于 `hwndFrom`，只读/dirty 状态位位于 `idFrom`。
+- 真实测试 DLL 已验证通知码、Buffer ID、状态位及打开、保存、关闭顺序；Release
+  全量 CTest `37/37` 通过。
+- 高频 `SCN_*`、`NPPN_SHORTCUTREMAPPED` 与 `NPPN_CMDLINEPLUGINMSG` 继续按真实插件
+  语料增量实现，不扩大为任意插件兼容承诺。
+
 ## 2026-08-09 JsonTools 深层矩阵与简单插件
 
 - JsonTools Settings、RemesPath 查询/赋值、JSON Lines、YAML、树节点跳转和 4 MB

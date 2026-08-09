@@ -387,6 +387,10 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
         _backupTimer->start();
 
     applyCommandLineInvocation(startupOptions);
+#ifdef Q_OS_WIN
+    if (_win32PluginManager)
+        _win32PluginManager->notifyReady();
+#endif
 }
 
 MainWindow::~MainWindow()
@@ -417,6 +421,7 @@ void MainWindow::applyFileCommandLineState(
     if (!view)
         return;
 
+    const QString previousLanguage = view->lexerLanguage();
     if (!options.userDefinedLanguage.isEmpty()) {
         const UserLangDesc* language =
             NppParameters::getInstance().getUserLangByName(
@@ -426,6 +431,8 @@ void MainWindow::applyFileCommandLineState(
     } else if (!options.language.isEmpty()) {
         view->setLexerByName(options.language);
     }
+    if (view->lexerLanguage() != previousLanguage)
+        notifyCurrentLanguageChanged();
 
     if (options.position >= 0) {
         qintptr position = qMin<qintptr>(
@@ -458,17 +465,11 @@ void MainWindow::applyFileCommandLineState(
 
     if (options.readOnly) {
         buffer->setCommandLineReadOnly(true);
-        buffer->setReadOnly(true);
-        for (DocTabView* tab : {_mainDocTab, _subDocTab})
-            if (tab->currentBuffer() == buffer)
-                tab->editor()->setReadOnly(true);
+        setBufferReadOnly(buffer, true);
     }
     if (options.monitorFiles) {
         buffer->setMonitoring(true);
-        buffer->setReadOnly(true);
-        for (DocTabView* tab : {_mainDocTab, _subDocTab})
-            if (tab->currentBuffer() == buffer)
-                tab->editor()->setReadOnly(true);
+        setBufferReadOnly(buffer, true);
         watchBufferFile(buffer);
     }
     updateLangStatus();
@@ -640,6 +641,11 @@ void MainWindow::setActiveTab(DocTabView* tab)
     syncDocumentMap();
     if (_funcListDock && _funcListDock->isVisible())
         _funcListPanel->updateForView(currentActiveView());
+#ifdef Q_OS_WIN
+    if (buf && _win32PluginManager)
+        _win32PluginManager->notifyBufferActivated(
+            reinterpret_cast<quintptr>(buf));
+#endif
 }
 
 void MainWindow::showSubView()
@@ -1014,12 +1020,27 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
     if (!confirmHugeFileOpen(this, fileSize))
         return false;
 
+#ifdef Q_OS_WIN
+    if (_win32PluginManager)
+        _win32PluginManager->notifyFileBeforeLoad();
+#endif
+
     Buffer* buf = MainFileManager.loadBuffer(filePath);
     if (!buf) {
+#ifdef Q_OS_WIN
+        if (_win32PluginManager)
+            _win32PluginManager->notifyFileLoadFailed(0);
+#endif
         QMessageBox::warning(this, tr("Open Failed"),
             tr("Cannot open file:\n%1").arg(filePath));
         return false;
     }
+
+#ifdef Q_OS_WIN
+    if (_win32PluginManager)
+        _win32PluginManager->notifyFileBeforeOpen(
+            reinterpret_cast<quintptr>(buf));
+#endif
 
     ScintillaEditView* view = targetTab->editor();
     view->createStandardDocument();
@@ -1029,6 +1050,11 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
     if (!MainFileManager.loadBufferContent(
             buf, view, decodingOptionsForPath(filePath), forcedEncoding,
             &loadError)) {
+#ifdef Q_OS_WIN
+        if (_win32PluginManager)
+            _win32PluginManager->notifyFileLoadFailed(
+                reinterpret_cast<quintptr>(buf));
+#endif
         MainFileManager.closeBuffer(buf);
         QMessageBox::warning(this, tr("Open Failed"),
             tr("Cannot open file:\n%1\n\n%2").arg(filePath, loadError));
@@ -1058,6 +1084,11 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
     addToRecentFiles(filePath);
     updateLangStatus();   // 对应原版 setLangStatus()，文件打开后更新语言类型
     updateActionStates();
+#ifdef Q_OS_WIN
+    if (_win32PluginManager)
+        _win32PluginManager->notifyFileOpened(
+            reinterpret_cast<quintptr>(buf));
+#endif
     return true;
 }
 
@@ -1096,6 +1127,11 @@ bool MainWindow::doSave(Buffer* buf, const QString& filePath)
         _savingPaths.insert(canonical);
 
     QString errorMessage;
+#ifdef Q_OS_WIN
+    if (_win32PluginManager)
+        _win32PluginManager->notifyFileBeforeSave(
+            reinterpret_cast<quintptr>(buf));
+#endif
     if (!MainFileManager.saveBuffer(buf, filePath, &errorMessage)) {
         if (!canonical.isEmpty())
             _savingPaths.remove(canonical);
@@ -1103,19 +1139,27 @@ bool MainWindow::doSave(Buffer* buf, const QString& filePath)
             tr("Cannot save file:\n%1\n\n%2").arg(filePath, errorMessage));
         return false;
     }
+#ifdef Q_OS_WIN
+    if (_win32PluginManager)
+        _win32PluginManager->notifyFileSaved(
+            reinterpret_cast<quintptr>(buf));
+#endif
     if (!canonical.isEmpty())
         _savingPaths.remove(canonical);
 
     // 保存成功后删除对应备份文件（与原版一致）
     buf->clearBackupFile();
 
-    buf->setReadOnly(!QFileInfo(filePath).isWritable());
+    setBufferReadOnly(buf, !QFileInfo(filePath).isWritable());
     activeBufferView->SendScintilla(SCI_SETSAVEPOINT);
+    const QString previousLanguage = activeBufferView->lexerLanguage();
     activeBufferView->setLexerForFile(filePath);
     for (DocTabView* tab : {_mainDocTab, _subDocTab}) {
         if (tab->currentBuffer() == buf)
             tab->editor()->setReadOnly(buf->isReadOnly());
     }
+    if (activeBufferView->lexerLanguage() != previousLanguage)
+        notifyCurrentLanguageChanged();
 
     // 两个视图都可能显示同一文档，都更新标题
     _mainDocTab->updateTabTitle(buf);
@@ -1174,10 +1218,10 @@ bool MainWindow::closeBufferList(const QList<Buffer*>& buffers)
     };
 
     for (Buffer* buffer : unique) {
+        const quintptr bufferId = reinterpret_cast<quintptr>(buffer);
 #ifdef Q_OS_WIN
         if (_win32PluginManager)
-            _win32PluginManager->notifyFileBeforeClose(
-                reinterpret_cast<quintptr>(buffer));
+            _win32PluginManager->notifyFileBeforeClose(bufferId);
 #endif
         if (!buffer->isUntitled())
             rememberClosedFile(buffer->getFullPath());
@@ -1186,6 +1230,10 @@ bool MainWindow::closeBufferList(const QList<Buffer*>& buffers)
         unwatchBufferFile(buffer);
         buffer->clearBackupFile();
         MainFileManager.closeBuffer(buffer);
+#ifdef Q_OS_WIN
+        if (_win32PluginManager)
+            _win32PluginManager->notifyFileClosed(bufferId);
+#endif
     }
     if (_mainDocTab->count() == 0)
         doNewBuffer(_mainDocTab);
@@ -1345,7 +1393,7 @@ void MainWindow::reloadFromDisk()
 
     buf->setEolMode(buf->getEolMode() == TextEolMode::Unknown
         ? fromScintillaEol(view->eolMode()) : buf->getEolMode());
-    buf->setReadOnly(!QFileInfo(path).isWritable());
+    setBufferReadOnly(buf, !QFileInfo(path).isWritable());
     buf->setLastKnownModificationTime(QFileInfo(path).lastModified());
     if (buf->document() != static_cast<qintptr>(view->document())) {
         buf->releaseDocument();
@@ -1416,8 +1464,12 @@ void MainWindow::renameCurrentFile()
     }
     buffer->setFilePath(newPath);
     buffer->setLastKnownModificationTime(QFileInfo(newPath).lastModified());
-    if (ScintillaEditView* view = activateBufferView(buffer))
+    if (ScintillaEditView* view = activateBufferView(buffer)) {
+        const QString previousLanguage = view->lexerLanguage();
         view->setLexerForFile(newPath);
+        if (view->lexerLanguage() != previousLanguage)
+            notifyCurrentLanguageChanged();
+    }
     _mainDocTab->updateTabTitle(buffer);
     _subDocTab->updateTabTitle(buffer);
     watchBufferFile(buffer);
@@ -1737,10 +1789,10 @@ void MainWindow::onBufferCloseRequested(Buffer* buf)
     if (!remainsOpen && !checkBufferSave(buf))
         return;
 
+    const quintptr bufferId = reinterpret_cast<quintptr>(buf);
 #ifdef Q_OS_WIN
     if (_win32PluginManager)
-        _win32PluginManager->notifyFileBeforeClose(
-            reinterpret_cast<quintptr>(buf));
+        _win32PluginManager->notifyFileBeforeClose(bufferId);
 #endif
 
     if (idx >= 0)
@@ -1757,6 +1809,10 @@ void MainWindow::onBufferCloseRequested(Buffer* buf)
         unwatchBufferFile(buf);
         buf->clearBackupFile();
         MainFileManager.closeBuffer(buf);
+#ifdef Q_OS_WIN
+        if (_win32PluginManager)
+            _win32PluginManager->notifyFileClosed(bufferId);
+#endif
     }
     updateActionStates();
 }
@@ -1801,6 +1857,11 @@ void MainWindow::onCurrentTabChanged(int /*index*/)
     syncDocumentMap();
     if (_funcListDock && _funcListDock->isVisible())
         _funcListPanel->updateForView(currentActiveView());
+#ifdef Q_OS_WIN
+    if (buf && _win32PluginManager)
+        _win32PluginManager->notifyBufferActivated(
+            reinterpret_cast<quintptr>(buf));
+#endif
 }
 
 void MainWindow::onFocusChanged(QWidget* /*old*/, QWidget* now)
@@ -2413,6 +2474,17 @@ void MainWindow::onBackupTimer()
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
+#ifdef Q_OS_WIN
+    if (_win32PluginManager && !_shutdownNotificationPending) {
+        _win32PluginManager->notifyBeforeShutdown();
+        _shutdownNotificationPending = true;
+    }
+    const auto cancelPluginShutdown = [this]() {
+        if (_win32PluginManager && _shutdownNotificationPending)
+            _win32PluginManager->notifyCancelShutdown();
+        _shutdownNotificationPending = false;
+    };
+#endif
     NppParameters& params = NppParameters::getInstance();
     NppGUI& gui = params.getNppGUI();
 
@@ -2430,6 +2502,9 @@ void MainWindow::closeEvent(QCloseEvent* event)
                         QFile::remove(_pendingPluginUpdatePlan);
                         _pendingPluginUpdatePlan.clear();
                     }
+#ifdef Q_OS_WIN
+                    cancelPluginShutdown();
+#endif
                     event->ignore();
                     return;
                 }
@@ -2463,6 +2538,9 @@ void MainWindow::closeEvent(QCloseEvent* event)
                 this, tr("Plugins Admin"),
                 tr("Could not start the plugin updater:\n%1")
                     .arg(updaterError));
+#ifdef Q_OS_WIN
+            cancelPluginShutdown();
+#endif
             event->ignore();
             return;
         }
@@ -2501,6 +2579,7 @@ bool MainWindow::setCurrentLanguageTypeFromPlugin(int languageType)
     ScintillaEditView* view = currentActiveView();
     if (!view)
         return false;
+    const QString previousLanguage = view->lexerLanguage();
     switch (languageType) {
         case 0: view->setBuiltinLanguage(QStringLiteral("normal")); break;
         case 8: view->setBuiltinLanguage(QStringLiteral("html")); break;
@@ -2509,7 +2588,171 @@ bool MainWindow::setCurrentLanguageTypeFromPlugin(int languageType)
         default: return false;
     }
     updateStatusBar();
+    if (view->lexerLanguage() != previousLanguage)
+        notifyCurrentLanguageChanged();
     return true;
+}
+
+quintptr MainWindow::currentBufferIdForWin32Plugin() const
+{
+    Buffer* buffer = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
+    return reinterpret_cast<quintptr>(buffer);
+}
+
+QString MainWindow::pathForWin32PluginBuffer(quintptr bufferId) const
+{
+    Buffer* requested = reinterpret_cast<Buffer*>(bufferId);
+    for (Buffer* buffer : MainFileManager.buffers()) {
+        if (buffer == requested)
+            return buffer->getFullPath();
+    }
+    return QString();
+}
+
+int MainWindow::openFileCountForWin32Plugin(int scope) const
+{
+    if (scope == 1)
+        return _mainDocTab ? _mainDocTab->count() : 0;
+    if (scope == 2)
+        return _subDocTab ? _subDocTab->count() : 0;
+    return (_mainDocTab ? _mainDocTab->count() : 0)
+        + (_subDocTab ? _subDocTab->count() : 0);
+}
+
+int MainWindow::currentDocumentIndexForWin32Plugin(int view) const
+{
+    const DocTabView* tab = view == SUB_VIEW ? _subDocTab : _mainDocTab;
+    return tab ? tab->currentIndex() : -1;
+}
+
+bool MainWindow::activateDocumentFromWin32Plugin(int view, int index)
+{
+    DocTabView* tab = view == SUB_VIEW ? _subDocTab : _mainDocTab;
+    if (!tab || index < 0 || index >= tab->count())
+        return false;
+    if (tab == _subDocTab && !tab->isVisible())
+        showSubView();
+    setActiveTab(tab);
+    tab->setCurrentIndex(index);
+    return true;
+}
+
+int MainWindow::currentLineForWin32Plugin() const
+{
+    ScintillaEditView* view = currentActiveView();
+    return view ? static_cast<int>(view->SendScintillaNpp(
+        SCI_LINEFROMPOSITION, view->SendScintillaNpp(SCI_GETCURRENTPOS))) : -1;
+}
+
+int MainWindow::bufferEncodingForWin32Plugin(quintptr bufferId) const
+{
+    Buffer* requested = reinterpret_cast<Buffer*>(bufferId);
+    for (Buffer* buffer : MainFileManager.buffers()) {
+        if (buffer != requested)
+            continue;
+        const QString encoding = buffer->getEncoding();
+        if (encoding.compare(QStringLiteral("UTF-8"), Qt::CaseInsensitive) == 0)
+            return buffer->hasBom() ? 1 : 4;
+        if (encoding.compare(QStringLiteral("UTF-16BE"), Qt::CaseInsensitive) == 0)
+            return 2;
+        if (encoding.compare(QStringLiteral("UTF-16LE"), Qt::CaseInsensitive) == 0)
+            return 3;
+        return 0;
+    }
+    return -1;
+}
+
+bool MainWindow::setBufferEncodingFromWin32Plugin(
+    quintptr bufferId, int encoding)
+{
+    Buffer* requested = reinterpret_cast<Buffer*>(bufferId);
+    for (Buffer* buffer : MainFileManager.buffers()) {
+        if (buffer != requested)
+            continue;
+        if (!buffer->isUntitled() || buffer->isDirty())
+            return false;
+        switch (encoding) {
+            case 0:
+                buffer->setEncoding(QStringLiteral("windows-1252"));
+                buffer->setHasBom(false);
+                break;
+            case 1:
+                buffer->setEncoding(QStringLiteral("UTF-8"));
+                buffer->setHasBom(true);
+                break;
+            case 2:
+                buffer->setEncoding(QStringLiteral("UTF-16BE"));
+                buffer->setHasBom(true);
+                break;
+            case 3:
+                buffer->setEncoding(QStringLiteral("UTF-16LE"));
+                buffer->setHasBom(true);
+                break;
+            case 4:
+                buffer->setEncoding(QStringLiteral("UTF-8"));
+                buffer->setHasBom(false);
+                break;
+            default:
+                return false;
+        }
+        updateStatusBar();
+        return true;
+    }
+    return false;
+}
+
+void MainWindow::setStatusBarTextFromWin32Plugin(
+    int section, const QString& text)
+{
+    QLabel* labels[] = {_docTypeLabel, _docSizeLabel, _posLabel,
+                        _eolLabel, _encodingLabel, _insertLabel};
+    if (section >= 0 && section < 6 && labels[section])
+        labels[section]->setText(text);
+}
+
+bool MainWindow::addToolbarCommandFromWin32Plugin(int commandId)
+{
+    if (!_fileToolBar)
+        return false;
+    for (QAction* action : findChildren<QAction*>()) {
+        if (action->property("win32PluginCommandId").toInt() != commandId)
+            continue;
+        if (!_fileToolBar->actions().contains(action))
+            _fileToolBar->addAction(action);
+        return true;
+    }
+    return false;
+}
+
+void MainWindow::notifyCurrentLanguageChanged()
+{
+#ifdef Q_OS_WIN
+    Buffer* buffer = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
+    if (buffer && _win32PluginManager) {
+        _win32PluginManager->notifyLanguageChanged(
+            reinterpret_cast<quintptr>(buffer));
+    }
+#endif
+}
+
+void MainWindow::setBufferReadOnly(Buffer* buffer, bool readOnly)
+{
+    if (!buffer)
+        return;
+    const bool changed = buffer->isReadOnly() != readOnly;
+    buffer->setReadOnly(readOnly);
+    for (DocTabView* tab : {_mainDocTab, _subDocTab}) {
+        if (tab && tab->currentBuffer() == buffer)
+            tab->editor()->setReadOnly(readOnly);
+    }
+#ifdef Q_OS_WIN
+    if (changed && _win32PluginManager) {
+        _win32PluginManager->notifyReadOnlyChanged(
+            reinterpret_cast<quintptr>(buffer), readOnly, buffer->isDirty());
+    }
+#else
+    Q_UNUSED(changed)
+#endif
 }
 
 // ─── 文档地图 ────────────────────────────────────────────────────────────────
@@ -3425,6 +3668,16 @@ void MainWindow::setupPluginSystem()
 #ifdef Q_OS_WIN
     // Only plugins with an audited synchronous Win32 message surface are
     // admitted here. Notification-heavy plugins remain excluded.
+    connect(_mainDocTab->editor(), &ScintillaEditBase::notify, this,
+            [this](Scintilla::NotificationData* notification) {
+        if (_win32PluginManager && notification)
+            _win32PluginManager->notifyScintilla(*notification, true);
+    });
+    connect(_subDocTab->editor(), &ScintillaEditBase::notify, this,
+            [this](Scintilla::NotificationData* notification) {
+        if (_win32PluginManager && notification)
+            _win32PluginManager->notifyScintilla(*notification, false);
+    });
     QStringList win32PluginErrors;
     _win32PluginManager->loadPlugins(
         pluginDir,
@@ -3439,7 +3692,12 @@ void MainWindow::setupPluginSystem()
             QStringLiteral("NPPJSONViewer"),
             QStringLiteral("JsonTools"),
             QStringLiteral("nppConverter"),
-            QStringLiteral("NppPluginDemo")
+            QStringLiteral("NppPluginDemo"),
+            QStringLiteral("GotoLineCol"),
+            QStringLiteral("RandomValuesNppPlugin"),
+            QStringLiteral("Merge files in one"),
+            QStringLiteral("SelectToClipboard"),
+            QStringLiteral("urlPlugin")
         },
         &win32PluginErrors);
     setProperty("win32PluginLoadErrors", win32PluginErrors);
@@ -3769,10 +4027,7 @@ void MainWindow::onWatchedFileChanged(const QString& path)
         !info.isWritable() || buf->isCommandLineReadOnly() ||
         buf->isMonitoring();
     if (buf->isReadOnly() != readOnly) {
-        buf->setReadOnly(readOnly);
-        for (DocTabView* tab : {_mainDocTab, _subDocTab})
-            if (tab->currentBuffer() == buf)
-                tab->editor()->setReadOnly(readOnly);
+        setBufferReadOnly(buf, readOnly);
         _mainDocTab->updateTabTitle(buf);
         _subDocTab->updateTabTitle(buf);
         statusBar()->showMessage(
@@ -4256,9 +4511,8 @@ void MainWindow::restoreSession()
                 if (expanded)
                     view->foldLine(static_cast<int>(line));
             }
-            view->setReadOnly(sfi._userReadOnly || buf->isReadOnly());
         }
-        buf->setReadOnly(sfi._userReadOnly || buf->isReadOnly());
+        setBufferReadOnly(buf, sfi._userReadOnly || buf->isReadOnly());
         const QDateTime sessionModificationTime = fromSessionFileTime(
             sfi._originalFileLastModifTimestamp,
             sfi._originalFileLastModifTimestampHigh);
@@ -4356,9 +4610,21 @@ void MainWindow::applyPreferencesToAllViews()
 void MainWindow::applyDarkMode()
 {
     const bool dark = NppParameters::getInstance().getNppGUI()._darkModeEnabled;
+    const bool changed = _hasAppliedDarkMode && _appliedDarkMode != dark;
+    _hasAppliedDarkMode = true;
+    _appliedDarkMode = dark;
+    const auto notifyDarkModeChanged = [this, changed]() {
+#ifdef Q_OS_WIN
+        if (changed && _win32PluginManager)
+            _win32PluginManager->notifyDarkModeChanged();
+#else
+        Q_UNUSED(changed)
+#endif
+    };
     if (!dark) {
         qApp->setPalette(qApp->style()->standardPalette());
         qApp->setStyleSheet(QString());
+        notifyDarkModeChanged();
         return;
     }
 
@@ -4430,6 +4696,7 @@ void MainWindow::applyDarkMode()
         QScrollBar::up-arrow, QScrollBar::down-arrow, QScrollBar::left-arrow, QScrollBar::right-arrow { image: none; width: 0; height: 0; }
         QToolTip { background: #303030; color: white; border: 1px solid #666666; }
     )"));
+    notifyDarkModeChanged();
 }
 
 void MainWindow::showPreferences()
@@ -5263,8 +5530,10 @@ void MainWindow::createMenus()
     });
     QAction* readOnlyAction = addCommand(
         _editMenu, tr("Set Read-Only"), "readOnlyAction", [this]() {
-        if (auto* view = currentActiveView())
-            view->setReadOnly(!view->isReadOnly());
+        Buffer* buffer = _activeDocTab
+            ? _activeDocTab->currentBuffer() : nullptr;
+        if (buffer)
+            setBufferReadOnly(buffer, !buffer->isReadOnly());
     });
     readOnlyAction->setCheckable(true);
 
@@ -5663,10 +5932,7 @@ void MainWindow::createMenus()
         buffer->setMonitoring(enabled);
         const bool readOnly = enabled || buffer->isCommandLineReadOnly() ||
             !QFileInfo(buffer->getFullPath()).isWritable();
-        buffer->setReadOnly(readOnly);
-        for (DocTabView* tab : {_mainDocTab, _subDocTab})
-            if (tab->currentBuffer() == buffer)
-                tab->editor()->setReadOnly(readOnly);
+        setBufferReadOnly(buffer, readOnly);
         if (enabled) watchBufferFile(buffer);
     });
     monitoringAction->setCheckable(true);
@@ -5890,7 +6156,12 @@ void MainWindow::createMenus()
     QAction* plainTextAct = _languageMenu->addAction(tr("None (Normal Text)"));
     plainTextAct->setObjectName("plainTextLanguageAction");
     connect(plainTextAct, &QAction::triggered, this, [this]() {
-        if (auto* v = currentActiveView()) v->clearLexer();
+        if (auto* v = currentActiveView()) {
+            const QString previousLanguage = v->lexerLanguage();
+            v->clearLexer();
+            if (v->lexerLanguage() != previousLanguage)
+                notifyCurrentLanguageChanged();
+        }
     });
 
     auto addLang = [&](QMenu* menu, const QString& name, const QString& ext) {
@@ -5898,10 +6169,13 @@ void MainWindow::createMenus()
         a->setData(ext);
         connect(a, &QAction::triggered, this, [this, a]() {
             if (auto* v = currentActiveView()) {
+                const QString previousLanguage = v->lexerLanguage();
                 if (a->data().toString().isEmpty())
                     v->clearLexer();
                 else
                     v->setLexerByExtension(a->data().toString());
+                if (v->lexerLanguage() != previousLanguage)
+                    notifyCurrentLanguageChanged();
             }
         });
     };
@@ -6016,7 +6290,12 @@ void MainWindow::createMenus()
             QAction* action = userLangMenu->addAction(language.name);
             action->setProperty("udlLanguage", true);
             connect(action, &QAction::triggered, this, [this, language]() {
-                if (auto* view = currentActiveView()) view->setUserDefinedLanguage(language);
+                if (auto* view = currentActiveView()) {
+                    const QString previousLanguage = view->lexerLanguage();
+                    view->setUserDefinedLanguage(language);
+                    if (view->lexerLanguage() != previousLanguage)
+                        notifyCurrentLanguageChanged();
+                }
             });
         }
         userLangMenu->addSeparator();
@@ -6281,8 +6560,12 @@ void MainWindow::createMenus()
                     userLangMenu->insertAction(before, action);
                     connect(action, &QAction::triggered, this,
                             [this, language]() {
-                        if (auto* view = currentActiveView())
+                        if (auto* view = currentActiveView()) {
+                            const QString previousLanguage = view->lexerLanguage();
                             view->setUserDefinedLanguage(language);
+                            if (view->lexerLanguage() != previousLanguage)
+                                notifyCurrentLanguageChanged();
+                        }
                     });
                 }
             });
@@ -6325,8 +6608,12 @@ void MainWindow::createMenus()
                     tr("Could not save userDefineLang.xml."));
                 return;
             }
-            if (auto* view = currentActiveView())
+            if (auto* view = currentActiveView()) {
+                const QString previousLanguage = view->lexerLanguage();
                 view->setUserDefinedLanguage(language);
+                if (view->lexerLanguage() != previousLanguage)
+                    notifyCurrentLanguageChanged();
+            }
         });
     }
 
@@ -6473,6 +6760,14 @@ void MainWindow::createMenus()
         for (ScintillaEditView* view :
              findChildren<ScintillaEditView*>())
             view->reloadConfiguredStyles();
+#ifdef Q_OS_WIN
+        Buffer* buffer = _activeDocTab
+            ? _activeDocTab->currentBuffer() : nullptr;
+        if (_win32PluginManager) {
+            _win32PluginManager->notifyWordStylesUpdated(
+                reinterpret_cast<quintptr>(buffer));
+        }
+#endif
     });
     addCommand(_settingsMenu, tr("Shortcut Mapper..."), "shortcutMapperAction",
                [this]() {
