@@ -9,6 +9,8 @@ set(WIN32_PLUGIN_SYSTEM_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Win32MainWindowAdapter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Win32MainEditorAdapter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Win32SubEditorAdapter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Win32NativeDockHost.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Win32PluginDockAdapter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Win32PluginManager.cpp
 )
 
@@ -17,6 +19,8 @@ set(WIN32_PLUGIN_SYSTEM_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Win32MainWindowAdapter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Win32MainEditorAdapter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Win32SubEditorAdapter.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Win32NativeDockHost.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Win32PluginDockAdapter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Win32PluginInterface.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Win32PluginManager.h
 )

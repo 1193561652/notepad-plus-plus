@@ -253,6 +253,10 @@ struct NppGUI {
     QRect      _appPos      = QRect(10, 10, 1024, 768);
     bool       _isMaximized = false;
     QByteArray _windowState; // QMainWindow::saveState() 字节流，base64 存储
+    int _dockingLeftWidth = 200;
+    int _dockingRightWidth = 200;
+    int _dockingTopHeight = 200;
+    int _dockingBottomHeight = 200;
 
     // 查找窗口位置（GUIConfig name="FindWindowPosition"，以 left/top/right/bottom 存储）
     int  _findWinLeft   = 100;

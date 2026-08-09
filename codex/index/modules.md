@@ -9,7 +9,10 @@
 - `src/ScintillaComponent/`：编辑器组件、Buffer、查找替换、打印和 UDL 自定义词法器。
 - `src/MISC/FileManager.*`：Buffer 生命周期和文件加载保存管理。
 - `src/WinControls/TabBar/DocTabView.*`：标签页管理。
-- `src/WinControls/DockingWnd/`：文件浏览、文档地图、函数列表等停靠面板。
+- `src/WinControls/DockingWnd/DockingManager.*`：对应原版同名管理类，统一管理四侧
+  Dock 容器、面板注册、标签化、显示/隐藏、尺寸和状态。
+- `src/WinControls/DockingWnd/`：文件浏览、文档地图、函数列表等停靠面板；面板由
+  `MainWindow` 创建业务对象后交给 `DockingManager` 注册。
 - `src/WinControls/Preference/PreferenceDlg.*`：偏好设置对话框，与原版 `WinControls/Preference` 职责对齐。
 - `src/Parameters.*`：配置管理。
 - `src/NativeLangSpeaker.*`：本地化/语言切换。
@@ -202,3 +205,8 @@
   平台依赖、线程/运行时和双代理 HWND 风险统一入口。
 - `codex/analysis/plugins-v846/batch-*.md`：逐插件静态证据和未验证项。
 - `tests/PluginInvestigationTests.cpp`：调查数据与 x86 JSON 基线的一致性校验。
+- `codex/analysis/plugins-v846/jsontools-v320-compatibility-evaluation.md`：
+  JsonTools 3.2.0 官方包、CLR/WinForms 边界、精确消息缺口和实施顺序。
+- `codex/changes/2026-08-09-jsontools-deep-and-simple-plugins.md`：
+  JsonTools 深层功能矩阵、上游内置测试路径边界，以及 nppConverter/NppPluginDemo
+  真实 DLL 的有限兼容结果。

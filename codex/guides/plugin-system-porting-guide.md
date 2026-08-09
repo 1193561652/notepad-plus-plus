@@ -416,35 +416,43 @@ Plugin Admin、清单/兼容模型、退出后安装/更新/卸载、SHA-256、Z
 
 - v8.4.6 x86 清单 169/169 项完成身份、版本、源码、许可证/维护、API、依赖、
   Win32/UI、线程/运行时、双代理风险和 A/B/C/D/U 初评。
-- 62 项有对应版本源码证据；107 项证据不足并严格保持 `U`，未反汇编。
+- 当前 64 项有对应版本源码证据；105 项证据不足并严格保持 `U`，未反汇编。
 - 统一矩阵：`codex/analysis/plugins-v846/api-dependency-matrix.md`。
 - 自动校验保证 JSON、inventory、importance 和六个字母批次恰好覆盖同一 169 项。
 
-阶段 1 不表示任何真实 DLL 已兼容，只为安全加载和接口白名单提供输入。
+阶段 1 当时不表示任何真实 DLL 已兼容；后续阶段现已完成首批真实 DLL 验证。
 
-### 阶段 2：安全加载基础
+### 阶段 2：安全加载基础（已完成，预检延期）
 
-- 实现 PE 架构、六导出、调用约定和依赖预检。
-- 建立当前加载插件日志、异常启动恢复、`-noPlugin` 和注册资源回滚。
-- 测试缺导出、错误架构、缺依赖、初始化失败、重复插件和卸载残留。
+- 已完成六导出校验、结构化加载日志、异常启动恢复、`-noPlugin` 和注册资源回滚。
+- 日志使用 JSON Lines；加载 DLL 前原子写入当前插件标记，正常成功或失败时清除。
+  若进程在加载期间退出，下次启动跳过该插件一次、显示恢复提示并清除标记。
+- 已用无效/有效测试 DLL 连续加载验证失败注册不占用插件槽位和命令 ID；
+  `-noPlugin` 回归同时覆盖命令行解析、宿主不创建加载器和不生成加载日志。
+- PE 架构和依赖预检按当前决策暂不实现，后续单独推进；错误架构和缺依赖测试随之延期。
 
-### 阶段 3：Windows 原版 ABI 与双代理骨架
+### 阶段 3：Windows 原版 ABI 与双代理骨架（已完成）
 
 - 实现 `NppData`、`FuncItem`、命令 ID、菜单和快捷键。
 - 为主/副视图建立生命周期稳定的代理 HWND，先实现已批准的同步 SCI 白名单。
 - Win32 类型只存在于 `src/Win32PluginSystem/` 和必要的平台桥接代码。
+- 已完成永久主/副 Scintilla 视图、三个代理 HWND、命令/快捷键、同步 SCI 白名单和
+  原生 DockingManager 接入。
 
-### 阶段 4：通知和 Host Services
+### 阶段 4：通知和 Host Services（进行中）
 
 - 转换 `NPPN_*` 与 `SCNotification`，覆盖 Buffer、文件、语言、主题和关闭顺序。
 - 把可跨平台能力收敛到组合式 `PluginHostServices`，不继续让 MainWindow 实现 ABI。
 - 验证双视图、clone、高频通知、线程和回调重入。
 
-### 阶段 5：首批真实插件
+### 阶段 5：首批真实插件（部分完成）
 
 - A 类先用 `mimeTools` 验证最小命令插件。
 - B 类用 `JsonTools`、`NPPJSONViewer`、`XMLTools` 验证文本、Dock 和运行时。
 - 每个插件单独批准消息增量；失败不得留下 QAction、命令、回调或 Dock。
+- mimeTools、Reverse Lines、Remove Duplicate Lines、SelectQuotedText、BracketsCheck、
+  SecurePad、Code Alignment、JSON Viewer、JsonTools、Converter 和 NppPluginDemo 已通过
+  官方 DLL 的有限兼容回归；XMLTools 尚未进入实现。
 
 ### 阶段 6：跨平台 ABI v1
 
@@ -536,10 +544,10 @@ ctest --test-dir build-no-plugins --output-on-failure
 
 ## 10. 当前实施主流程
 
-阶段 0 和阶段 1 已完成。当前下一切片是阶段 2 安全加载基础：只处理架构、导出、
-依赖、加载诊断、异常启动恢复和资源回滚，不提前扩大 ABI 消息白名单。阶段 2 完成
-后再进入 Windows 原版 ABI 与双代理骨架；新 API 不作为首个实现切片。具体依赖
-顺序以讨论记录中的 `PS-025` 为准。
+阶段 0、1、阶段 2 的非延期项及阶段 3 已完成，阶段 5 已有首批真实插件语料。当前
+主切片是阶段 4：补齐由真实插件证明需要的常用 `NPPN_*`、Buffer、文件、语言和主题
+生命周期，再从这些语料收敛组合式 Host Services。PE 架构/依赖预检继续按既有决策
+延期；不得借通知补齐为设想中的插件无限扩大消息白名单。
 
 每一阶段先产生可审查的调查或验证记录，再修改兼容原则或实现代码。不得在未核验
 插件真实 API 使用情况时，为设想中的插件扩大兼容层。

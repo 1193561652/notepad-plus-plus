@@ -1736,6 +1736,13 @@ void NppParameters::feedGUIConfig(const TiXmlElement* el)
         _nppGUI._appPos      = QRect(x, y, w, h);
         _nppGUI._isMaximized = parseBool(attr(L"isMaximized"), false);
     }
+    else if (name == "DockingManager") {
+        _nppGUI._dockingLeftWidth = parseInt(attr(L"leftWidth"), 200);
+        _nppGUI._dockingRightWidth = parseInt(attr(L"rightWidth"), 200);
+        _nppGUI._dockingTopHeight = parseInt(attr(L"topHeight"), 200);
+        _nppGUI._dockingBottomHeight =
+            parseInt(attr(L"bottomHeight"), 200);
+    }
     else if (name == "FindWindowPosition") {
         _nppGUI._findWinLeft   = parseInt(attr(L"left"),   100);
         _nppGUI._findWinTop    = parseInt(attr(L"top"),    100);
@@ -2375,6 +2382,14 @@ bool NppParameters::writeConfigXml(const QString& filePath)
         el->SetAttribute(L"width",       _nppGUI._appPos.width());
         el->SetAttribute(L"height",      _nppGUI._appPos.height());
         el->SetAttribute(L"isMaximized", bw(_nppGUI._isMaximized));
+    }
+    // DockingManager
+    {
+        TiXmlElement* el = makeCfgEl(guiConfigs, L"DockingManager");
+        el->SetAttribute(L"leftWidth", _nppGUI._dockingLeftWidth);
+        el->SetAttribute(L"rightWidth", _nppGUI._dockingRightWidth);
+        el->SetAttribute(L"topHeight", _nppGUI._dockingTopHeight);
+        el->SetAttribute(L"bottomHeight", _nppGUI._dockingBottomHeight);
     }
     // RememberLastSession
     {

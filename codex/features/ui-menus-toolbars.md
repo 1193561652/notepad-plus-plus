@@ -18,7 +18,10 @@ UI 层应尽量保持原版 Notepad++ 用户体验，包括菜单、工具栏、
 - `MainWindow` 负责创建菜单、编码菜单、工具栏和状态栏。
 - `DocTabView` 负责文档标签。
 - `QSplitter` 承载主视图和副视图。
-- `QDockWidget` 承载文件浏览、文档地图、函数列表、查找结果等面板。
+- `DockingManager` 对应原版同名管理类，统一注册、查找、显示、隐藏、标签化、
+  调整尺寸并保存/恢复全部停靠面板状态。
+- `QDockWidget` 只作为 `DockingManager` 内部的 Qt 布局实现，承载文件浏览、文档
+  地图、函数列表、查找结果等面板；`MainWindow` 不再直接调用 `addDockWidget()`。
 - `resources.qrc` 已包含 Notepad++ 风格图标、中文语言资源、样式模型。
 
 ## 已确认入口
@@ -33,6 +36,22 @@ UI 层应尽量保持原版 Notepad++ 用户体验，包括菜单、工具栏、
 - `setupDocumentMap()`
 - `setupFunctionList()`
 - `setupFindResultPanel()`
+- `DockingManager::createDockableDlg()` / `showDockableDlg()`
+
+## DockingManager 结构
+
+- 原版映射：`Notepad_plus::_dockingManager` 对应 `MainWindow::_dockingManager`。
+- `DockingData` 保留原版 `tTbData` 的 client、名称、dialog ID、mask、图标、附加
+  信息和模块名语义，同时增加 Qt objectName/allowedAreas 等平台实现字段。
+- `DockingCont` 保存 left/right/top/bottom 四侧容器和注册顺序；同侧可见 Dock 使用
+  `QMainWindow::tabifyDockWidget()` 形成原版容器式标签页。
+- 原版 `DockingManager` 的 `init`、`createDockableDlg`、`updateContainerInfo`、
+  `setActiveTab`、`showDockableDlg`、容器查询和尺寸接口均有 Qt 对应入口。
+- 原版 `DockingManager` XML 的四侧尺寸已读取和写回；Qt 的完整布局字节仍存放在
+  `qtState.ini`，不会污染原版 XML 结构。
+- 尚未等价：原版动态浮动容器编号/前一容器映射、`ActiveTabs` XML，以及 Win32
+  插件 HWND client 承载。这些将在真实 Dock 插件接入时扩展管理器，而不是写回
+  `MainWindow`。
 
 ## 风险点
 

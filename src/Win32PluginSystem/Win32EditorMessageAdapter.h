@@ -20,6 +20,10 @@ public:
 
     ScintillaEditView* editor() const { return _editor; }
     HWND handle() const { return _handle; }
+    void setSelectionTextLengthIncludesTerminator(bool enabled)
+    {
+        _selectionTextLengthIncludesTerminator = enabled;
+    }
     bool isValid() const
         { return _editor != nullptr && _handle && IsWindow(_handle); }
 
@@ -29,4 +33,5 @@ public:
 private:
     ScintillaEditView* _editor = nullptr;
     HWND _handle = nullptr;
+    bool _selectionTextLengthIncludesTerminator = false;
 };

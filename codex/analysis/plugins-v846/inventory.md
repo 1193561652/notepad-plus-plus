@@ -17,7 +17,7 @@
 | 唯一 `folder-name` | 169 |
 | 重复 `folder-name` | 0 |
 | 首版完成 | 169 |
-| 等级 A / B / C / D / U | 13 / 23 / 25 / 1 / 107 |
+| 等级 A / B / C / D / U | 13 / 25 / 25 / 1 / 105 |
 | 重要度 高 / 中 / 低 | 20 / 94 / 55 |
 
 ## 插件清单
@@ -105,10 +105,10 @@
 | 79 | NavigateTo | NavigateTo | 1.12.7.0 | https://github.com/young-developer/nppNavigateTo/releases/download/v.1.12.7/NavigateTo_v.1.12.7_v142_x86.zip | https://github.com/young-developer/nppNavigateTo | 首版完成 | 未找到对应版本/证据不足 | 中 | U |
 | 80 | NewFileBrowser | NewFileBrowser | 0.1.3 | https://sourceforge.net/projects/locationnav/files/NewFileBrowser_v0.1.3.zip | https://sourceforge.net/projects/locationnav/ | 首版完成 | 未找到对应版本/证据不足 | 低 | U |
 | 81 | NppBplistPlugin | Notepad++ bplist plugin | 1.3.0.0 | https://github.com/azerg/NppBplistPlugin/releases/download/1.3.0.0/NppBplistPlugin_x86.zip | https://github.com/azerg/NppBplistPlugin | 首版完成 | 未找到对应版本/证据不足 | 中 | U |
-| 82 | NppPluginDemo | Notepad++ Plugin Demo | 4.2 | https://github.com/npp-plugins/plugindemo/releases/download/v4.2/pluginDemo.v4.2.bin.zip | https://npp-user-manual.org/docs/plugins/ | 首版完成 | 未找到对应版本/证据不足 | 中 | U |
+| 82 | NppPluginDemo | Notepad++ Plugin Demo | 4.2 | https://github.com/npp-plugins/plugindemo/releases/download/v4.2/pluginDemo.v4.2.bin.zip | https://npp-user-manual.org/docs/plugins/ | 首版完成 | 有，tag v4.2/真实 x64 DLL 已验证 | 中 | B |
 | 83 | NppPluginTemplate | Notepad++ Plugin Template | 4.2 | https://github.com/npp-plugins/plugintemplate/releases/download/v4.2/pluginTemplate.v4.2.bin.zip | https://npp-user-manual.org/docs/plugins/ | 首版完成 | 未找到对应版本/证据不足 | 中 | U |
 | 84 | NotepadStarterPlugin | NotepadStarterPlugin | 2.3.3.0 | https://github.com/lygstate/NotepadStarter/releases/download/2.3.3.0/NotepadStarter_2.3.3.0_Win32.zip | https://github.com/lygstate/NotepadStarter/ | 首版完成 | 未找到对应版本/证据不足 | 低 | U |
-| 85 | nppConverter | Npp Converter | 4.4.0 | https://github.com/npp-plugins/converter/releases/download/v4.4/nppConvert.v4.4.zip | https://github.com/npp-plugins/converter/ | 首版完成 | 未找到对应版本/证据不足 | 高 | U |
+| 85 | nppConverter | Npp Converter | 4.4.0 | https://github.com/npp-plugins/converter/releases/download/v4.4/nppConvert.v4.4.zip | https://github.com/npp-plugins/converter/ | 首版完成 | 有，tag v4.4/真实 x64 DLL 已验证 | 高 | B |
 | 86 | nppRandomStringGenerator | npp Random String Generator | 1.4.0 | https://github.com/cmbsolutions/nppRandomStringGenerator/releases/download/v1.4.0/nppRandomStringGenerator.1.4.0.x86.zip | https://github.com/cmbsolutions/nppRandomStringGenerator | 首版完成 | 未找到对应版本/证据不足 | 低 | U |
 | 87 | NppXmlTreeviewPlugin | Npp Xml Treeview | 2.0.0 | https://github.com/joaoasrosa/nppxmltreeview/releases/download/v2.0.0/NppXMLTreeViewPlugin_x86.zip | https://github.com/joaoasrosa/nppxmltreeview/ | 首版完成 | 未找到对应版本/证据不足 | 低 | U |
 | 88 | NppAutoIndent | NppAutoIndent | 1.2.0.0 | https://downloads.sourceforge.net/sourceforge/npp-plugins/NppAutoIndent_1_2_dll.zip | https://sourceforge.net/projects/npp-plugins/files/NppAutoIndent/ | 首版完成 | 未找到对应版本/证据不足 | 中 | U |

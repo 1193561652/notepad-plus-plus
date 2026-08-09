@@ -1,5 +1,61 @@
 # 本地缓存：最新分析
 
+## 2026-08-09 JsonTools 深层矩阵与简单插件
+
+- JsonTools Settings、RemesPath 查询/赋值、JSON Lines、YAML、树节点跳转和 4 MB
+  partial/full tree 阈值已由真实 DLL 自动验证。
+- `Run tests` 菜单存在，但 v3.2.0 上游测试代码无保护地依赖作者绝对目录；不在宿主中伪造
+  路径或改写官方 DLL，详见本轮变更记录。
+- 官方 nppConverter 4.4.0 与 NppPluginDemo 4.2 已通过现有插件管理流程安装、白名单加载和
+  真实命令/Dock 验证；适配层只新增 `SCI_ADDTEXT` 与 `SCI_ENSUREVISIBLE`。
+- 全量 CTest `37/37` 通过。
+- 记录：`codex/changes/2026-08-09-jsontools-deep-and-simple-plugins.md`。
+- 缓存：`codex/cache/2026-08-09-jsontools-deep-and-simple-plugins.md`。
+
+## 2026-08-09 JsonTools 3.2.0 适配
+
+- 官方 x64 CLR4/WinForms DLL 已通过插件管理语料安装，并进入 Windows 审核白名单。
+- 已补齐当前路径/文件名、新建/打开、3 个 SCI 消息、`NPPN_TBMODIFICATION` 和
+  `NPPN_FILEBEFORECLOSE`；关闭通知另由测试 DLL 验证 Buffer ID。
+- 真实 DLL 已验证加载、10 项命令表、快捷键、pretty/compress、JSON lexer 和 WinForms
+  JSON Tree Dock；注册后的 Dock 会显示并切到前台。
+- JsonTools 上游使用功能索引 `4` 作为 Dock ID，菜单勾选则使用宿主分配命令 ID；适配器
+  必须保留这两个标识的区别。
+- 实施记录：`codex/changes/2026-08-09-jsontools-v320-compatibility.md`。
+- 原评估：`codex/analysis/plugins-v846/jsontools-v320-compatibility-evaluation.md`。
+- 本地缓存：`codex/cache/2026-08-09-jsontools-v320-evaluation.md`。
+
+## 2026-08-08 Windows 初始窗口外框位置
+
+- `AppPosition` 与原版一致，表示完整窗口外框，不是 Qt 客户区。
+- 恢复时使用 frame margins 换算客户区尺寸并用 `move()` 放置外框；关闭时保存 `frameGeometry()`。
+- 修复默认 `x=0, y=0` 导致标题栏位于屏幕之外、调整大小后才出现的问题。
+- 详细记录：`codex/changes/2026-08-08-window-frame-geometry.md`。
+
+## 2026-08-08 前 8 个简单 Win32 插件语料
+
+- 8 个官方 x64 包均已通过插件管理流程安装；官方 ZIP 和 SHA-256 已进入本地测试缓存。
+- Reverse Lines、Remove Duplicate Lines、SelectQuotedText、BracketsCheck、SecurePad、Code Alignment 共 6 个插件已通过真实 DLL 功能测试。
+- Poor Man's T-SQL Formatter 因 CLR 2.0 激活错误 1114 跳过；BetterMultiSelection 因全局 Hook、通知链和输入状态依赖跳过。
+- 同步消息适配新增配置目录、语言类型、扩展名、command ID、快捷键、空函数分隔符和插件实际使用的 Scintilla 消息。
+- BracketsCheck 的直接 `HMENU` 勾选回写仍是已知 UI 差异，不应通过给 Qt 主窗口强挂原生菜单临时解决。
+- 详细记录：`codex/changes/2026-08-08-simple-win32-plugin-corpus.md`。
+
+## 2026-08-08 mimeTools 2.8 完整兼容
+
+- 官方 `mimeTools 2.8 x64` 的 18 个 `FuncItem` 表项已接入 Plugins 菜单：4 个分隔符、
+  13 个文本转换和 About；命令不再只可由测试接口调用。
+- 真实 DLL 直接完成 Base64 7 项、quoted-printable 2 项和 URL 3 项；回归覆盖每个
+  转换的有效输入、空选区、URL target/selection、主/副永久视图和插件字节缓冲区。
+- DLL URL 实现把 `SCI_GETSELTEXT` 长度当作含 NUL 值并在清零时多写 2 字节；Qt
+  adapter 仅对其 11–13 号 URL 命令的长度查询补回 NUL，文本复制语义不变。
+- DLL 的 SAML Decode `tinf_uncompress()` 缺少输入边界，About 的 Win32 资源 modeless
+  dialog 在 Qt 宿主中均可复现崩溃。`Win32PluginManager` 对这两个命令提供等价的安全
+  替代：raw-DEFLATE zlib 解码（上限 200000 字节、原错误文案和选区替换）与非模态
+  About 对话框。其他命令仍直接调用 DLL。
+- `mimetools-managed-install` 与 `ui-localization-runtime-100` 通过；后续全 UI
+  DPI/主题矩阵和全量 CTest 必须继续覆盖本语料。
+
 缓存日期：2026-08-02
 
 ## 2026-08-02 主/副永久 Scintilla 视图
@@ -534,3 +590,24 @@
   覆盖显式 target range、selection 和插件分配输出缓冲。
 - 永久视图迁移将标签容器改为独立 `QTabBar` 后，Qt 默认的 expanding 行为曾把少量
   标签拉伸到整行；`NppTabBar` 现显式 `setExpanding(false)`，恢复原版按内容宽度布局。
+
+## 2026-08-08 插件加载恢复基线
+
+- 完成 JSON Lines 结构化加载日志和原子加载中标记，状态位于用户配置目录
+  `plugin-load/`。
+- 异常退出后，下次启动跳过最后正在加载的插件一次，记录恢复事件、清除标记并显示提示。
+- 注册失败会释放 DLL、恢复命令 ID 检查点，不污染已加载插件集合。
+- `-noPlugin` 经命令行解析回归验证，不创建插件管理器、代理 HWND 或加载日志。
+- PE 架构和依赖预检按用户决策延期。
+- 详细记录：`codex/changes/2026-08-08-plugin-load-recovery.md`。
+
+## 2026-08-08 Qt DockingManager 结构恢复
+
+- 新增与原版职责对应的跨平台 `DockingManager`、`DockingData` 和四侧
+  `DockingCont`；底层继续使用 Qt Dock 布局引擎。
+- `MainWindow` 不再直接创建、添加、显示隐藏或持久化 `QDockWidget`，全部 10 个
+  内置面板经管理器注册。
+- 同侧 Dock 标签化，四侧尺寸重新读写原版 `config.xml/DockingManager` 属性，
+  完整 Qt 布局继续保存在 `qtState.ini`。
+- `AGENTS.md` 已将原版逻辑、类职责、生命周期和调用关系提升为强制移植基线。
+- 详细记录：`codex/changes/2026-08-08-qt-docking-manager-structure.md`。

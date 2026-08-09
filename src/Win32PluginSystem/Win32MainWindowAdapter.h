@@ -13,6 +13,7 @@
 
 class QMainWindow;
 class ScintillaEditView;
+class Win32PluginDockAdapter;
 
 class Win32MainWindowAdapter final
 {
@@ -20,7 +21,8 @@ public:
     Win32MainWindowAdapter(QMainWindow* window,
                            ScintillaEditView* mainEditor,
                            ScintillaEditView* subEditor,
-                           HWND handle);
+                           HWND handle,
+                           Win32PluginDockAdapter* dockAdapter);
     ~Win32MainWindowAdapter();
 
     QMainWindow* window() const { return _window; }
@@ -30,7 +32,7 @@ public:
                  _subclassInstalled; }
 
     LRESULT handleMessage(UINT message, WPARAM wParam, LPARAM lParam,
-                          bool* handled) const;
+                          bool* handled);
 
 private:
     static LRESULT CALLBACK subclassProc(
@@ -41,5 +43,6 @@ private:
     ScintillaEditView* _mainEditor = nullptr;
     ScintillaEditView* _subEditor = nullptr;
     HWND _handle = nullptr;
+    Win32PluginDockAdapter* _dockAdapter = nullptr;
     bool _subclassInstalled = false;
 };

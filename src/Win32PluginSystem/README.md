@@ -19,6 +19,15 @@
 - Linux/macOS 原生插件 ABI 不放入本目录。
 - 不向通用业务层暴露 Win32 类型或头文件。
 
+## 加载故障恢复
+
+- 加载器在用户配置目录的 `plugin-load/` 中写入 JSON Lines 结构化日志。
+- 调用 `LoadLibraryW` 前先原子写入 `plugin-load-in-progress.json`；普通成功或失败均清除。
+- 标记在异常退出后保留。下一次启动会跳过对应插件一次、记录 `recovery-skip` 并提示用户。
+- 插件导出或命令表注册失败时，释放模块、恢复命令 ID 检查点且不加入已加载集合。
+- `-noPlugin` 启动不创建本系统，因此不会创建代理 HWND 或加载状态文件。
+- PE 架构与依赖预检当前明确延期，不属于本轮实现。
+
 ## 依赖边界
 
 - 本目录可以依赖 `MISC/PluginsManager` 提供的平台无关模型和宿主服务。
@@ -66,7 +75,7 @@ Buffer，切换标签通过 `SCI_SETDOCPOINTER` 更换两个永久编辑器显�
 只对白名单消息原样调用 Scintilla 5 消息入口；消息编号、指针宽度和
 `WPARAM/LPARAM/LRESULT` 语义与 mimeTools 2.8 使用的接口一致。
 
-## 最小 ABI 加载验证
+## mimeTools 2.8 兼容验证
 
 - `Win32PluginInterface.h` 保持 v8.4.6 的 `NppData`、`FuncItem`、快捷键结构和
   六导出函数签名。
@@ -81,13 +90,82 @@ Buffer，切换标签通过 `SCI_SETDOCPOINTER` 更换两个永久编辑器显�
 `mimeTools 2.8 x64`。
 
 CTest 先用 `npp-plugin-updater` 和标准安装计划安装已校验的官方 ZIP，再验证安装
-收据、目录发现、ABI 初始化、`MIME Tools` 名称、命令表和关闭生命周期。人工集成
-验证还使用同一 updater 从官方 GitHub Release 完成了真实网络下载和事务安装。
-当前白名单覆盖 mimeTools v2.8 实际使用的九个消息：
+收据、目录发现、ABI 初始化、`MIME Tools` 名称、命令表、菜单和关闭生命周期。当前
+白名单覆盖 mimeTools v2.8 实际使用的九个消息：
 `SCI_GETSELECTIONSTART/END`、`SCI_GETSELTEXT`、`SCI_TARGETFROMSELECTION`、
 `SCI_GETTARGETTEXT`、`SCI_SETTARGETSTART/END`、`SCI_REPLACETARGET` 和
-`SCI_SETSEL`。真实 DLL 的 Base64 Encode 已在主/副视图通过，URL Encode 在主视图
-通过，并覆盖插件分配的输入/输出字节缓冲区。
+`SCI_SETSEL`。
 
-`mimeTools` 白名单仅用于当前 Win32 ABI 接入测试。扩展消息路由后应移除白名单，按
-插件管理器发现结果加载所有兼容插件。
+`MainWindow` 将 DLL 返回的 `FuncItem` 表加入 Plugins 菜单，保留 4 个分隔符和全部
+14 个可操作项。真实 DLL 直接执行 12 个文本转换：Base64 的 7 项、quoted-printable
+的 2 项和 URL 的 3 项。回归测试覆盖每项的成功转换、空选区不修改、主/副永久视图、
+目标替换、选择区和插件分配的字节缓冲区。
+
+mimeTools 的 URL 源码在计算 `SCI_GETSELTEXT` 输出缓冲区时假定长度包含 NUL；Qt
+Scintilla 的返回值是精确文本长度。仅在该 DLL 的 3 个 URL 命令进行长度查询时，adapter
+额外返回 NUL 长度，避免插件自身少分配 2 字节。复制文本仍返回真实长度。
+
+官方 x64 DLL 的 SAML Decode 使用无输入边界的 `tinf_uncompress()`，About 使用内嵌
+Win32 modeless dialog；两条路径在 Qt 宿主中均可复现进程崩溃。兼容层只替代这两个
+命令：SAML 使用 zlib 的 raw-DEFLATE 解码，并保持原插件的 URL/Base64/inflate 错误文案、
+200000 字节上限、选区与替换语义；About 使用非模态 Qt 对话框显示原资源中的作者、版本
+和 GPL 信息。其余命令不由宿主重实现。
+
+当前白名单只接纳已经完成 API 审计和真实 DLL 回归的同步消息型插件。扩展通知、Hook、
+Dock 和运行时边界后，应逐项扩大兼容集合；不能仅因插件已经安装就自动加载。
+
+## Simple synchronous plugin corpus
+
+The audited load set now also includes Reverse Lines, Remove Duplicate Lines,
+SelectQuotedText, BracketsCheck, SecurePad, and Code Alignment. These plugins
+remain on the same compatibility boundary as mimeTools: the DLL receives the
+three stable HWND values and its synchronous `NPPM_*`/`SCI_*` calls are handled
+by the adapters. No plugin editing algorithm is reimplemented in Qt.
+
+Poor Man's T-SQL Formatter is installed but skipped because its .NET 2.0 image
+requires a process-wide CLR activation decision. BetterMultiSelection is
+installed but excluded because it depends on global hooks and the full
+notification/input pipeline. BracketsCheck's direct `GetMenu`/`CheckMenuItem`
+state synchronization is also deferred; attaching an HMENU to the Qt main
+window is not an acceptable local workaround.
+
+## Dock adapter and JSON Viewer 1.41
+
+`Win32PluginDockAdapter` and `Win32NativeDockHost` implement the v8.4.6 Dock
+ABI without moving Win32 types into the generic UI layer. The adapter maps
+`tTbData`, DMM messages, DMN notifications, and modeless dialogs. The host is
+the sole owner of the plugin client HWND and restores its original parent and
+styles before plugin DLL unload.
+
+The official JSON Viewer 1.41 x64 DLL is installed through the updater fixture.
+Runtime coverage executes Show JSON Viewer, Format JSON, and Compress JSON;
+verifies JSON language selection, Dock show/hide/float/redock, direct HWND
+parenting, exact host sizing, and shutdown cleanup. Qt 5 creates four new
+native Qt widgets for this Dock: host, QDockWidget, close button, and float
+button. No editor, splitter, central widget, or higher container is promoted.
+
+## JsonTools 3.2.0
+
+The official x64 CLR4/WinForms DLL is installed from the pinned corpus and
+loaded unchanged. Its narrow additional surface is handled here: current-path,
+filename, file-new, file-open, append-text, goto-line, goto-position, toolbar
+modification, and file-before-close notifications.
+
+JsonTools intentionally registers its tree with function index `4` as the Dock
+ID. The host-assigned command ID is copied into the managed function table by
+`NPPN_TBMODIFICATION` and is used separately for menu check state. Do not merge
+these identifiers in the adapter. Registering a Dock also makes it current so a
+new WinForms panel does not remain behind an existing tabified Dock.
+## JsonTools deep matrix and simple corpus additions
+
+The real JsonTools 3.2.0 DLL is covered for Settings, RemesPath query and
+assignment, JSON Lines, YAML output, tree-to-source navigation, and its exact
+4 MB partial/full tree behavior. The upstream `Run tests` command is not
+portable because `JsonGrepperTests.cs` calls `GetFiles()` on the author's
+absolute test directory without guarding a missing directory. The host does
+not synthesize that path or replace the plugin command.
+
+The audited Windows corpus also includes the official nppConverter 4.4.0 and
+NppPluginDemo 4.2 x64 packages. They use the existing package installer,
+six-export loader, message receivers, and DockingManager. Their source-proven
+editor additions are limited to `SCI_ADDTEXT` and `SCI_ENSUREVISIBLE`.

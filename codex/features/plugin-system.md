@@ -42,9 +42,12 @@
 - Windows x64 CTest 先用 `npp-plugin-updater` 按标准计划安装已校验的官方
   mimeTools ZIP，再验证安装收据、插件名 `MIME Tools` 和非空命令表。人工集成测试
   已通过同一 updater 从官方 Release 实际下载并安装。
-- mimeTools v2.8 使用的九个 `SCI_*` 已全部加入白名单。真实 DLL 的 Base64 Encode
-  在主/副视图通过，URL Encode 在主视图通过，覆盖 selection、target、字节缓冲和
-  replacement 语义。
+- mimeTools v2.8 使用的九个 `SCI_*` 已全部加入白名单。`FuncItem` 的 18 个表项
+  （4 个分隔符、13 个文本转换和 About）已进入 Plugins 菜单；13 个转换均有真实
+  安装 DLL 的菜单触发回归。Base64、quoted-printable 和 URL 直接执行 DLL；SAML 与
+  About 因官方 DLL 在 Qt 宿主中的可复现崩溃，由 Win32 兼容层提供等价、安全的实现。
+- URL 命令保留 DLL 执行，但只在其 `SCI_GETSELTEXT` 长度查询中适配原 DLL 假定的 NUL
+  长度，以修复其自身临时输出缓冲区少分配问题。
 - `MainWindow` 完成主/副 `DocTabView` 创建后立即构造管理类，并传入主窗口与
   两个永久 `ScintillaEditView`。
 - 管理类保存 Qt 窗口引用并提供相应 `HWND`，供后续原版六导出、消息路由和 Dock
@@ -97,7 +100,55 @@
 
 ## 仍延期的插件工作
 
-- 安全加载基础：PE 架构、六导出、依赖预检、加载日志、异常恢复和注册回滚。
-- Windows v8.4.6 原版插件 ABI 兼容层。
+- 安全加载剩余项：PE 架构和依赖预检；本轮按决策暂不实现。
+- Windows v8.4.6 原版插件 ABI 已形成有限兼容层；当前继续补齐真实语料需要的通知和
+  Host Services，不承诺任意旧插件通用兼容。
 - 跨平台稳定插件 ABI 及 SDK。
 - Linux/macOS 原生插件生态清单、签名、公证和发布策略。
+
+## 2026-08-08 简单插件兼容语料
+
+- 当前同步消息白名单已从 mimeTools 扩展到 Reverse Lines、Remove Duplicate Lines、SelectQuotedText、BracketsCheck、SecurePad 和 Code Alignment。
+- 这些插件继续使用原版 `NppData`、`FuncItem`、`NPPM_*` 和 `SCI_*`；编辑行为由 Scintilla 5 原样执行，Qt adapter 只负责 HWND 到现有对象的映射。
+- CTest 使用项目 updater 从 `third_party/win32-plugins` 的固定官方包安装 9 个语料（mimeTools 加本轮 8 个），验证 SHA-256、安装回执、加载诊断、菜单和真实命令。
+- Poor Man's T-SQL Formatter 需要 CLR 2.0/4.0 激活策略；BetterMultiSelection 需要 Hook、`NPPN_*`/`SCN_*` 通知与多选输入状态，二者未进入当前加载白名单。
+- BracketsCheck 的核心检查已兼容；它直接调用 `GetMenu/CheckMenuItem` 的旧式菜单勾选回写尚未映射到 Qt 菜单。
+
+## 2026-08-08 插件加载恢复基线
+
+- `PluginLoadJournal` 在用户配置目录的 `plugin-load/` 下维护
+  `plugin-load.jsonl` 和原子写入的 `plugin-load-in-progress.json`。
+- 每个会话及插件加载均记录开始、成功、失败、恢复跳过和会话完成事件；日志超过
+  1 MiB 时轮转为 `.1`。
+- 上次进程若在某个插件加载期间退出，下次启动只跳过该插件一次并显示非模态恢复提示；
+  其余兼容白名单插件继续加载。
+- 注册失败会卸载 DLL、恢复命令 ID 检查点且不写入已加载集合。真实测试 DLL 验证
+  随后的有效插件取得连续命令 ID。
+- `-noPlugin` 经实际 `CommandLineParser` 解析后，不创建 `Win32PluginManager`、代理窗口
+  或加载日志，Plugins 菜单保持禁用占位状态。
+
+## 2026-08-09 JsonTools 3.2.0 适配
+
+- 官方 x64 CLR4/WinForms DLL 已加入固定语料、插件管理安装计划和 Windows 兼容白名单，
+  未重写插件算法或 UI。
+- 主窗口适配器新增当前完整路径、文件名、新建和打开消息；编辑器适配器新增
+  `SCI_APPENDTEXT`、`SCI_GOTOLINE`、`SCI_GOTOPOS`。
+- 插件批量加载后发送 `NPPN_TBMODIFICATION`，关闭每个 Buffer 前发送
+  `NPPN_FILEBEFORECLOSE`。前者刷新托管菜单命令 ID；JsonTools 自身仍按上游代码用
+  功能索引 `4` 作为树 Dock ID。
+- 真实 DLL 回归已验证 10 个 FuncItem、3 个快捷键、pretty/compress、JSON lexer、
+  路径/新建/打开消息、直接 SCI 消息、WinForms JSON Tree Dock 的可见性与 HWND 父子关系。
+- Settings、RemesPath、JSON Lines、YAML、树节点跳转和 4 MB 大树边界已纳入真实 DLL
+  自动矩阵；内置 `Run tests` 仅剩下方记录的上游绝对路径缺陷。
+
+## 2026-08-09 深层 JsonTools 与简单插件语料
+
+- JsonTools 真实 DLL 矩阵现覆盖 Settings、RemesPath 查询/赋值、JSON Lines、YAML、树节点
+  源码跳转，以及超过 4 MB 时先建直接子树、确认后建完整树的上游行为。
+- JsonTools v3.2.0 `Run tests` 的 JsonGrepper 套件硬编码作者绝对目录并在 `GetFiles()` 外
+  没有异常保护。宿主不伪造路径、不截断插件命令；修复菜单自身需要另行决定维护补丁 DLL
+  或升级插件版本。
+- Windows 审核语料新增官方 nppConverter 4.4.0 和 NppPluginDemo 4.2。两者沿用插件管理
+  安装、白名单加载、`FuncItem` 命令和 DockingManager，不建立插件专属架构。
+- 编辑器适配层新增源码证实需要的 `SCI_ADDTEXT` 与 `SCI_ENSUREVISIBLE`。Converter 已验证
+  双向转换、配置和面板插入；Demo 已验证 Hello、Dock 和行跳转。

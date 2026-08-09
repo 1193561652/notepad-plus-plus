@@ -17,18 +17,60 @@ LRESULT Win32EditorMessageAdapter::handleMessage(
         *handled = true;
 
     switch (message) {
+        case SCI_BEGINUNDOACTION:
+        case SCI_ADDTEXT:
+        case SCI_APPENDTEXT:
+        case SCI_CLEARSELECTIONS:
+        case SCI_ENDUNDOACTION:
+        case SCI_ENSUREVISIBLE:
+        case SCI_GETCOLUMN:
+        case SCI_GETCURRENTPOS:
+        case SCI_GETEOLMODE:
+        case SCI_GETLENGTH:
+        case SCI_GETLEXER:
+        case SCI_GETLINE:
+        case SCI_GETLINECOUNT:
+        case SCI_GETLINEENDPOSITION:
+        case SCI_GETSELECTIONNEND:
+        case SCI_GETSELECTIONNSTART:
         case SCI_GETSELECTIONSTART:
         case SCI_GETSELECTIONEND:
         case SCI_GETSELTEXT:
+        case SCI_GETSTYLEAT:
         case SCI_TARGETFROMSELECTION:
         case SCI_GETTARGETTEXT:
+        case SCI_GETTABWIDTH:
+        case SCI_GETTEXT:
+        case SCI_GETTEXTLENGTH:
+        case SCI_GETTEXTRANGE:
+        case SCI_GETUSETABS:
+        case SCI_GOTOLINE:
+        case SCI_GOTOPOS:
+        case SCI_INSERTTEXT:
+        case SCI_LINEFROMPOSITION:
+        case SCI_POSITIONFROMLINE:
+        case SCI_REPLACESEL:
         case SCI_SETTARGETSTART:
         case SCI_SETTARGETEND:
         case SCI_REPLACETARGET:
+        case SCI_SELECTALL:
         case SCI_SETSEL:
-            return static_cast<LRESULT>(_editor->SendScintillaNpp(
-                message, static_cast<uptr_t>(wParam),
-                static_cast<sptr_t>(lParam)));
+        case SCI_SETSELECTIONEND:
+        case SCI_SETSELECTIONSTART:
+        case SCI_SETTEXT:
+        case SCI_WORDENDPOSITION:
+        case SCI_WORDSTARTPOSITION:
+        {
+            const LRESULT result = static_cast<LRESULT>(
+                _editor->SendScintillaNpp(
+                    message, static_cast<uptr_t>(wParam),
+                    static_cast<sptr_t>(lParam)));
+            if (message == SCI_GETSELTEXT && lParam == 0
+                && _selectionTextLengthIncludesTerminator) {
+                return result + 1;
+            }
+            return result;
+        }
         default:
             if (handled)
                 *handled = false;

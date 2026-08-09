@@ -416,8 +416,8 @@ Windows 原 DLL 的宿主消息都能由有限同步代理表达，COM/MFC 依�
 - [ ] 对六个清单包复核 SHA-256、目录布局、附带 DLL 和 PE x86 架构。
 - [ ] 核验六个标准导出、Unicode 返回值、FuncItem 数量/名称/快捷键。
 - [ ] 在原版 Notepad++ v8.4.6 x86 建立行为基线和关闭顺序日志。
-- [ ] 对 B 类先验证 JSON Viewer 的 Dock/选区，再验证 JsonTools CLR/Dock，最后
-  验证 XMLTools 的编码、annotation、tag autoclose 和 COM 异常。
+- [x] 对 B 类验证 JSON Viewer 的 Dock/选区和 JsonTools CLR/Dock。
+- [ ] 验证 XMLTools 的编码、annotation、tag autoclose 和 COM 异常。
 - [ ] 对 C 类只做安全加载/拒绝、异常隔离和诊断验证；不得因“能显示菜单”改判。
 - [ ] 验证插件初始化、通知和命令异常不会让宿主崩溃；记录可恢复和必须重启情形。
 - [ ] 验证高频通知性能、指针缓冲区越界保护、关闭超时和后台任务取消。
@@ -430,6 +430,15 @@ Windows 原 DLL 的宿主消息都能由有限同步代理表达，COM/MFC 依�
 | E-02 | [ComparePlus `cp_1.0.0`](https://github.com/pnedev/comparePlus/tree/cp_1.0.0) | direct-call、双视图、Dock、subclass、线程 | 未运行 x86 包 |
 | E-03 | [DSpellCheck `v1.4.24`](https://github.com/Predelnik/DSpellCheck/tree/v1.4.24) | indicator、通知、subclass、网络和依赖 | 未运行 x86 包 |
 | E-04 | [NPP_HexEdit `0.9.12`](https://github.com/chcg/NPP_HexEdit/tree/0.9.12) | 额外 Scintilla、HEX view、原生 UI | 仓库自述为原源码镜像/延续 |
-| E-05 | [JsonTools `v3.2.0`](https://github.com/molsonkiko/JsonToolsNppPlugin/tree/v3.2.0) | .NET/WinForms、实际窄 API 集、Dock | 未核验生成 DLL 导出 |
+| E-05 | [JsonTools `v3.2.0`](https://github.com/molsonkiko/JsonToolsNppPlugin/tree/v3.2.0) | .NET/WinForms、实际窄 API 集、Dock | 2026-08-09 已验证 CLR4、格式化/压缩、Settings、RemesPath、JSON Lines、YAML、树跳转和 4 MB 阈值；`Run tests` 仍有上游绝对路径缺陷 |
 | E-06 | [JSON Viewer `v1.41`](https://github.com/kapilratnani/JSON-Viewer/tree/v1.41) | RapidJSON、Dock、selection API | README 标题仍写 1.40，结论以 tag 源码为准 |
 | E-07 | [XMLTools `3.1.1.13`](https://github.com/morbac/xmltools/tree/3.1.1.13) | MSXML、MFC UI、宿主/SCI 调用 | 未运行 COM 场景 |
+
+### 11.1 JsonTools 后续复核
+
+2026-08-09 对官方 x86/x64 包、六导出、CLR 元数据和当前 Qt 适配层进行了复核。
+除 6.2 原记录外，可达业务路径还需要 `NPPM_GETFULLCURRENTPATH`、
+`NPPM_GETFILENAME`、`NPPM_MENUCOMMAND(IDM_FILE_NEW)`、`NPPM_DOOPEN` 和
+`SCI_GOTOPOS`。源码中的 `JsonGrepper` 网络/线程代码在 v3.2.0 菜单中不可达。
+等级仍为 B；有限增量、真实 DLL 和深层功能矩阵均已实施，完整结果见
+`jsontools-v320-compatibility-evaluation.md`。

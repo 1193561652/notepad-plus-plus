@@ -16,6 +16,7 @@
 #include "MISC/PluginsManager/PluginUpdatePlan.h"
 #include "CommandLineOptions.h"
 #include "MISC/ClosedFileHistory.h"
+#include "WinControls/DockingWnd/DockingManager.h"
 
 class ScintillaEditView;
 class DocTabView;
@@ -56,6 +57,12 @@ public:
     void openFile(const QString& path) override { doOpenFile(path, _activeDocTab); }
     QString currentFilePath() const override;
     QMainWindow* mainWindow() override { return this; }
+    DockingManager& dockingManager() { return _dockingManager; }
+    const DockingManager& dockingManager() const { return _dockingManager; }
+    QString currentPathForWin32Plugin() const;
+    bool executeMenuCommandFromWin32Plugin(int commandId);
+    bool openFileFromWin32Plugin(const QString& path);
+    bool setCurrentLanguageTypeFromPlugin(int languageType);
 #ifdef Q_OS_WIN
     Win32PluginManager* win32PluginManager() const
     {
@@ -108,6 +115,9 @@ private:
     void setupFindResultPanel();
     void setupAuxiliaryPanels();
     void setupPluginSystem();
+#ifdef Q_OS_WIN
+    void populateWin32PluginMenu();
+#endif
     void showPluginAdmin();
     bool schedulePluginOperations(
         const QVector<PluginOperation>& operations);
@@ -269,6 +279,7 @@ private:
     DocTabView*       _mainDocTab      = nullptr;
     DocTabView*       _subDocTab       = nullptr;
     DocTabView*       _activeDocTab    = nullptr;
+    DockingManager    _dockingManager;
 
     FindReplaceDlg*    _findReplaceDlg   = nullptr;
     PreferenceDlg*     _preferenceDlg    = nullptr;

@@ -15,6 +15,7 @@
 #include "ScintillaComponent/ScintillaTextSearch.h"
 #include "ScintillaComponent/EditorMacro.h"
 #include "WinControls/DockingWnd/FileBrowserPanel.h"
+#include "WinControls/DockingWnd/DockingManager.h"
 #include "WinControls/Preference/PreferenceDlg.h"
 #include "WinControls/DockingWnd/DocumentMapPanel.h"
 #include "WinControls/DockingWnd/FunctionListPanel.h"
@@ -87,6 +88,7 @@
 #include <QTabWidget>
 #include <QXmlStreamReader>
 #include <QSharedPointer>
+#include <QWindow>
 #include <algorithm>
 #include <functional>
 
@@ -271,9 +273,16 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
     resize(900, 600);
 
     setupTabViews();
+    _dockingManager.init(this, _splitter);
 #ifdef Q_OS_WIN
-    _win32PluginManager = new Win32PluginManager(
-        this, _mainDocTab->editor(), _subDocTab->editor());
+    if (!startupOptions.noPlugin) {
+        const QString pluginStateDirectory =
+            QDir(NppParameters::getInstance().getUserPath())
+                .filePath(QStringLiteral("plugin-load"));
+        _win32PluginManager = new Win32PluginManager(
+            this, _mainDocTab->editor(), _subDocTab->editor(),
+            pluginStateDirectory, &_dockingManager);
+    }
 #endif
     createActions();
     createMenus();
@@ -313,13 +322,29 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
     NppParameters& params = NppParameters::getInstance();
     const NppGUI& gui = params.getNppGUI();
 
+    _dockingManager.setDockedContSize(
+        CONT_LEFT, gui._dockingLeftWidth);
+    _dockingManager.setDockedContSize(
+        CONT_RIGHT, gui._dockingRightWidth);
+    _dockingManager.setDockedContSize(
+        CONT_TOP, gui._dockingTopHeight);
+    _dockingManager.setDockedContSize(
+        CONT_BOTTOM, gui._dockingBottomHeight);
+
     QRect pos = gui._appPos;
-    if (pos.width() > 100 && pos.height() > 100)
-        setGeometry(pos);
+    if (pos.width() > 100 && pos.height() > 100) {
+        const QMargins frameMargins = windowHandle()
+            ? windowHandle()->frameMargins() : QMargins();
+        resize(qMax(100, pos.width() - frameMargins.left()
+                               - frameMargins.right()),
+               qMax(100, pos.height() - frameMargins.top()
+                               - frameMargins.bottom()));
+        move(pos.topLeft());
+    }
     if (gui._isMaximized)
         showMaximized();
     if (!gui._windowState.isEmpty())
-        restoreState(gui._windowState);
+        _dockingManager.restoreState(gui._windowState);
     if (startupOptions.hasWindowPosition())
         move(startupOptions.windowX, startupOptions.windowY);
     if (startupOptions.alwaysOnTop)
@@ -366,6 +391,10 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
 
 MainWindow::~MainWindow()
 {
+#ifdef Q_OS_WIN
+    delete _win32PluginManager;
+    _win32PluginManager = nullptr;
+#endif
     if (_recordingMacro) {
         _recordingMacro->endRecording();
         delete _recordingMacro;
@@ -469,7 +498,7 @@ void MainWindow::applyCommandLineInvocation(
             if (!QFileInfo(path).isDir())
                 continue;
             _fileBrowserPanel->setRootPath(path);
-            _fileBrowserDock->show();
+            _dockingManager.showDockableDlg(_fileBrowserPanel, true);
             _fileBrowserAction->setChecked(true);
         }
         return;
@@ -652,13 +681,13 @@ void MainWindow::setBufferEolMode(Buffer* buffer, int mode, bool convertText)
 void MainWindow::setupFileBrowser()
 {
     _fileBrowserPanel = new FileBrowserPanel(this);
-
-    _fileBrowserDock = new QDockWidget(tr("Folder as Workspace"), this);
-    _fileBrowserDock->setObjectName("FileBrowserDock");
-    _fileBrowserDock->setWidget(_fileBrowserPanel);
-    _fileBrowserDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    addDockWidget(Qt::LeftDockWidgetArea, _fileBrowserDock);
-    _fileBrowserDock->hide();
+    DockingData data;
+    data.hClient = _fileBrowserPanel;
+    data.pszName = tr("Folder as Workspace");
+    data.objectName = QStringLiteral("FileBrowserDock");
+    data.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea;
+    _fileBrowserDock = _dockingManager.createDockableDlg(
+        data, CONT_LEFT, false);
 
     connect(_fileBrowserPanel, &FileBrowserPanel::fileActivated,
             this, [this](const QString& path) {
@@ -675,10 +704,7 @@ void MainWindow::setupFileBrowser()
 
 void MainWindow::toggleFileBrowser()
 {
-    if (_fileBrowserDock->isVisible())
-        _fileBrowserDock->hide();
-    else
-        _fileBrowserDock->show();
+    _dockingManager.toggleDockableDlg(_fileBrowserPanel);
 }
 
 void MainWindow::updateFindReplaceView()
@@ -1148,6 +1174,11 @@ bool MainWindow::closeBufferList(const QList<Buffer*>& buffers)
     };
 
     for (Buffer* buffer : unique) {
+#ifdef Q_OS_WIN
+        if (_win32PluginManager)
+            _win32PluginManager->notifyFileBeforeClose(
+                reinterpret_cast<quintptr>(buffer));
+#endif
         if (!buffer->isUntitled())
             rememberClosedFile(buffer->getFullPath());
         removeFromTab(_mainDocTab, buffer);
@@ -1512,7 +1543,7 @@ void MainWindow::openFolderAsWorkspace()
         tr("Open Folder as Workspace"), initial);
     if (folder.isEmpty()) return;
     _fileBrowserPanel->setRootPath(folder);
-    _fileBrowserDock->show();
+    _dockingManager.showDockableDlg(_fileBrowserPanel, true);
     _fileBrowserAction->setChecked(true);
 }
 
@@ -1705,6 +1736,12 @@ void MainWindow::onBufferCloseRequested(Buffer* buf)
     const bool remainsOpen = otherDocTab->indexOfBuffer(buf) >= 0;
     if (!remainsOpen && !checkBufferSave(buf))
         return;
+
+#ifdef Q_OS_WIN
+    if (_win32PluginManager)
+        _win32PluginManager->notifyFileBeforeClose(
+            reinterpret_cast<quintptr>(buf));
+#endif
 
     if (idx >= 0)
         srcTab->removeTab(idx);
@@ -2401,10 +2438,17 @@ void MainWindow::closeEvent(QCloseEvent* event)
     }
 
     gui._isMaximized  = isMaximized();
-    gui._windowState  = saveState();
+    gui._windowState  = _dockingManager.saveState();
+    gui._dockingLeftWidth =
+        _dockingManager.getDockedContSize(CONT_LEFT);
+    gui._dockingRightWidth =
+        _dockingManager.getDockedContSize(CONT_RIGHT);
+    gui._dockingTopHeight =
+        _dockingManager.getDockedContSize(CONT_TOP);
+    gui._dockingBottomHeight =
+        _dockingManager.getDockedContSize(CONT_BOTTOM);
     if (!isMaximized()) {
-        QRect g = geometry();
-        gui._appPos = g;
+        gui._appPos = frameGeometry();
     }
     if (gui._isSnapshotMode)
         onBackupTimer();
@@ -2436,18 +2480,50 @@ QString MainWindow::currentFilePath() const
     return (buf && !buf->isUntitled()) ? buf->getFullPath() : QString();
 }
 
+QString MainWindow::currentPathForWin32Plugin() const
+{
+    Buffer* buf = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
+    return buf ? buf->getFullPath() : QString();
+}
+
+bool MainWindow::executeMenuCommandFromWin32Plugin(int commandId)
+{
+    return executeNppCommand(commandId);
+}
+
+bool MainWindow::openFileFromWin32Plugin(const QString& path)
+{
+    return !path.isEmpty() && doOpenFile(path, _activeDocTab);
+}
+
+bool MainWindow::setCurrentLanguageTypeFromPlugin(int languageType)
+{
+    ScintillaEditView* view = currentActiveView();
+    if (!view)
+        return false;
+    switch (languageType) {
+        case 0: view->setBuiltinLanguage(QStringLiteral("normal")); break;
+        case 8: view->setBuiltinLanguage(QStringLiteral("html")); break;
+        case 9: view->setBuiltinLanguage(QStringLiteral("xml")); break;
+        case 57: view->setBuiltinLanguage(QStringLiteral("json")); break;
+        default: return false;
+    }
+    updateStatusBar();
+    return true;
+}
+
 // ─── 文档地图 ────────────────────────────────────────────────────────────────
 
 void MainWindow::setupDocumentMap()
 {
     _docMapPanel = new DocumentMapPanel(this);
-
-    _docMapDock = new QDockWidget(tr("Document Map"), this);
-    _docMapDock->setObjectName("DocumentMapDock");
-    _docMapDock->setWidget(_docMapPanel);
-    _docMapDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    addDockWidget(Qt::RightDockWidgetArea, _docMapDock);
-    _docMapDock->hide();
+    DockingData data;
+    data.hClient = _docMapPanel;
+    data.pszName = tr("Document Map");
+    data.objectName = QStringLiteral("DocumentMapDock");
+    data.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea;
+    _docMapDock = _dockingManager.createDockableDlg(
+        data, CONT_RIGHT, false);
 
     connect(_docMapDock, &QDockWidget::visibilityChanged, this, [this](bool visible) {
         if (_docMapAction) _docMapAction->setChecked(visible);
@@ -2479,13 +2555,13 @@ void MainWindow::syncDocumentMap()
 void MainWindow::setupFunctionList()
 {
     _funcListPanel = new FunctionListPanel(this);
-
-    _funcListDock = new QDockWidget(tr("Function List"), this);
-    _funcListDock->setObjectName("FunctionListDock");
-    _funcListDock->setWidget(_funcListPanel);
-    _funcListDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    addDockWidget(Qt::RightDockWidgetArea, _funcListDock);
-    _funcListDock->hide();
+    DockingData data;
+    data.hClient = _funcListPanel;
+    data.pszName = tr("Function List");
+    data.objectName = QStringLiteral("FunctionListDock");
+    data.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea;
+    _funcListDock = _dockingManager.createDockableDlg(
+        data, CONT_RIGHT, false);
 
     connect(_funcListPanel, &FunctionListPanel::navigationRequested,
             this, [this](int line) {
@@ -2508,11 +2584,12 @@ void MainWindow::setupFunctionList()
 void MainWindow::setupAuxiliaryPanels()
 {
     _documentList = new QListWidget(this);
-    _documentListDock = new QDockWidget(tr("Document List"), this);
-    _documentListDock->setObjectName("DocumentListDock");
-    _documentListDock->setWidget(_documentList);
-    addDockWidget(Qt::RightDockWidgetArea, _documentListDock);
-    _documentListDock->hide();
+    DockingData documentListData;
+    documentListData.hClient = _documentList;
+    documentListData.pszName = tr("Document List");
+    documentListData.objectName = QStringLiteral("DocumentListDock");
+    _documentListDock = _dockingManager.createDockableDlg(
+        documentListData, CONT_RIGHT, false);
 
     auto refreshDocuments = [this]() {
         _documentList->clear();
@@ -2577,25 +2654,26 @@ void MainWindow::setupAuxiliaryPanels()
         if (!workspace.isEmpty() && QFileInfo::exists(workspace))
             panel->loadWorkspace(workspace);
 
-        QDockWidget* dock = new QDockWidget(tr("Project %1").arg(i + 1), this);
-        dock->setObjectName(i == 0
+        DockingData projectData;
+        projectData.hClient = panel;
+        projectData.pszName = tr("Project %1").arg(i + 1);
+        projectData.objectName = i == 0
             ? QStringLiteral("ProjectPanelsDock")
-            : QStringLiteral("ProjectPanelsDock%1").arg(i + 1));
-        dock->setWidget(panel);
-        dock->setMinimumWidth(190);
-        addDockWidget(Qt::LeftDockWidgetArea, dock);
-        dock->hide();
-        _projectPanelsDock[i] = dock;
+            : QStringLiteral("ProjectPanelsDock%1").arg(i + 1);
+        projectData.minimumWidth = 190;
+        _projectPanelsDock[i] = _dockingManager.createDockableDlg(
+            projectData, CONT_LEFT, false);
     }
-    resizeDocks({_projectPanelsDock[0]}, {207}, Qt::Horizontal);
+    _dockingManager.setDockedContSize(CONT_LEFT, 207);
 
     _clipboardHistory = new QListWidget(this);
     _clipboardHistory->setWordWrap(true);
-    _clipboardDock = new QDockWidget(tr("Clipboard History"), this);
-    _clipboardDock->setObjectName("ClipboardHistoryDock");
-    _clipboardDock->setWidget(_clipboardHistory);
-    addDockWidget(Qt::BottomDockWidgetArea, _clipboardDock);
-    _clipboardDock->hide();
+    DockingData clipboardData;
+    clipboardData.hClient = _clipboardHistory;
+    clipboardData.pszName = tr("Clipboard History");
+    clipboardData.objectName = QStringLiteral("ClipboardHistoryDock");
+    _clipboardDock = _dockingManager.createDockableDlg(
+        clipboardData, CONT_BOTTOM, false);
     connect(QApplication::clipboard(), &QClipboard::dataChanged, this, [this]() {
         const QString text = QApplication::clipboard()->text();
         if (text.isEmpty())
@@ -2624,11 +2702,12 @@ void MainWindow::setupAuxiliaryPanels()
                 .arg(code, 4, 16, QChar('0')).toUpper(), _characterList);
         item->setData(Qt::UserRole, QString(character));
     }
-    _characterDock = new QDockWidget(tr("Character Panel"), this);
-    _characterDock->setObjectName("CharacterPanelDock");
-    _characterDock->setWidget(_characterList);
-    addDockWidget(Qt::RightDockWidgetArea, _characterDock);
-    _characterDock->hide();
+    DockingData characterData;
+    characterData.hClient = _characterList;
+    characterData.pszName = tr("Character Panel");
+    characterData.objectName = QStringLiteral("CharacterPanelDock");
+    _characterDock = _dockingManager.createDockableDlg(
+        characterData, CONT_RIGHT, false);
     connect(_characterList, &QListWidget::itemActivated, this,
             [this](QListWidgetItem* item) {
         if (ScintillaEditView* view = currentActiveView())
@@ -2647,12 +2726,14 @@ void MainWindow::setupFindResultPanel()
     _findResultView->setMarginWidth(1, 0);
     _findResultView->setReadOnly(true);
 
-    _findResultDock = new QDockWidget(tr("Find Result"), this);
-    _findResultDock->setObjectName("FindResultDock");
-    _findResultDock->setWidget(_findResultView);
-    _findResultDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
-    addDockWidget(Qt::BottomDockWidgetArea, _findResultDock);
-    _findResultDock->hide();
+    DockingData findResultData;
+    findResultData.hClient = _findResultView;
+    findResultData.pszName = tr("Find Result");
+    findResultData.objectName = QStringLiteral("FindResultDock");
+    findResultData.allowedAreas =
+        Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea;
+    _findResultDock = _dockingManager.createDockableDlg(
+        findResultData, CONT_BOTTOM, false);
 
     // 双击结果行 → 跳转到对应文档位置。
     connect(_findResultView, &ScintillaEditBase::doubleClick, this,
@@ -2797,8 +2878,7 @@ void MainWindow::onFindAllResults(const QString& searchText,
                 result.matchLen);
         }
     }
-    _findResultDock->show();
-    _findResultDock->raise();
+    _dockingManager.showDockableDlg(_findResultView, true);
 }
 
 void MainWindow::onFindAllOpenedDocsRequested(const QString& searchText,
@@ -3343,19 +3423,130 @@ void MainWindow::setupPluginSystem()
         QDir(NppParameters::getInstance().getNppPath())
             .filePath(QStringLiteral("plugins"));
 #ifdef Q_OS_WIN
-    // Temporary compatibility-test filter. Remove it after the Win32 message
-    // router supports the broader plugin corpus.
+    // Only plugins with an audited synchronous Win32 message surface are
+    // admitted here. Notification-heavy plugins remain excluded.
     QStringList win32PluginErrors;
     _win32PluginManager->loadPlugins(
-        pluginDir, {QStringLiteral("mimeTools")}, &win32PluginErrors);
+        pluginDir,
+        {
+            QStringLiteral("mimeTools"),
+            QStringLiteral("qkNppReverseLines"),
+            QStringLiteral("Remove Duplicate Lines"),
+            QStringLiteral("SelectQuotedText"),
+            QStringLiteral("BracketsCheck"),
+            QStringLiteral("SecurePad"),
+            QStringLiteral("CodeAlignmentNpp"),
+            QStringLiteral("NPPJSONViewer"),
+            QStringLiteral("JsonTools"),
+            QStringLiteral("nppConverter"),
+            QStringLiteral("NppPluginDemo")
+        },
+        &win32PluginErrors);
+    setProperty("win32PluginLoadErrors", win32PluginErrors);
     for (const QString& error : win32PluginErrors)
         qWarning() << "Win32 plugin load failed:" << error;
+    qInfo() << "Loaded Win32 plugins:"
+            << _win32PluginManager->loadedPluginNames();
+    populateWin32PluginMenu();
+    const QString recoveredPlugin =
+        _win32PluginManager->recoveredPluginFolder();
+    if (!recoveredPlugin.isEmpty()) {
+        QTimer::singleShot(0, this, [this, recoveredPlugin]() {
+            QMessageBox* notice = new QMessageBox(
+                QMessageBox::Warning, tr("Plugin load recovery"),
+                tr("The previous launch stopped while loading plugin '%1'.\n\n"
+                   "The plugin was skipped for this launch. Update or uninstall "
+                   "it before trying again.").arg(recoveredPlugin),
+                QMessageBox::Ok, this);
+            notice->setObjectName(
+                QStringLiteral("pluginLoadRecoveryNotice"));
+            notice->setAttribute(Qt::WA_DeleteOnClose);
+            notice->setWindowModality(Qt::NonModal);
+            notice->show();
+        });
+    }
 #endif
 #ifdef ENABLE_PLUGIN_SYSTEM
     _pluginManager = new PluginManager(this);
     _pluginManager->loadPlugins(pluginDir, this);
 #endif
 }
+
+#ifdef Q_OS_WIN
+void MainWindow::populateWin32PluginMenu()
+{
+    if (!_pluginsMenu || !_win32PluginManager)
+        return;
+
+    QAction* placeholder = findChild<QAction*>(
+        QStringLiteral("noPluginsLoadedAction"));
+    if (placeholder) {
+        _pluginsMenu->removeAction(placeholder);
+        delete placeholder;
+    }
+
+    QAction* const insertionPoint = findChild<QAction*>(
+        QStringLiteral("pluginsAdminAction"));
+    for (int pluginIndex = 0;
+         pluginIndex < _win32PluginManager->loadedPluginCount();
+         ++pluginIndex) {
+        const QString pluginName =
+            _win32PluginManager->loadedPluginNames().value(pluginIndex);
+        if (pluginName.isEmpty())
+            continue;
+
+        QMenu* pluginMenu = new QMenu(pluginName, _pluginsMenu);
+        pluginMenu->setObjectName(
+            QStringLiteral("win32PluginMenu_%1").arg(pluginIndex));
+        const int functionCount =
+            _win32PluginManager->loadedPluginFunctionCount(pluginIndex);
+        for (int functionIndex = 0; functionIndex < functionCount;
+             ++functionIndex) {
+            if (_win32PluginManager->isLoadedPluginFunctionSeparator(
+                    pluginIndex, functionIndex)) {
+                pluginMenu->addSeparator();
+                continue;
+            }
+
+            const QString functionName =
+                _win32PluginManager->loadedPluginFunctionName(
+                    pluginIndex, functionIndex);
+            if (functionName.isEmpty())
+                continue;
+            QAction* action = pluginMenu->addAction(functionName);
+            action->setObjectName(QStringLiteral("win32PluginAction_%1_%2")
+                                      .arg(pluginIndex)
+                                      .arg(functionIndex));
+            action->setProperty(
+                "win32PluginCommandId",
+                _win32PluginManager->loadedPluginFunctionCommandId(
+                    pluginIndex, functionIndex));
+            const bool initiallyChecked =
+                _win32PluginManager->isLoadedPluginFunctionInitiallyChecked(
+                    pluginIndex, functionIndex);
+            if (initiallyChecked) {
+                action->setCheckable(true);
+                action->setChecked(true);
+            }
+            const QKeySequence shortcut =
+                _win32PluginManager->loadedPluginFunctionShortcut(
+                    pluginIndex, functionIndex);
+            if (!shortcut.isEmpty())
+                action->setShortcut(shortcut);
+            connect(action, &QAction::triggered, this,
+                    [this, pluginIndex, functionIndex]() {
+                QString error;
+                if (!_win32PluginManager->executePluginCommand(
+                        pluginIndex, functionIndex, &error)) {
+                    QMessageBox::warning(this, tr("Plugin command failed"),
+                                         error);
+                }
+            });
+        }
+        _pluginsMenu->insertMenu(insertionPoint, pluginMenu);
+    }
+}
+#endif
 
 void MainWindow::showPluginAdmin()
 {
@@ -4545,14 +4736,14 @@ void MainWindow::createActions()
     _docMapAction->setObjectName("docMapAction");
     _docMapAction->setCheckable(true);
     connect(_docMapAction, &QAction::triggered, this, [this]() {
-        _docMapDock->setVisible(!_docMapDock->isVisible());
+        _dockingManager.toggleDockableDlg(_docMapPanel);
     });
 
     _funcListAction = new QAction(loadBmpIcon(":/icons/functionList.bmp"), tr("&Function List"), this);
     _funcListAction->setObjectName("funcListAction");
     _funcListAction->setCheckable(true);
     connect(_funcListAction, &QAction::triggered, this, [this]() {
-        _funcListDock->setVisible(!_funcListDock->isVisible());
+        _dockingManager.toggleDockableDlg(_funcListPanel);
     });
 
     // 宏
@@ -4790,7 +4981,7 @@ void MainWindow::createMenus()
         Buffer* buffer = _activeDocTab->currentBuffer();
         if (!buffer || buffer->isUntitled()) return;
         _fileBrowserPanel->setRootPath(QFileInfo(buffer->getFullPath()).absolutePath());
-        _fileBrowserDock->show();
+        _dockingManager.showDockableDlg(_fileBrowserPanel, true);
     });
 
     addCommand(_fileMenu, tr("Open in &Default Viewer"), "openDefaultViewerAction",
@@ -5603,7 +5794,7 @@ void MainWindow::createMenus()
     _viewMenu->addAction(_docMapAction);
     _viewMenu->addAction(_funcListAction);
     addCommand(_viewMenu, tr("Document List"), "documentListAction", [this]() {
-        _documentListDock->setVisible(!_documentListDock->isVisible());
+        _dockingManager.toggleDockableDlg(_documentList);
     });
     QMenu* projectPanelsMenu = _viewMenu->addMenu(tr("Project Panels"));
     projectPanelsMenu->setObjectName("projectPanelsMenu");
@@ -5614,19 +5805,19 @@ void MainWindow::createMenus()
                             : QString("projectPanels%1Action").arg(panelIndex + 1).toLatin1().constData(),
             [this, panelIndex]() {
                 QDockWidget* dock = _projectPanelsDock[panelIndex];
-                dock->setVisible(!dock->isVisible());
+                _dockingManager.toggleDockableDlg(_projectPanels[panelIndex]);
                 if (dock->isVisible())
-                    resizeDocks({dock}, {207}, Qt::Horizontal);
+                    _dockingManager.setDockedContSize(CONT_LEFT, 207);
             });
         action->setCheckable(true);
         connect(_projectPanelsDock[panelIndex], &QDockWidget::visibilityChanged,
                 action, &QAction::setChecked);
     }
     addCommand(_viewMenu, tr("Clipboard History"), "clipboardHistoryAction", [this]() {
-        _clipboardDock->setVisible(!_clipboardDock->isVisible());
+        _dockingManager.toggleDockableDlg(_clipboardHistory);
     });
     addCommand(_viewMenu, tr("Character Panel"), "characterPanelAction", [this]() {
-        _characterDock->setVisible(!_characterDock->isVisible());
+        _dockingManager.toggleDockableDlg(_characterList);
     });
     _viewMenu->addSeparator();
 

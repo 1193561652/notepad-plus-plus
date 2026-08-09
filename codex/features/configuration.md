@@ -86,7 +86,9 @@
 - 原版 `Parameters` 覆盖 config、session、langs、stylers、shortcuts、contextMenu、toolbarIcons、UDL、find history、project panels、file browser、cloud/local config 和 plugin config 路径。
 - Qt 版当前覆盖主要配置文件入口，但未确认完整保留未知节点、未知属性和原版节点顺序。
 - 原版在初始化时会复制默认模型文件并处理本地/云端配置路径；Qt 版路径策略更简单。
-- 原版 FindHistory、ProjectPanels、DockingData、Plugin 命令等配置尚未在 Qt 版形成完整等价实现。
+- 原版 DockingManager 的 left/right/top/bottom 尺寸现已由 Qt `DockingManager`
+  读取和写回；`ActiveTabs` 仍未形成 XML 级等价实现。
+- 原版 FindHistory、ProjectPanels、Plugin 命令等配置尚未在 Qt 版形成完整等价实现。
 
 ## 后续索引任务
 

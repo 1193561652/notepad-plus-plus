@@ -120,10 +120,10 @@
 | NavigateTo | NavigateTo | 中 | 低 | F | U | 覆盖一定用户群或可复用工作流；Do you have more then 10 open tabs? |
 | NewFileBrowser | NewFileBrowser | 低 | 低 | F | U | 面向较窄场景、旧平台集成或可替代功能；Define 20 new file's initial text and have an inner web browser which can run current file. |
 | NppBplistPlugin | Notepad++ bplist plugin | 中 | 低 | F | U | 覆盖一定用户群或可复用工作流；Supports viewing/editing binary plist files. |
-| NppPluginDemo | Notepad++ Plugin Demo | 中 | 低 | F | U | 覆盖一定用户群或可复用工作流；Notepad++ Plugin Demo is written from Notepad++ Plugin Template to demonstrate the usage… |
+| NppPluginDemo | Notepad++ Plugin Demo | 中 | 低 | F | B | v4.2 源码与真实 x64 DLL 已验证；基础命令、Dock 和行跳转可兼容，宽会话/通知示例不扩展。 |
 | NppPluginTemplate | Notepad++ Plugin Template | 中 | 低 | F | U | 覆盖一定用户群或可复用工作流；Template for making plugin development as easy and simple as possible. |
 | NotepadStarterPlugin | NotepadStarterPlugin | 低 | 低 | F | U | 面向较窄场景、旧平台集成或可替代功能；When it is installed as a Notepad++ plugin or running NotepadStarter.exe in the Notepad++… |
-| nppConverter | Npp Converter | 高 | 中 | F | U | ASCII/十六进制转换是通用开发辅助能力。 |
+| nppConverter | Npp Converter | 高 | 中 | F | B | v4.4 源码与真实 x64 DLL 已验证；ASCII/Hex、配置和 Conversion Panel 可兼容。 |
 | nppRandomStringGenerator | npp Random String Generator | 低 | 低 | F | U | 面向较窄场景、旧平台集成或可替代功能；Generates random strings with configurable output. |
 | NppXmlTreeviewPlugin | Npp Xml Treeview | 低 | 低 | F | U | 面向较窄场景、旧平台集成或可替代功能；Treeview visualization for XML files. |
 | NppAutoIndent | NppAutoIndent | 中 | 低 | F | U | 覆盖一定用户群或可复用工作流；Smart indentation for C-style languages, such as C/C++, PHP, and Java. |

@@ -7,6 +7,7 @@
 #endif
 
 #include <QObject>
+#include <QKeySequence>
 #include <QStringList>
 #include <QVector>
 #ifndef NOMINMAX
@@ -16,19 +17,24 @@
 
 #include "Win32PluginSystem/Win32MainEditorAdapter.h"
 #include "Win32PluginSystem/Win32MainWindowAdapter.h"
+#include "Win32PluginSystem/Win32PluginDockAdapter.h"
 #include "Win32PluginSystem/Win32SubEditorAdapter.h"
 #include "Win32PluginSystem/Win32PluginInterface.h"
+#include "MISC/PluginsManager/PluginLoadJournal.h"
 
 class QMainWindow;
 class QWidget;
 class ScintillaEditView;
+class DockingManager;
 
 class Win32PluginManager final : public QObject
 {
 public:
     Win32PluginManager(QMainWindow* mainWindow,
                        ScintillaEditView* mainEditor,
-                       ScintillaEditView* subEditor);
+                       ScintillaEditView* subEditor,
+                       const QString& pluginStateDirectory,
+                       DockingManager* dockingManager);
     ~Win32PluginManager() override;
 
     QMainWindow* mainWindow() const { return _mainWindowAdapter.window(); }
@@ -42,6 +48,8 @@ public:
         { return _mainEditorAdapter; }
     const Win32SubEditorAdapter& subEditorAdapter() const
         { return _subEditorAdapter; }
+    const Win32PluginDockAdapter& dockAdapter() const
+        { return _dockAdapter; }
 
     HWND mainWindowHandle() const;
     HWND mainEditorHandle() const;
@@ -53,10 +61,22 @@ public:
                     QStringList* errors = nullptr);
     int loadedPluginCount() const { return _loadedPlugins.size(); }
     QStringList loadedPluginNames() const;
+    QString recoveredPluginFolder() const { return _recoveredPluginFolder; }
+    QString loadJournalPath() const { return _loadJournal.journalPath(); }
+    QString loadMarkerPath() const { return _loadJournal.markerPath(); }
     int loadedPluginFunctionCount(int pluginIndex) const;
+    QString loadedPluginFunctionName(int pluginIndex, int functionIndex) const;
+    int loadedPluginFunctionCommandId(int pluginIndex, int functionIndex) const;
+    bool isLoadedPluginFunctionInitiallyChecked(
+        int pluginIndex, int functionIndex) const;
+    QKeySequence loadedPluginFunctionShortcut(
+        int pluginIndex, int functionIndex) const;
+    bool isLoadedPluginFunctionSeparator(int pluginIndex,
+                                         int functionIndex) const;
     bool executePluginCommand(int pluginIndex, int functionIndex,
                               QString* errorMessage = nullptr);
     LRESULT relayMessage(UINT message, WPARAM wParam, LPARAM lParam) const;
+    void notifyFileBeforeClose(quintptr bufferId);
 
 private:
     struct LoadedPlugin {
@@ -70,11 +90,19 @@ private:
     };
 
     void unloadPlugins();
+    void notifyPlugins(unsigned int code, quintptr idFrom = 0) const;
+    bool executeMimeToolsSamlDecode(QString* errorMessage);
+    void showMimeToolsAbout();
+    void showJsonViewerAbout();
 
+    Win32PluginDockAdapter _dockAdapter;
     Win32MainWindowAdapter _mainWindowAdapter;
     HWND _mainEditorReceiver = nullptr;
     HWND _subEditorReceiver = nullptr;
     Win32MainEditorAdapter _mainEditorAdapter;
     Win32SubEditorAdapter _subEditorAdapter;
+    PluginLoadJournal _loadJournal;
     QVector<LoadedPlugin> _loadedPlugins;
+    QString _recoveredPluginFolder;
+    int _nextCommandId = 50000;
 };

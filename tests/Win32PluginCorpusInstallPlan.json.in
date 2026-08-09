@@ -1,0 +1,98 @@
+{
+    "format": 1,
+    "application": "@NPP_MIMETOOLS_TEST_APPLICATION@",
+    "plugin-root": "@NPP_MIMETOOLS_TEST_PLUGIN_ROOT@",
+    "operations": [
+        {
+            "operation": "update",
+            "folder-name": "mimeTools",
+            "version": "2.8",
+            "repository": "file:///@NPP_MIMETOOLS_ARCHIVE_URL_PATH@",
+            "sha256": "ed5133f8a0552e974135ada78a0260581be979f916ddbcd45697d2a1a1b8f280"
+        },
+        {
+            "operation": "update",
+            "folder-name": "qkNppReverseLines",
+            "version": "1.0.0.0",
+            "repository": "file:///@NPP_REVERSE_LINES_ARCHIVE_URL_PATH@",
+            "sha256": "d4b4d9aa51080bf1e829ca124ab5484247a034524f625c55b8d2c261676352bb"
+        },
+        {
+            "operation": "update",
+            "folder-name": "Remove Duplicate Lines",
+            "version": "1.3.0.0",
+            "repository": "file:///@NPP_REMOVE_DUPLICATE_LINES_ARCHIVE_URL_PATH@",
+            "sha256": "f90bf1803e703c0a10cfa9fb022e914628e2abd4c23e666e6b9a4e11bcf0464f"
+        },
+        {
+            "operation": "update",
+            "folder-name": "SelectQuotedText",
+            "version": "1.0.0",
+            "repository": "file:///@NPP_SELECT_QUOTED_TEXT_ARCHIVE_URL_PATH@",
+            "sha256": "3e53432d770d39c8d9d004fdc69512764cb82f2468e6f4b9cb61ac51fb618b04"
+        },
+        {
+            "operation": "update",
+            "folder-name": "BracketsCheck",
+            "version": "1.2.2",
+            "repository": "file:///@NPP_BRACKETS_CHECK_ARCHIVE_URL_PATH@",
+            "sha256": "a56363d21f392e0e67b4110555e1d2a0477e55ac8368abccc5c0f9f2d11f5ba9"
+        },
+        {
+            "operation": "update",
+            "folder-name": "PoorMansTSqlFormatterNppPlugin",
+            "version": "1.6.13.31508",
+            "repository": "file:///@NPP_POOR_MANS_TSQL_ARCHIVE_URL_PATH@",
+            "sha256": "ea99ec04ba73f027b92f086d2345efb544ef62a922e4755fab7f875b49803bb2"
+        },
+        {
+            "operation": "update",
+            "folder-name": "SecurePad",
+            "version": "2.4",
+            "repository": "file:///@NPP_SECURE_PAD_ARCHIVE_URL_PATH@",
+            "sha256": "4e565cb4417ad2ff5c5db19dd6f0bacdf90a8bf268c9f54d1693e9c50526ffa8"
+        },
+        {
+            "operation": "update",
+            "folder-name": "CodeAlignmentNpp",
+            "version": "14.1.107",
+            "repository": "file:///@NPP_CODE_ALIGNMENT_ARCHIVE_URL_PATH@",
+            "sha256": "a11c60ad2dcaf0064a5c3cca01aa2d2a6743897875e23887867783a2756b796b"
+        },
+        {
+            "operation": "update",
+            "folder-name": "BetterMultiSelection",
+            "version": "1.5",
+            "repository": "file:///@NPP_BETTER_MULTI_SELECTION_ARCHIVE_URL_PATH@",
+            "sha256": "a33dddd93d40a2bb595ea44eeb5bcdaefd3189c5fae3c40a052da9d02597bb63"
+        },
+        {
+            "operation": "update",
+            "folder-name": "NPPJSONViewer",
+            "version": "1.41",
+            "repository": "file:///@NPP_JSON_VIEWER_ARCHIVE_URL_PATH@",
+            "sha256": "f9e3f6e1d93e088f7477cd6bc3cb9767b803acc4171533155435fbc02ae8926a"
+        },
+        {
+            "operation": "update",
+            "folder-name": "JsonTools",
+            "version": "3.2.0",
+            "repository": "file:///@NPP_JSON_TOOLS_ARCHIVE_URL_PATH@",
+            "sha256": "884704a9dc046616831a8df6013114100472e4a7b7a4bb62e40309b286b33a0d"
+        },
+        {
+            "operation": "update",
+            "folder-name": "nppConverter",
+            "version": "4.4.0",
+            "repository": "file:///@NPP_CONVERTER_ARCHIVE_URL_PATH@",
+            "sha256": "e7eafbac35d91572aa93c5fd6a8a957669b50d0160aa2e35e9e632e2ac6ab63d"
+        },
+        {
+            "operation": "update",
+            "folder-name": "NppPluginDemo",
+            "version": "4.2",
+            "repository": "file:///@NPP_PLUGIN_DEMO_ARCHIVE_URL_PATH@",
+            "sha256": "afa33fe958a907c2b80c0e8ae26deaea533455a2a2826f30a9b46fba0ba59941"
+        }
+    ]
+}

@@ -34,7 +34,7 @@
 | 6 | `NppAutoIndent` 1.2.0.0 | 未找到对应版本源码；C 风格语言智能缩进 | 未核验 | UI/线程未核验 | 预计高度依赖字符通知、行/括号查询和 selection；通知时序需实测；**U** | x86 JSON、SourceForge；精确消息、重入、编码未验证 |
 | 7 | `NppBplistPlugin` 1.3.0.0 | 有公开仓库，未取得对应版本源码；查看/编辑 binary plist | 未核验 | 解析库、转换策略及 UI 未核验 | 若替换当前文档可代理；若提供自定义二进制视图则需新视图 API；**U** | x86 JSON、`azerg/NppBplistPlugin` 1.3.0.0 发布链接；源码 tag、文件保存语义未验证 |
 | 8 | `NppCalc` 1.5 | 未找到对应版本源码；400 余函数的表达式计算器 | 未核验 | 清单声明 RS-232、TCP/IP、文件、压缩/密码能力；线程/网络模型未核验 | 基本文本插入可代理，但外设/网络与复杂运行时不属于窗口代理；**U** | x86 JSON、SourceForge；源码、依赖、权限和异常边界未验证 |
-| 9 | `nppConverter` 4.4.0 | 有公开仓库，未在本轮检出 v4.4 源码；ASCII/Hex 转换 | 未核验 | 原生 UI、线程未核验 | 预计为选区读取/替换，适合作为简单兼容样本；未满足版本源码条件，**U** | x86 JSON、`npp-plugins/converter` v4.4 发布链接；对应源码、精确 SCI 未验证 |
+| 9 | `nppConverter` 4.4.0 | tag v4.4，commit `43667bd`；ASCII/Hex 和 Conversion Panel | `NPPM_GETCURRENTSCINTILLA`、`GETPLUGINSCONFIGDIR`、`DOOPEN`、Dock/modeless；选区、替换、`SCI_ADDTEXT` | 原生资源 Dock，无后台线程 | 官方 x64 DLL 已验证双向转换、配置和面板插入，有限 Dock 兼容，**B** | v4.4 源码、官方包 SHA-256 与真实 DLL 自动回归 |
 | 10 | `nppcrypt` 1.0.1.6 | 有公开仓库，未取得对应源码；加解密、hash、随机数、Base16/32/64 | 未核验 | 密码库、随机源、原生对话框未核验 | 文本输入输出可代理；密码 UI、二进制数据和缓冲区边界需查；**U** | x86 JSON、`jeanpaulrichter/nppcrypt` 1.0.1.6 发布链接；算法依赖、API、敏感数据清理未验证 |
 | 11 | `NppDocShare` 0.1.0.0 | 有公开仓库，但清单版本与包名 `0.1.13` 不一致，未取得对应源码；双机实时协同编辑 | 未核验 | 清单明确网络通信；线程、协议、同步模型未核验 | 高频远端编辑、线程切换、撤销/selection 一致性远超简单同步转发；**U** | x86 JSON、`chcg/NppDocShare` 发布包；版本错配、协议、重入和关闭未验证 |
 | 12 | `NppEditorConfig` 0.4.0 | 有公开仓库，未取得对应版本源码；发现并应用 `.editorconfig` | 未核验 | EditorConfig 解析库/文件遍历；UI、线程未核验 | 路径查询、buffer 通知和 tab/EOL 设置应可有限代理；文件监控与通知顺序待查；**U** | x86 JSON、`editorconfig/editorconfig-notepad-plus-plus` v0.4.0 发布链接；源码 tag、精确消息未验证 |
@@ -52,7 +52,7 @@
 | 24 | `NppJumpList` 1.2.2 | 有公开仓库页面，未取得对应源码；Windows 7 Jump List | 未核验 | 清单明确 Windows shell Jump List，可能 COM；细节未核验 | 双代理无助于 Shell 集成；跨平台需平台特性或不支持；**U** | x86 JSON、`chcg/JumpList` 1.2.2.10 包、SourceForge 主页；源码版本、COM、线程未验证 |
 | 25 | `NppMarkdownPanel` 0.6.2 | 有公开仓库，未取得对应版本源码；Markdown 实时预览 | 未核验 | 清单确认 preview panel；浏览器控件、Dock、渲染运行时与线程未核验 | 文档通知可代理；Web/HTML 预览视图需 Dock/自定义视图，更新节流需实测；**U** | x86 JSON、`mohzy83/NppMarkdownPanel` 0.6.2 发布链接；对应源码、浏览器内核、API 未验证 |
 | 26 | `NppMenuSearch` 0.9.6 | 有公开仓库页面，未取得对应源码；在工具栏搜索菜单和 Preferences | 未核验 | 清单明确插入工具栏输入框并访问菜单/Preferences；窗口结构依赖高 | 主窗口 HWND 不等于原版工具栏/菜单树；不宜扩大宿主去模拟内部控件；**U** | x86 JSON、`peter-frentrup/NppMenuSearch`、SF 0.9.6 包；源码版本、窗口遍历/subclass 未验证 |
-| 27 | `NppPluginDemo` 4.2 | 公开示例仓库/手册，未在本轮取得 v4.2 源码快照 | 未核验 | 示例通常含菜单、对话框、通知，但不得据模板推断本包实际调用 | 应作为六导出与最小消息 smoke 样本；未满足源码条件，**U** | x86 JSON、`npp-plugins/plugindemo` v4.2 包、N++ 插件手册；对应源码/二进制导出未验证 |
+| 27 | `NppPluginDemo` 4.2 | tag v4.2，commit `39d2758`；Hello、路径、会话示例和 Go To Line Dock | 基础路径/新建、Dock；宽文件枚举/Session API；`SCI_SETTEXT`、`ENSUREVISIBLE`、`GOTOLINE` 等 | 原生资源 Dock、工具栏通知和可选字符通知 | 官方 x64 DLL 已验证 Hello、Dock、行跳转；宽示例不为演示插件扩大宿主，**B** | v4.2 源码、官方包 SHA-256 与真实 DLL 自动回归 |
 | 28 | `NppPluginOpenHost` 1.1.0.0 | 有公开仓库，清单包直接指向 `main/bin`，没有固定源码 tag 证据；打开 Windows hosts | 未核验 | 清单明确 Windows hosts 文件；权限/UAC 未核验 | `DOOPEN` 类能力可代理，提权和系统路径属平台服务；**U** | x86 JSON、`jejemorg/NppPluginOpenHost` main 包；1.1.0.0 源码对应关系、权限流程未验证 |
 | 29 | `NppPluginTemplate` 4.2 | 公开模板仓库/手册，未取得 v4.2 源码快照 | 未核验 | 模板本身不是实际业务插件；六导出应有，但本轮不凭名称判定 | 适合作为最小 ABI 样本；在对应源码/包核验前 **U** | x86 JSON、`npp-plugins/plugintemplate` v4.2 包、N++ 插件手册；导出、命令和消息未验证 |
 | 30 | `nppplugin_ofis2` 3.0.1 | 有公开聚合仓库，未取得对应源码；索引目录并快速打开文件 | 未核验 | 可能依赖 SolutionHub；索引线程/文件系统、UI 未核验 | 文档打开可代理；插件间 ABI、索引、结果 UI 是难点；**U** | x86 JSON、`incrediblejr/nppplugins` v3.0.1 包；对应子项目源码、依赖协议未验证 |
