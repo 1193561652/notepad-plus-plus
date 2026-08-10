@@ -48,26 +48,20 @@
 `ForWin32Plugin` / `FromWin32Plugin`。仅 Windows 测试需要的管理器访问器继续受
 `Q_OS_WIN` 限定。
 
-## 仍存在的结构差异
+## 已完成的结构对齐
 
 ### 主控制器实现分片
 
-原版将职责分散在 `Notepad_plus.cpp`、`NppCommands.cpp`、`NppIO.cpp` 和
-`NppNotification.cpp`，并以 `Notepad_plus_Window` 封装 Win32 窗口。Qt 当前的
-`MainWindow.cpp` 同时承担上述四类方法，文件规模约 7600 行。这是当前最明显的
-结构差异。
-
-本轮没有机械拆分该文件，原因是其中的文件生命周期、命令 action、通知、插件和
-局部 helper 互相引用；在没有先建立分片边界测试时直接移动定义会扩大回归面。
-后续应作为独立纯结构批次实施：
+2026-08-10 已将原先约 7600 行的集中实现按原版职责拆为：
 
 - `Notepad_plus`：状态所有者、初始化、主/副视图和顶层协调；
 - `NppCommands`：QAction 命令入口和命令状态；
 - `NppIO`：打开、保存、关闭、监视、最近文件和 Session 文件流程；
 - `NppNotification`：Scintilla、标签、焦点和插件生命周期通知；
-- `MainWindow` 或 Qt 平台窗口层：只保留 `QMainWindow` 事件和控件承载。
+- `MainWindow.cpp`：保留 Qt 窗口事件、永久双视图、Dock/面板和插件宿主服务。
 
-该拆分必须先增加方法所有者/调用顺序测试，且不得借结构调整改变行为。
+`MainWindow.h` 仍是状态所有者，没有增加代理控制器或改变信号、调用顺序。拆分前后
+成员定义集合核对一致；Release 全目标构建及 CTest `38/38` 通过。
 
 ### 合理的平台差异
 

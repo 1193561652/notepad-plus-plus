@@ -652,9 +652,19 @@
 - `DockingWnd` 只保留 DockingManager，业务面板不再混入布局管理目录。
 - MainWindow 的插件宿主方法改为平台中性命名；`NPPM_*` 解释继续只存在于
   `Win32PluginSystem`。
-- `MainWindow.cpp` 仍合并原版 Notepad_plus/NppCommands/NppIO/NppNotification 职责，
-  已记录为需要独立测试保护的纯结构重构，不在本批次冒险机械拆分。
+- 主控制器已按原版职责拆为 `Notepad_plus.cpp`、`NppCommands.cpp`、`NppIO.cpp`、
+  `NppNotification.cpp` 和 Qt 窗口宿主 `MainWindow.cpp`；类状态和调用关系保持不变。
 - 审计：`codex/analysis/2026-08-09-original-structure-interface-audit.md`。
 - 修改：`codex/changes/2026-08-09-original-structure-alignment.md`。
 - Release 全目标构建和 CTest `37/37` 通过；验证见
   `codex/validation/2026-08-09-original-structure-alignment/README.md`。
+
+## 2026-08-10 主控制器结构拆分
+
+- 文件/Buffer/Session/编码流程：`src/NppIO.cpp`。
+- 菜单、搜索替换、编辑命令和 QAction 状态：`src/NppCommands.cpp`。
+- 编辑器、标签、焦点及生命周期通知：`src/NppNotification.cpp`。
+- 构造、析构和命令行顶层协调：`src/Notepad_plus.cpp`。
+- Qt 窗口、Dock/面板和插件宿主服务：`src/MainWindow.cpp`。
+- Release 全目标构建和 CTest `38/38` 通过；详见
+  `codex/validation/2026-08-10-main-controller-structure-split/README.md`。

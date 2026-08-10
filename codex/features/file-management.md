@@ -12,6 +12,8 @@
 - `./src/ScintillaComponent/FileManager.cpp`
 - `./src/MainWindow.h`
 - `./src/MainWindow.cpp`
+- `./src/NppIO.cpp`
+- `./src/NppNotification.cpp`
 - `./src/ScintillaComponent/DocTabView.h`
 - `./src/ScintillaComponent/DocTabView.cpp`
 

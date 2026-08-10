@@ -24,9 +24,9 @@ int main()
 
     QSet<QString> names;
     QSet<int> ids;
-    QFile source(QStringLiteral(NPP_MAINWINDOW_SOURCE));
-    ok &= expect(source.open(QFile::ReadOnly), "MainWindow.cpp must be readable");
-    const QString mainWindowSource = QString::fromUtf8(source.readAll());
+    QFile source(QStringLiteral(NPP_COMMANDS_SOURCE));
+    ok &= expect(source.open(QFile::ReadOnly), "NppCommands.cpp must be readable");
+    const QString commandsSource = QString::fromUtf8(source.readAll());
 
     for (const NppCommandMapping& mapping : mappings) {
         const QString name = QString::fromLatin1(mapping.objectName);
@@ -34,8 +34,8 @@ int main()
         ok &= expect(mapping.commandId > 0, "command ID must be positive");
         ok &= expect(!names.contains(name), "command object names must be unique");
         ok &= expect(!ids.contains(mapping.commandId), "command IDs must be unique");
-        ok &= expect(mainWindowSource.contains(name),
-                     "mapped action must exist in MainWindow.cpp");
+        ok &= expect(commandsSource.contains(name),
+                     "mapped action must exist in NppCommands.cpp");
         names.insert(name);
         ids.insert(mapping.commandId);
     }

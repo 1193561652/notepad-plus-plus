@@ -8,7 +8,12 @@
 当前主线实现已包含以下模块：
 
 - `src/main.cpp`：程序入口。
-- `src/MainWindow.h|cpp`：主窗口、菜单、工具栏、状态栏、多视图、停靠窗口、会话、最近文件、插件入口等集中协调逻辑。
+- `src/MainWindow.h`：Qt 主控制器的共享声明和状态所有者。
+- `src/Notepad_plus.cpp`：构造、析构、命令行调用和顶层协调，对应原版 `Notepad_plus.cpp`。
+- `src/NppCommands.cpp`：菜单、工具栏、命令状态、搜索替换和编辑命令，对应原版 `NppCommands.cpp`。
+- `src/NppIO.cpp`：文件、Buffer、编码、会话、监视和最近文件流程，对应原版 `NppIO.cpp`。
+- `src/NppNotification.cpp`：编辑器、标签、焦点和生命周期通知，对应原版 `NppNotification.cpp`。
+- `src/MainWindow.cpp`：Qt 窗口、永久双视图、Dock/面板和插件宿主服务。
 - `src/ScintillaComponent/`：编辑器组件、Buffer/FileManager、DocTabView、自动完成、查找替换、打印和 UDL 自定义词法器。
 - `src/WinControls/DockingWnd/DockingManager.*`：对应原版同名管理类，统一管理四侧
   Dock 容器、面板注册、标签化、显示/隐藏、尺寸和状态。

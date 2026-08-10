@@ -7,7 +7,7 @@
 - `src/WinControls/ProjectPanel/ProjectPanel.h|cpp`：Workspace/Edit UI 与工程树编辑。
 - `src/WinControls/ProjectPanel/WorkspaceDocument.h|cpp`：workspace XML 数据模型。
 - `src/MainWindow.cpp::setupAuxiliaryPanels()`：三个 Project Dock 的创建与信号连接。
-- `src/MainWindow.cpp::createMenus()`：Shortcut Mapper 和 Project Panel 菜单入口。
+- `src/NppCommands.cpp::createMenus()`：Shortcut Mapper 和 Project Panel 菜单入口。
 - `src/localization.cpp::changeDlgLang()`：标签、按钮、表格表头和树顶层条目本地化。
 - `resources/nativeLang/chineseSimplified.xml`：三个区域的简体中文资源。
 

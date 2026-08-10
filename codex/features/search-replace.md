@@ -8,6 +8,7 @@
 
 - `./src/ScintillaComponent/FindReplaceDlg.h`
 - `./src/ScintillaComponent/FindReplaceDlg.cpp`
+- `./src/NppCommands.cpp`
 - `./src/MainWindow.cpp`
 - `./src/ScintillaComponent/ScintillaEditView.h`
 

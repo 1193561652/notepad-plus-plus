@@ -29,7 +29,9 @@ QString readFile(const QString& path)
 int main()
 {
     const QString mainWindowSource =
-        readFile(QStringLiteral(NPP_MAINWINDOW_SOURCE));
+        readFile(QStringLiteral(NPP_MAINWINDOW_SOURCE))
+        + readFile(QStringLiteral(NPP_NOTEPAD_SOURCE))
+        + readFile(QStringLiteral(NPP_COMMANDS_SOURCE));
     const QString findDialogSource =
         readFile(QStringLiteral(NPP_FIND_DIALOG_SOURCE));
     const QString preferencesSource =

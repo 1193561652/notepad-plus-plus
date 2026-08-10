@@ -10,6 +10,8 @@
 - `src/ScintillaComponent/DocTabView.cpp`
 - `src/MainWindow.h`
 - `src/MainWindow.cpp`
+- `src/NppIO.cpp`
+- `src/NppNotification.cpp`
 
 ## 主要类
 
@@ -40,7 +42,14 @@
 ## 缓存结论
 
 文件/Buffer 模块形成三层：Buffer 持状态和 Scintilla document 引用，FileManager 管
-Buffer 生命周期，MainWindow 协调两个永久编辑器与 UI 流程。
+Buffer 生命周期，`NppIO.cpp` 实现文件与会话流程；MainWindow 协调两个永久编辑器，
+`NppNotification.cpp` 同步标签、状态栏和生命周期通知。
+
+## 2026-08-10 主控制器结构拆分
+
+- 文件、Buffer、编码、Session、外部文件监视和最近文件成员定义位于 `src/NppIO.cpp`。
+- 标签关闭、文本修改、标签切换、焦点、光标和语言通知位于 `src/NppNotification.cpp`。
+- `MainWindow.h` 的类、字段和调用关系未改变；拆分是行为不变的翻译单元重组。
 
 ## 2026-07-22 阶段二更新
 

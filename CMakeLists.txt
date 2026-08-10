@@ -130,6 +130,10 @@ set(SOURCES
     src/Parameters.cpp
     src/localization.cpp
     src/MainWindow.cpp
+    src/Notepad_plus.cpp
+    src/NppCommands.cpp
+    src/NppIO.cpp
+    src/NppNotification.cpp
     src/TinyXml/tinyxml.cpp
     src/TinyXml/tinyxmlerror.cpp
     src/TinyXml/tinyxmlparser.cpp
@@ -335,9 +339,18 @@ if(BUILD_TESTING)
         src/NppCommandRegistry.cpp
     )
     target_compile_definitions(npp-command-registry-tests PRIVATE
-        NPP_MAINWINDOW_SOURCE="${CMAKE_SOURCE_DIR}/src/MainWindow.cpp")
+        NPP_COMMANDS_SOURCE="${CMAKE_SOURCE_DIR}/src/NppCommands.cpp")
     target_link_libraries(npp-command-registry-tests Qt5::Core)
     add_test(NAME npp-command-registry-tests COMMAND npp-command-registry-tests)
+
+    add_executable(main-controller-structure-tests
+        tests/MainControllerStructureTests.cpp
+    )
+    target_compile_definitions(main-controller-structure-tests PRIVATE
+        NPP_SOURCE_DIR="${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(main-controller-structure-tests Qt5::Core)
+    add_test(NAME main-controller-structure-tests
+        COMMAND main-controller-structure-tests)
 
     add_executable(file-association-model-tests
         tests/FileAssociationModelTests.cpp
@@ -491,6 +504,8 @@ if(BUILD_TESTING)
     )
     target_compile_definitions(find-dialog-localization-tests PRIVATE
         NPP_MAINWINDOW_SOURCE="${CMAKE_SOURCE_DIR}/src/MainWindow.cpp"
+        NPP_NOTEPAD_SOURCE="${CMAKE_SOURCE_DIR}/src/Notepad_plus.cpp"
+        NPP_COMMANDS_SOURCE="${CMAKE_SOURCE_DIR}/src/NppCommands.cpp"
         NPP_FIND_DIALOG_SOURCE="${CMAKE_SOURCE_DIR}/src/ScintillaComponent/FindReplaceDlg.cpp"
         NPP_PREFERENCES_SOURCE="${CMAKE_SOURCE_DIR}/src/WinControls/Preference/preferenceDlg.cpp"
         NPP_FIND_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/chineseSimplified.xml"
