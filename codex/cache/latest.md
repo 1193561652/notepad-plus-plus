@@ -1,5 +1,14 @@
 # 本地缓存：最新分析
 
+## 2026-08-11 无白名单 Win32 插件加载验证
+
+- 临时移除审核白名单并无过滤加载固定真实插件语料；18 个 DLL 注册成功，
+  `PoorMansTSqlFormatterNppPlugin` 以 `LoadLibraryW` 错误 1114 正常降级。
+- `XMLTools` 记录加载成功后，运行测试发生段错误；当前回调期故障没有加载中标记，
+  不能靠下一次启动恢复机制自动归因。
+- 已恢复审核白名单。当前同进程原版 ABI 不能保证任意不兼容 DLL 仅失去功能而不影响
+  主程序；详见 `codex/validation/2026-08-11-unfiltered-win32-plugin-loading/README.md`。
+
 ## 2026-08-09 高、中优先级插件兼容
 
 - 新增 5 个未经修改的官方插件 DLL：GotoLineCol、Random Values、Merge files in one、SelectToClipboard、urlPlugin。

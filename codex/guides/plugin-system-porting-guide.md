@@ -456,6 +456,10 @@ Plugin Admin、清单/兼容模型、退出后安装/更新/卸载、SHA-256、Z
   SecurePad、Code Alignment、JSON Viewer、JsonTools、Converter 和 NppPluginDemo 已通过
   官方 DLL 的有限兼容回归；XMLTools 尚未进入实现。
 
+2026-08-11 的无过滤真实语料验证表明，移除审核白名单后 `XMLTools` 在注册成功后的
+运行阶段造成进程段错误。当前同进程兼容层不得以“未知消息返回 0”为依据宣称任意
+插件可安全降级；在新的隔离方案获批前继续保留审核白名单。
+
 ### 阶段 6：跨平台 ABI v1
 
 - 基于真实语料冻结版本化 C ABI 的错误、所有权、线程和服务发现规则。
