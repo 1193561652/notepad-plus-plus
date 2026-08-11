@@ -17,9 +17,32 @@
 - 18 个 DLL 完成注册。
 - `PoorMansTSqlFormatterNppPlugin` 在 `LoadLibraryW` 返回错误 1114 后被正常记录为失败，
   加载器继续处理后续插件。
-- `XMLTools` 被记录为加载成功；随后进程发生段错误，CTest 失败。
+- `XMLTools` 被记录为加载成功；随后进程发生段错误，CTest 失败。该顺序只能说明
+  相关性，不能单独完成插件归因。
 - 崩溃发生在加载会话标记完成后，没有留下 `plugin-load-in-progress.json`，因此当前
   恢复机制不能把回调期或插件后台行为故障归因到具体插件。
+
+## 逐插件及组合归因
+
+后续增加了仅在 `ui-parity-capture` 测试目标生效的过滤覆盖，所有插件均使用完整
+`MainWindow` 初始化、菜单、READY、通知和析构路径，在独立进程与独立配置目录运行。
+
+| 结果 | 插件 |
+|---|---|
+| READY 阶段卡死 | `BetterMultiSelection` |
+| 可控加载失败 | `PoorMansTSqlFormatterNppPlugin`，`LoadLibraryW` 错误 1114 |
+| 单独运行无崩溃/卡死 | 其余 17 项，包括 `XMLTools` |
+
+关键组合结果：
+
+- `BetterMultiSelection + XMLTools`：稳定复现访问冲突，退出码 `0xC0000005`
+  （十进制 `-1073741819`）。
+- `BetterMultiSelection + BracketsCheck`：保持 READY 阶段卡死，没有转为访问冲突。
+- 排除 `BetterMultiSelection`、加载其余全部插件：正常退出到预期测试断言，没有崩溃。
+- `XMLTools` 单独完成加载、READY、编辑器通知和卸载，没有崩溃。
+
+因此，初始段错误不能归因为“XMLTools 单独崩溃”。当前确认的独立故障插件是
+`BetterMultiSelection`；访问冲突是它与 `XMLTools` 同时运行时的组合故障。
 
 ## 结论
 

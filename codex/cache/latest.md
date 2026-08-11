@@ -4,8 +4,10 @@
 
 - 临时移除审核白名单并无过滤加载固定真实插件语料；18 个 DLL 注册成功，
   `PoorMansTSqlFormatterNppPlugin` 以 `LoadLibraryW` 错误 1114 正常降级。
-- `XMLTools` 记录加载成功后，运行测试发生段错误；当前回调期故障没有加载中标记，
-  不能靠下一次启动恢复机制自动归因。
+- 后续独立进程矩阵确认：`BetterMultiSelection` 单独在 READY 阶段卡死；
+  `BetterMultiSelection + XMLTools` 组合产生 `0xC0000005` 访问冲突；`XMLTools` 单独
+  完成加载、READY、编辑通知和卸载，不崩溃。排除 Better 后其余全量组合不崩溃。
+- 当前回调期故障没有加载中标记，不能靠下一次启动恢复机制自动归因。
 - 已恢复审核白名单。当前同进程原版 ABI 不能保证任意不兼容 DLL 仅失去功能而不影响
   主程序；详见 `codex/validation/2026-08-11-unfiltered-win32-plugin-loading/README.md`。
 

@@ -935,26 +935,34 @@ void MainWindow::setupPluginSystem()
             _win32PluginManager->notifyScintilla(*notification, false);
     });
     QStringList win32PluginErrors;
+    QStringList win32PluginFolders = {
+        QStringLiteral("mimeTools"),
+        QStringLiteral("qkNppReverseLines"),
+        QStringLiteral("Remove Duplicate Lines"),
+        QStringLiteral("SelectQuotedText"),
+        QStringLiteral("BracketsCheck"),
+        QStringLiteral("SecurePad"),
+        QStringLiteral("CodeAlignmentNpp"),
+        QStringLiteral("NPPJSONViewer"),
+        QStringLiteral("JsonTools"),
+        QStringLiteral("nppConverter"),
+        QStringLiteral("NppPluginDemo"),
+        QStringLiteral("GotoLineCol"),
+        QStringLiteral("RandomValuesNppPlugin"),
+        QStringLiteral("Merge files in one"),
+        QStringLiteral("SelectToClipboard"),
+        QStringLiteral("urlPlugin")
+    };
+#ifdef NPP_PLUGIN_REGISTRATION_TEST
+    const QString testPluginFilter =
+        qEnvironmentVariable("NPP_QT_TEST_WIN32_PLUGIN_FILTER");
+    if (!testPluginFilter.isEmpty()) {
+        win32PluginFolders = testPluginFilter.split(
+            QLatin1Char('|'), QString::SkipEmptyParts);
+    }
+#endif
     _win32PluginManager->loadPlugins(
-        pluginDir,
-        {
-            QStringLiteral("mimeTools"),
-            QStringLiteral("qkNppReverseLines"),
-            QStringLiteral("Remove Duplicate Lines"),
-            QStringLiteral("SelectQuotedText"),
-            QStringLiteral("BracketsCheck"),
-            QStringLiteral("SecurePad"),
-            QStringLiteral("CodeAlignmentNpp"),
-            QStringLiteral("NPPJSONViewer"),
-            QStringLiteral("JsonTools"),
-            QStringLiteral("nppConverter"),
-            QStringLiteral("NppPluginDemo"),
-            QStringLiteral("GotoLineCol"),
-            QStringLiteral("RandomValuesNppPlugin"),
-            QStringLiteral("Merge files in one"),
-            QStringLiteral("SelectToClipboard"),
-            QStringLiteral("urlPlugin")
-        },
+        pluginDir, win32PluginFolders,
         &win32PluginErrors);
     setProperty("win32PluginLoadErrors", win32PluginErrors);
     for (const QString& error : win32PluginErrors)
