@@ -2,6 +2,7 @@
 // 移植自: v8.4.6:PowerEditor/src/ScintillaComponent/ScintillaEditView.cpp
 
 #include "ScintillaEditView.h"
+#include "MISC/QtCompat.h"
 #include "UserDefinedLexer.h"
 #include "../Parameters.h"
 #include "AutoCompletionParser.h"
@@ -513,9 +514,9 @@ void ScintillaEditView::init()
         if ((static_cast<int>(type) & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0)
             emit textChanged();
     });
-    connect(this, &textChanged,
+    connect(this, &ScintillaEditView::textChanged,
             this, &ScintillaEditView::scheduleUrlRefresh);
-    connect(this, &cursorPositionChanged,
+    connect(this, &ScintillaEditView::cursorPositionChanged,
             this, [this](int, int) { refreshXmlTagHighlight(); });
 
     // 当前行背景高亮（对应原版 SCI_SETCARETLINEVISIBLEALWAYS）
@@ -1544,7 +1545,7 @@ void ScintillaEditView::setupAutoComplete()
             .getLangDescByName(_currentLexerName)) {
         for (int set = 0; set < LangDesc::KeywordSetCount; ++set)
             words.append(language->keywords[set].split(
-                QLatin1Char(' '), QString::SkipEmptyParts));
+                QLatin1Char(' '), NppQtCompat::SkipEmptyParts));
     }
     const NppParameters& parameters = NppParameters::getInstance();
     const QVector<AutoCompletionEntry> configured =
@@ -1714,7 +1715,8 @@ void ScintillaEditView::refreshUrlHotspots()
         QStringLiteral("mailto:")
     };
     schemes.append(gui._uriCustomizedSchemes.split(
-        QRegularExpression(QStringLiteral("\\s+")), QString::SkipEmptyParts));
+        QRegularExpression(QStringLiteral("\\s+")),
+        NppQtCompat::SkipEmptyParts));
     QStringList escaped;
     for (const QString& scheme : schemes)
         escaped.append(QRegularExpression::escape(scheme));

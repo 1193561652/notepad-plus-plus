@@ -2,6 +2,7 @@
 // 移植自: v8.4.6:PowerEditor/src/Parameters.cpp
 
 #include "Parameters.h"
+#include "MISC/QtCompat.h"
 #include <QApplication>
 #include <QDir>
 #include <QFile>
@@ -11,7 +12,6 @@
 #include <QXmlStreamWriter>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
-#include <QRegExp>
 #include "TinyXml/tinyxml.h"
 
 static int windowsVirtualKeyToQt(int key)
@@ -564,7 +564,9 @@ bool NppParameters::loadUserDefinedLanguages()
         UserLangDesc desc;
         desc.name = xmlAttr(lang, L"name");
         desc.sourceFilePath = filePath;
-        desc.exts = xmlAttr(lang, L"ext").toLower().split(QRegExp("\\s+"), QString::SkipEmptyParts);
+        desc.exts = xmlAttr(lang, L"ext").toLower().split(
+            QRegularExpression(QStringLiteral("\\s+")),
+            NppQtCompat::SkipEmptyParts);
 
         if (TiXmlElement* settings = lang->FirstChildElement(L"Settings")) {
             if (TiXmlElement* global = settings->FirstChildElement(L"Global")) {
@@ -618,7 +620,9 @@ bool NppParameters::loadUserDefinedLanguages()
                         name.startsWith("Words") ? 5 : 8;
                     const int index = name.mid(offset).toInt(&ok) - 1;
                     if (ok && index >= 0 && index < 8)
-                        desc.keywords[index] = value.split(QRegExp("\\s+"), QString::SkipEmptyParts);
+                        desc.keywords[index] = value.split(
+                            QRegularExpression(QStringLiteral("\\s+")),
+                            NppQtCompat::SkipEmptyParts);
                 }
             }
         }
@@ -1018,7 +1022,8 @@ bool NppParameters::loadLangs()
         cur.commentStart = txAttr(el, L"commentStart");
         cur.commentEnd   = txAttr(el, L"commentEnd");
         QString extStr   = txAttr(el, L"ext");
-        for (const QString& e : extStr.split(' ', QString::SkipEmptyParts))
+        for (const QString& e :
+             extStr.split(' ', NppQtCompat::SkipEmptyParts))
             cur.exts << e.toLower();
         // Keywords children
         for (TiXmlNode* kw = n->FirstChildElement(L"Keywords"); kw;
@@ -1809,7 +1814,8 @@ void NppParameters::feedGUIConfig(const TiXmlElement* el)
         } else {
             const QStringList columns =
                 attr(L"edgeMultiColumnPos").split(
-                    QRegExp("[,; ]+"), QString::SkipEmptyParts);
+                    QRegularExpression(QStringLiteral("[,; ]+")),
+                    NppQtCompat::SkipEmptyParts);
             _svp._edgeNbColumn =
                 columns.isEmpty() ? 80 : parseInt(columns.first(), 80);
         }

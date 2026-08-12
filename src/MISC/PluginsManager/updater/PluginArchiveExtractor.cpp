@@ -1,4 +1,5 @@
 #include "PluginArchiveExtractor.h"
+#include "MISC/QtCompat.h"
 
 #include <QDir>
 #include <QFile>
@@ -123,7 +124,7 @@ bool PluginArchiveExtractor::validateEntry(const QString& entry,
         return false;
     }
     const QStringList parts =
-        normalized.split(QLatin1Char('/'), QString::SkipEmptyParts);
+        normalized.split(QLatin1Char('/'), NppQtCompat::SkipEmptyParts);
     for (const QString& part : parts) {
         if (part == QStringLiteral("..")) {
             if (error)
@@ -166,7 +167,7 @@ bool PluginArchiveExtractor::extractZip(const QString& archivePath,
 
     const QStringList entries =
         QString::fromUtf8(listing).split(QLatin1Char('\n'),
-                                         QString::SkipEmptyParts);
+                                         NppQtCompat::SkipEmptyParts);
     if (entries.isEmpty()) {
         if (error)
             *error = QStringLiteral("Plugin archive is empty.");

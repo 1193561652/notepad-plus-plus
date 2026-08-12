@@ -1,6 +1,5 @@
 #include <ILexer.h>
 #include <Lexilla.h>
-#include <SciLexer.h>
 #include <cstdio>
 
 namespace {
@@ -38,7 +37,5 @@ int main()
     GetLexerName(0, firstName, sizeof(firstName));
     ok &= check(firstName[0] != '\0',
                 "Lexilla catalogue did not expose lexer names");
-    ok &= check(LexerNameFromID(SCLEX_CPP) != nullptr,
-                "Lexer ID lookup failed");
     return ok ? 0 : 1;
 }

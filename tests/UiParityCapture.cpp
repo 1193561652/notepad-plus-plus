@@ -17,6 +17,7 @@
 #include <QMenu>
 #include <QProcess>
 #include <QRegExp>
+#include <QRegularExpression>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QScreen>
@@ -619,7 +620,8 @@ int main(int argc, char* argv[])
             QStringLiteral("noPluginsLoadedAction"));
         if (!placeholder || placeholder->isEnabled()
             || !mainWindow.findChildren<QMenu*>(
-                    QRegExp(QStringLiteral("win32PluginMenu_.*"))).isEmpty()
+                    QRegularExpression(
+                        QStringLiteral("win32PluginMenu_.*"))).isEmpty()
             || QFileInfo(QDir(parameters.getUserPath()).filePath(
                     QStringLiteral("plugin-load/plugin-load.jsonl"))).exists()) {
             return 80;

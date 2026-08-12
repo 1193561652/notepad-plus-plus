@@ -192,8 +192,13 @@ void FindReplaceDlg::makeBottomRow(QLayout* parentLayout)
     // 信号连接
     connect(_transGB,            &QGroupBox::toggled,
             this,                &FindReplaceDlg::onTransparencyChanged);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    connect(_transModeGroup,     &QButtonGroup::idClicked,
+            this, [this](int){ onTransparencyChanged(); });
+#else
     connect(_transModeGroup,     QOverload<int>::of(&QButtonGroup::buttonClicked),
             this, [this](int){ onTransparencyChanged(); });
+#endif
     connect(_transSlider,        &QSlider::valueChanged,
             this, [this](int){ onTransparencyChanged(); });
 

@@ -18,6 +18,7 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 ----------------------------------------------------------------------------------------*/
 
 #include <string>
+#include <cstring>
 #include <map>
 #include <vector>
 #include <assert.h>
@@ -626,7 +627,7 @@ static bool IsNumber(StyleContext & sc, vector<string> * numberTokens[], vvstrin
 
 static inline void SubGroup(const char * s, vvstring & vec, bool group=false)
 {
-    size_t length = strlen(s);
+    size_t length = std::strlen(s);
     char * temp = new char[length+1];
     unsigned int index = 0;
     vector<string> subvector;
@@ -656,7 +657,7 @@ static inline void SubGroup(const char * s, vvstring & vec, bool group=false)
             {
                 if (*temp)
                 {
-                    if (!strcmp(temp, "EOL"))
+                    if (!std::strcmp(temp, "EOL"))
                     {
                         subvector.push_back("\r\n");
                         subvector.push_back("\n");
@@ -675,7 +676,7 @@ static inline void SubGroup(const char * s, vvstring & vec, bool group=false)
                 temp[index++] = s[i];
                 if (*temp)
                 {
-                    if (!strcmp(temp, "EOL"))
+                    if (!std::strcmp(temp, "EOL"))
                     {
                         subvector.push_back("\r\n");
                         subvector.push_back("\n");
@@ -700,7 +701,7 @@ static inline void SubGroup(const char * s, vvstring & vec, bool group=false)
 
 static inline void GenerateVector(vvstring & vec, const char * s, const char * prefix, size_t minLength)
 {
-    size_t length = strlen(s);
+    size_t length = std::strlen(s);
     char * temp = new char[length];
     unsigned int index = 0;
     bool copy = false;

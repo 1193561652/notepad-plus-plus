@@ -2,6 +2,7 @@
 // 移植自: v8.4.6:PowerEditor/src/
 
 #include "MainWindow.h"
+#include "MISC/QtCompat.h"
 #include "NppCommandRegistry.h"
 #include "ScintillaComponent/ScintillaEditView.h"
 #include "ScintillaComponent/Buffer.h"
@@ -973,7 +974,7 @@ void MainWindow::setupPluginSystem()
         qEnvironmentVariable("NPP_QT_TEST_WIN32_PLUGIN_FILTER");
     if (!testPluginFilter.isEmpty()) {
         enabledPluginFolders = testPluginFilter.split(
-            QLatin1Char('|'), QString::SkipEmptyParts);
+            QLatin1Char('|'), NppQtCompat::SkipEmptyParts);
     }
 #endif
     if (!enabledPluginFolders.isEmpty()) {

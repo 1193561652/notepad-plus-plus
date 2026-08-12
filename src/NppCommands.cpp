@@ -9,6 +9,7 @@
 #include "ScintillaComponent/FileManager.h"
 #include "EncodingMapper.h"
 #include "MISC/PlatformServices.h"
+#include "MISC/QtCompat.h"
 #include "MISC/TextFileCodec.h"
 #include "WinControls/ToolBar/ToolbarIconTheme.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
@@ -100,6 +101,19 @@ static TextDecodingOptions decodingOptionsForPath(const QString& filePath)
     options.detectEncoding = gui._detectEncoding;
     options.openAnsiAsUtf8 = gui._openAnsiAsUtf8;
     return options;
+}
+
+static bool startDetachedCommand(const QString& command)
+{
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    QStringList parts = QProcess::splitCommand(command);
+    if (parts.isEmpty())
+        return false;
+    const QString program = parts.takeFirst();
+    return QProcess::startDetached(program, parts);
+#else
+    return QProcess::startDetached(command);
+#endif
 }
 
 // Menu commands and command-state handling.
@@ -1068,7 +1082,9 @@ void MainWindow::onFindInFilesRequested(const QString& searchText,
     }
 
     QStringList nameFilters;
-    for (const QString& part : filters.split(QRegularExpression("[;\\s]+"), QString::SkipEmptyParts))
+    for (const QString& part : filters.split(
+             QRegularExpression("[;\\s]+"),
+             NppQtCompat::SkipEmptyParts))
         nameFilters << part;
     if (nameFilters.isEmpty())
         nameFilters << "*.*";
@@ -1140,7 +1156,7 @@ void MainWindow::onFindInProjectsRequested(const QString& searchText,
 {
     QStringList nameFilters = filters.split(
         QRegularExpression(QStringLiteral("[;\\s]+")),
-        QString::SkipEmptyParts);
+        NppQtCompat::SkipEmptyParts);
     if (nameFilters.isEmpty())
         nameFilters << QStringLiteral("*.*");
     QList<FindAllResult> results;
@@ -1291,7 +1307,8 @@ void MainWindow::onReplaceInFilesRequested(const QString& searchText,
 
     QStringList nameFilters;
     for (const QString& part :
-         filters.split(QRegularExpression("[;\\s]+"), QString::SkipEmptyParts))
+         filters.split(QRegularExpression("[;\\s]+"),
+                       NppQtCompat::SkipEmptyParts))
         nameFilters << part;
     if (nameFilters.isEmpty())
         nameFilters << "*.*";
@@ -1423,7 +1440,7 @@ void MainWindow::onReplaceInProjectsRequested(const QString& searchText,
 
     QStringList nameFilters = filters.split(
         QRegularExpression(QStringLiteral("[;\\s]+")),
-        QString::SkipEmptyParts);
+        NppQtCompat::SkipEmptyParts);
     if (nameFilters.isEmpty())
         nameFilters << QStringLiteral("*.*");
     int replacements = 0;
@@ -2717,7 +2734,7 @@ void MainWindow::createMenus()
         const QString contents = view->text();
         const int words = contents.split(
             QRegularExpression(QStringLiteral("\\s+")),
-            QString::SkipEmptyParts).size();
+            NppQtCompat::SkipEmptyParts).size();
         QMessageBox::information(
             this, tr("Document Summary"),
             tr("Characters: %1\nWords: %2\nLines: %3")
@@ -3380,7 +3397,7 @@ void MainWindow::createMenus()
             UserLangDesc language = editableLanguages.at(index);
             language.exts = extensions.text().toLower().split(
                 QRegularExpression(QStringLiteral("\\s+")),
-                QString::SkipEmptyParts);
+                NppQtCompat::SkipEmptyParts);
             language.caseSensitive = caseSensitive.isChecked();
             language.foldComments = foldComments.isChecked();
             for (int i = 0; i < 8; ++i)
@@ -3710,7 +3727,7 @@ void MainWindow::createMenus()
         const QString command = QInputDialog::getText(
             this, tr("Run"), tr("Command:"), QLineEdit::Normal,
             QString(), &ok).trimmed();
-        if (ok && !command.isEmpty() && !QProcess::startDetached(command))
+        if (ok && !command.isEmpty() && !startDetachedCommand(command))
             QMessageBox::warning(this, tr("Run"), tr("Could not start command."));
     });
     const QVector<UserCommandDef>& userCommands =
@@ -3768,7 +3785,7 @@ void MainWindow::createMenus()
             if (expanded.startsWith("http://", Qt::CaseInsensitive) ||
                 expanded.startsWith("https://", Qt::CaseInsensitive)) {
                 QDesktopServices::openUrl(QUrl(expanded));
-            } else if (!QProcess::startDetached(expanded)) {
+            } else if (!startDetachedCommand(expanded)) {
                 QMessageBox::warning(this, tr("Run"),
                                      tr("Could not start command."));
             }
