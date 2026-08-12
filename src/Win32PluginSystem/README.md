@@ -39,6 +39,14 @@
   `WIN32_PLUGIN_SYSTEM_SOURCES`，不得加入顶层通用 `SOURCES`。
 - 在 ABI 行为和生命周期未验证前，不把实验接口声明为稳定接口。
 
+### Scintilla 结构 ABI
+
+- 发给代理编辑器 HWND 的普通消息保持插件使用的当前 Win32 指针宽度结构。
+- `SCI_GETDIRECTFUNCTION` 返回的宿主 thunk 转换旧 direct 插件使用的
+  `Sci_PositionCR=long` 结构。
+- 不得把旧结构转换移动到公共 HWND 路径：XMLTools 3.1.1.13 在该路径使用
+  `intptr_t`，DoxyIt 0.4.4 和 ElasticTabstops 1.3.1 则需要旧 direct 转换。
+
 ## 计划结构
 
 ```text
@@ -123,11 +131,28 @@ three stable HWND values and its synchronous `NPPM_*`/`SCI_*` calls are handled
 by the adapters. No plugin editing algorithm is reimplemented in Qt.
 
 Poor Man's T-SQL Formatter is installed but skipped because its .NET 2.0 image
-requires a process-wide CLR activation decision. BetterMultiSelection is
-installed but excluded because it depends on global hooks and the full
-notification/input pipeline. BracketsCheck's direct `GetMenu`/`CheckMenuItem`
-state synchronization is also deferred; attaching an HMENU to the Qt main
-window is not an acceptable local workaround.
+requires a process-wide CLR activation decision. BetterMultiSelection 1.5 is
+admitted after the editor receivers gained `SCI_GETDIRECTFUNCTION` and
+`SCI_GETDIRECTPOINTER` pass-through to the permanent Scintilla Qt instances.
+Its READY initialization, Hook enable/disable, main-editor direct calls, clean
+unload, and coexistence with XMLTools are covered; physical keyboard behavior
+remains a manual Windows check. BracketsCheck's direct
+`GetMenu`/`CheckMenuItem` state synchronization is also deferred; attaching an
+HMENU to the Qt main window is not an acceptable local workaround.
+
+## Configurable plugin enablement
+
+Plugin loading is controlled by `pluginsEnabled.xml` in the active application
+configuration directory. The stable key is the plugin folder name. Only an
+entry with `enabled="yes"` is passed to either the Win32 compatibility manager
+or the cross-platform plugin manager; a missing file, missing entry, disabled
+entry, malformed XML, or invalid attribute leaves the plugin unloaded.
+
+The Plugins Admin Installed page exposes a separate Enabled checkbox between
+the plugin name and version. Changes are atomically persisted immediately and
+apply on the next application launch. This user-controlled list replaces the
+hard-coded folder list, but enabling a plugin is not a compatibility guarantee:
+an incompatible in-process DLL may still terminate the host.
 
 ## Dock adapter and JSON Viewer 1.41
 
@@ -169,3 +194,38 @@ The audited Windows corpus also includes the official nppConverter 4.4.0 and
 NppPluginDemo 4.2 x64 packages. They use the existing package installer,
 six-export loader, message receivers, and DockingManager. Their source-proven
 editor additions are limited to `SCI_ADDTEXT` and `SCI_ENSUREVISIBLE`.
+
+## EditorConfig 0.4.0 and AutoSave 1.6.1.0
+
+The official x64 DLLs are pinned and installed unchanged by the corpus fixture.
+EditorConfig uses the standard buffer notifications and Scintilla tab, indent,
+EOL, fold, and text-range messages. AutoSave installs its own window procedure
+on the real main-window HWND and uses `NPPM_SAVECURRENTFILEAS` for timestamped
+and recovery copies. The latter preserves the original `asCopy` behavior so a
+copy does not rename or clean the active buffer.
+
+Do not relay every Qt native window message to all plugin `messageProc`
+callbacks. Qt emits a different destruction stream, and the audited plugin
+corpus can block during shutdown under that policy. These two plugins do not
+require it: EditorConfig uses notifications and AutoSave owns a WndProc hook.
+
+`win32-configuration-plugins` covers both real DLLs together. Focus-loss and
+minute-timer behavior additionally require an interactive Windows desktop;
+set `NPP_QT_TEST_REAL_FOCUS=1` only in that environment.
+
+## Session and document policy plugins
+
+The unchanged SessionMgr 1.4.4 DLL uses the host's existing session XML
+implementation through `NPPM_SAVECURRENTSESSION` and `NPPM_LOADSESSION`.
+Buffer position and application-directory queries are also implemented with
+the v8.4.6 return-value and UTF-16 buffer conventions.
+
+AutoCodepage 1.2.4 and AutoEolFormat 1.0.2 retain their independent INI files
+and request original menu command IDs. File-open notifications must finish
+with `NPPN_FILEOPENED` before `NPPN_BUFFERACTIVATED`, matching the original
+host's event order.
+
+nppAutoDetectIndent 2.3 uses the Scintilla 5 direct API and native
+`Sci_TextRange`. The editor adapter selects that ABI only while invoking this
+plugin; older audited DLLs continue to receive the legacy Scintilla 4 range
+translation.

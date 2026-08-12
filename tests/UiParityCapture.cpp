@@ -3,6 +3,7 @@
 #include <QAbstractButton>
 #include <QDialog>
 #include <QDebug>
+#include <QDeadlineTimer>
 #include <QDir>
 #include <QDockWidget>
 #include <QFile>
@@ -14,12 +15,14 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMenu>
+#include <QProcess>
 #include <QRegExp>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QScreen>
 #include <QSet>
 #include <QTabBar>
+#include <QTableWidget>
 #include <QTextStream>
 #include <QTimer>
 #include <QWindow>
@@ -32,7 +35,10 @@
 #include "CommandLineOptions.h"
 #include "MISC/UiFont.h"
 #include "MISC/PluginsManager/PluginLoadJournal.h"
+#include "MISC/PluginsManager/PluginEnablementConfig.h"
 #include "Parameters.h"
+#include "WinControls/PluginsAdmin/PluginAdminDialog.h"
+#include "WinControls/PluginsAdmin/PluginAdminModel.h"
 #include "WinControls/Preference/preferenceDlg.h"
 #include "ScintillaComponent/DocTabView.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
@@ -91,6 +97,29 @@ HWND findCurrentProcessDialog(const wchar_t* expectedTitle, bool* exactMatch)
     if (exactMatch)
         *exactMatch = context.exact != nullptr;
     return context.exact ? context.exact : context.fallback;
+}
+
+QString nativeDialogControlReport(HWND dialog)
+{
+    QStringList controls;
+    EnumChildWindows(dialog, [](HWND child, LPARAM data) -> BOOL {
+        QStringList* output = reinterpret_cast<QStringList*>(data);
+        wchar_t className[128]{};
+        wchar_t text[512]{};
+        GetClassNameW(child, className, 128);
+        GetWindowTextW(child, text, 512);
+        const LRESULT check = SendMessageW(child, BM_GETCHECK, 0, 0);
+        output->append(QStringLiteral(
+            "id=%1 class=%2 check=%3 enabled=%4 visible=%5 text=%6")
+            .arg(GetDlgCtrlID(child))
+            .arg(QString::fromWCharArray(className))
+            .arg(check)
+            .arg(IsWindowEnabled(child) != FALSE)
+            .arg(IsWindowVisible(child) != FALSE)
+            .arg(QString::fromWCharArray(text)));
+        return TRUE;
+    }, reinterpret_cast<LPARAM>(&controls));
+    return controls.join(QLatin1Char('\n'));
 }
 
 HWND findCurrentProcessWindow(const wchar_t* expectedTitle)
@@ -260,7 +289,9 @@ int main(int argc, char* argv[])
 
     if (argc < 2 || argc > 4) {
         qCritical("Usage: ui-parity-capture <output-directory> "
-                  "[light|dark|noPlugin|pluginRecovery|registrationRollback] "
+                  "[light|dark|noPlugin|pluginRecovery|registrationRollback|"
+                  "betterMultiSelection|pluginEnablement|p0Plugins] "
+                  "[configurationPlugins] "
                   "[zh_CN]");
         return 2;
     }
@@ -280,6 +311,29 @@ int main(int argc, char* argv[])
         && QString::fromLocal8Bit(argv[2]).compare(
                QStringLiteral("pluginRecovery"),
                Qt::CaseInsensitive) == 0;
+    const bool betterMultiSelectionMode = argc >= 3
+        && QString::fromLocal8Bit(argv[2]).compare(
+               QStringLiteral("betterMultiSelection"),
+               Qt::CaseInsensitive) == 0;
+    const bool pluginEnablementMode = argc >= 3
+        && QString::fromLocal8Bit(argv[2]).compare(
+               QStringLiteral("pluginEnablement"),
+               Qt::CaseInsensitive) == 0;
+    const bool p0PluginsMode = argc >= 3
+        && QString::fromLocal8Bit(argv[2]).compare(
+               QStringLiteral("p0Plugins"), Qt::CaseInsensitive) == 0;
+    const bool configurationPluginsMode = argc >= 3
+        && QString::fromLocal8Bit(argv[2]).compare(
+               QStringLiteral("configurationPlugins"),
+               Qt::CaseInsensitive) == 0;
+    const bool sessionManagerMode = argc >= 3
+        && QString::fromLocal8Bit(argv[2]).compare(
+               QStringLiteral("sessionManager"),
+               Qt::CaseInsensitive) == 0;
+    const bool documentPolicyPluginsMode = argc >= 3
+        && QString::fromLocal8Bit(argv[2]).compare(
+               QStringLiteral("documentPolicyPlugins"),
+               Qt::CaseInsensitive) == 0;
 
     const bool forceChinese =
         argc == 4
@@ -287,7 +341,10 @@ int main(int argc, char* argv[])
                QStringLiteral("zh_CN"), Qt::CaseInsensitive) == 0;
     NppParameters& parameters = NppParameters::getInstance();
     if (forceChinese || noPluginMode || registrationRollbackMode
-        || pluginRecoveryMode) {
+        || pluginRecoveryMode || betterMultiSelectionMode
+        || pluginEnablementMode || p0PluginsMode
+        || configurationPluginsMode || sessionManagerMode
+        || documentPolicyPluginsMode) {
         const QString settingsPath =
             output + QStringLiteral("/settings");
         if (!QDir().mkpath(settingsPath)
@@ -297,8 +354,207 @@ int main(int argc, char* argv[])
     }
     if (!parameters.load())
         return 18;
+    if (pluginEnablementMode) {
+        QFile::remove(
+            PluginEnablementConfig::filePathForConfigDirectory(
+                parameters.getUserPath()));
+    }
     if (forceChinese)
         parameters.setNativeLang(QStringLiteral("zh_CN"));
+#ifdef NPP_WIN32_PLUGIN_CORPUS_MANAGED_TEST
+    if (!pluginEnablementMode) {
+        PluginEnablementConfig pluginEnablement(
+            PluginEnablementConfig::filePathForConfigDirectory(
+                parameters.getUserPath()));
+        const QStringList enabledPluginFolders = {
+        QStringLiteral("mimeTools"),
+        QStringLiteral("qkNppReverseLines"),
+        QStringLiteral("Remove Duplicate Lines"),
+        QStringLiteral("SelectQuotedText"),
+        QStringLiteral("BracketsCheck"),
+        QStringLiteral("SecurePad"),
+        QStringLiteral("CodeAlignmentNpp"),
+        QStringLiteral("BetterMultiSelection"),
+        QStringLiteral("NPPJSONViewer"),
+        QStringLiteral("JsonTools"),
+        QStringLiteral("nppConverter"),
+        QStringLiteral("NppPluginDemo"),
+        QStringLiteral("GotoLineCol"),
+        QStringLiteral("RandomValuesNppPlugin"),
+        QStringLiteral("Merge files in one"),
+        QStringLiteral("SelectToClipboard"),
+        QStringLiteral("urlPlugin")
+        };
+        for (const QString& folder : enabledPluginFolders)
+            pluginEnablement.setEnabled(folder, true);
+        if (p0PluginsMode) {
+            const QStringList p0PluginFolders = {
+                QStringLiteral("DoxyIt"),
+                QStringLiteral("ElasticTabstops"),
+                QStringLiteral("SurroundSelection"),
+                QStringLiteral("XMLTools")
+            };
+            for (const QString& folder : p0PluginFolders)
+                pluginEnablement.setEnabled(folder, true);
+        }
+        if (configurationPluginsMode) {
+            pluginEnablement.setEnabled(QStringLiteral("AutoSave"), true);
+            pluginEnablement.setEnabled(
+                QStringLiteral("NppEditorConfig"), true);
+        }
+        if (sessionManagerMode)
+            pluginEnablement.setEnabled(QStringLiteral("SessionMgr"), true);
+        if (documentPolicyPluginsMode) {
+            pluginEnablement.setEnabled(
+                QStringLiteral("nppAutoDetectIndent"), true);
+            pluginEnablement.setEnabled(QStringLiteral("AutoCodepage"), true);
+            pluginEnablement.setEnabled(QStringLiteral("AutoEolFormat"), true);
+        }
+        QString enablementError;
+        if (!pluginEnablement.save(&enablementError))
+            return 92;
+    }
+#endif
+    if (p0PluginsMode) {
+        const QString pluginConfigDir = QDir(parameters.getUserPath())
+            .filePath(QStringLiteral("plugins/Config"));
+        if (!QDir().mkpath(pluginConfigDir))
+            return 109;
+        QFile elasticConfig(QDir(pluginConfigDir).filePath(
+            QStringLiteral("ElasticTabstops.ini")));
+        if (!elasticConfig.open(QIODevice::WriteOnly | QIODevice::Text)
+            || elasticConfig.write(
+                "enabled true\nextensions *\npadding 1\n"
+                "convert_leading_tabs_to_spaces false\n") <= 0) {
+            return 109;
+        }
+        elasticConfig.close();
+        QFile xmlToolsConfig(QDir(pluginConfigDir).filePath(
+            QStringLiteral("XMLTools.ini")));
+        if (!xmlToolsConfig.open(QIODevice::WriteOnly | QIODevice::Text)
+            || xmlToolsConfig.write(
+                "[XML Tools]\n"
+                "doCheckXML=0\n"
+                "doCloseTag=1\n"
+                "doPreventXXE=1\n"
+                "errorDisplayMode=Annotation\n"
+                "xpathOnStatusbar=0\n") <= 0) {
+            return 109;
+        }
+    }
+    QString configurationPluginProjectDir;
+    QString editorConfigSamplePath;
+    QString autoSaveSamplePath;
+    QString documentPolicyProjectDir;
+    QString autoCodepageSamplePath;
+    QString autoEolSamplePath;
+    QString autoIndentSamplePath;
+    if (configurationPluginsMode) {
+        const QString pluginConfigDir = QDir(parameters.getUserPath())
+            .filePath(QStringLiteral("plugins/Config"));
+        if (!QDir().mkpath(pluginConfigDir))
+            return 129;
+        QFile autoSaveConfig(QDir(pluginConfigDir).filePath(
+            QStringLiteral("AutoSave.ini")));
+        const bool timerTest = qEnvironmentVariableIsSet(
+            "NPP_QT_TEST_AUTOSAVE_TIMER");
+        const QByteArray autoSaveSettings = QByteArray(
+                "[Options]\r\nTimer=1\r\nSaveOnActivateApp=")
+            + (timerTest ? "0" : "1")
+            + "\r\nSaveOnTimer=" + (timerTest ? "1" : "0")
+            + "\r\nSaveCurrentFileOnly=1\r\n"
+              "NamedFilesMode=1\r\nUnNamedFilesMode=0\r\n"
+              "UnNamedFilesSaveFolder=$CDIR$\\autorecover\r\n"
+              "UnNamedFilesRecoverFolder=$CDIR$\\autorecover\r\n"
+              "MaxFileSize=0\r\n";
+        if (!autoSaveConfig.open(QIODevice::WriteOnly | QIODevice::Text)
+            || autoSaveConfig.write(autoSaveSettings) <= 0) {
+            return 129;
+        }
+        autoSaveConfig.close();
+
+        configurationPluginProjectDir = QFileInfo(QDir(output).filePath(
+            QStringLiteral("configuration-plugin-project")))
+            .absoluteFilePath();
+        if (!QDir().mkpath(configurationPluginProjectDir))
+            return 129;
+        QFile editorConfig(QDir(configurationPluginProjectDir).filePath(
+            QStringLiteral(".editorconfig")));
+        if (!editorConfig.open(QIODevice::WriteOnly | QIODevice::Text)
+            || editorConfig.write(
+                "root = true\n\n"
+                "[*]\n"
+                "indent_style = space\n"
+                "indent_size = 3\n"
+                "tab_width = 6\n"
+                "end_of_line = lf\n"
+                "trim_trailing_whitespace = true\n"
+                "insert_final_newline = true\n") <= 0) {
+            return 129;
+        }
+        editorConfig.close();
+        editorConfigSamplePath = QDir(configurationPluginProjectDir).filePath(
+            QStringLiteral("editor-config-sample.txt"));
+        autoSaveSamplePath = QDir(configurationPluginProjectDir).filePath(
+            QStringLiteral("auto-save-sample.txt"));
+        for (const QString& path : {editorConfigSamplePath,
+                                    autoSaveSamplePath}) {
+            QFile sample(path);
+            if (!sample.open(QIODevice::WriteOnly)
+                || sample.write("initial\n") <= 0) {
+                return 129;
+            }
+        }
+    }
+    if (documentPolicyPluginsMode) {
+        const QString pluginConfigDir = QDir(parameters.getUserPath())
+            .filePath(QStringLiteral("plugins/Config"));
+        if (!QDir().mkpath(pluginConfigDir))
+            return 137;
+        const struct ConfigFile {
+            const char* name;
+            const char* contents;
+        } configs[] = {
+            {"AutoCodepage.ini",
+             "[Header]\r\nVersion=1.0\r\n[Groups]\r\n"
+             "Cyrillic=active\r\n[Cyrillic]\r\nCodepage=45021\r\n"
+             "Language=-1\r\nExt1=acp\r\n"},
+            {"AutoEolFormat.ini",
+             "[Header]\r\nVersion=1.0\r\n[Groups]\r\n"
+             "Unix=active\r\n[Unix]\r\nEolFormat=45002\r\n"
+             "Ext1=eolpolicy\r\n"}
+        };
+        for (const ConfigFile& config : configs) {
+            QFile file(QDir(pluginConfigDir).filePath(
+                QString::fromLatin1(config.name)));
+            if (!file.open(QIODevice::WriteOnly | QIODevice::Text)
+                || file.write(config.contents) <= 0) {
+                return 137;
+            }
+        }
+        documentPolicyProjectDir = QFileInfo(QDir(output).filePath(
+            QStringLiteral("document-policy-project"))).absoluteFilePath();
+        if (!QDir().mkpath(documentPolicyProjectDir))
+            return 137;
+        autoCodepageSamplePath = QDir(documentPolicyProjectDir).filePath(
+            QStringLiteral("sample.acp"));
+        autoEolSamplePath = QDir(documentPolicyProjectDir).filePath(
+            QStringLiteral("sample.eolpolicy"));
+        autoIndentSamplePath = QDir(documentPolicyProjectDir).filePath(
+            QStringLiteral("sample.cpp"));
+        const QList<QPair<QString, QByteArray>> samples = {
+            {autoCodepageSamplePath, QByteArray("plain text\r\n")},
+            {autoEolSamplePath, QByteArray("one\r\ntwo\r\n")},
+            {autoIndentSamplePath, QByteArray("if (true) {\n\tvalue();\n}\n")}
+        };
+        for (const auto& sample : samples) {
+            QFile file(sample.first);
+            if (!file.open(QIODevice::WriteOnly)
+                || file.write(sample.second) != sample.second.size()) {
+                return 137;
+            }
+        }
+    }
     const QString requestedTheme = argc == 3
         ? QString::fromLocal8Bit(argv[2]).toLower()
         : argc == 4 ? QString::fromLocal8Bit(argv[2]).toLower() : QString();
@@ -400,6 +656,129 @@ int main(int argc, char* argv[])
         || win32Plugins->subEditorAdapter().handle()
             != win32Plugins->secondaryEditorHandle()) {
         return 37;
+    }
+    auto directApiWorks = [](HWND handle, ScintillaEditView* editor) {
+        const SciFnDirect directFunction = reinterpret_cast<SciFnDirect>(
+            SendMessageW(handle, SCI_GETDIRECTFUNCTION, 0, 0));
+        const sptr_t directPointer = static_cast<sptr_t>(
+            SendMessageW(handle, SCI_GETDIRECTPOINTER, 0, 0));
+        return directFunction && directPointer
+            && directFunction(directPointer, SCI_GETLENGTH, 0, 0)
+                == editor->SendScintillaNpp(SCI_GETLENGTH);
+    };
+    if (!directApiWorks(win32Plugins->mainEditorHandle(), mainTabs->editor())
+        || !directApiWorks(win32Plugins->secondaryEditorHandle(),
+                           subTabs->editor())) {
+        return 38;
+    }
+    if (sessionManagerMode) {
+        const QStringList names = win32Plugins->loadedPluginNames();
+        const int index = names.indexOf(QStringLiteral("Session Manager"));
+        if (names.size() != 1 || index < 0
+            || win32Plugins->loadedPluginFunctionCount(index) != 8)
+            return 138;
+        const QString sessionPath = QDir(output).filePath(
+            QStringLiteral("plugin-session.xml"));
+        const std::wstring nativePath = QDir::toNativeSeparators(
+            sessionPath).toStdWString();
+        if (!SendMessageW(win32Plugins->mainWindowHandle(),
+                          NppMessageSaveCurrentSession, 0,
+                          reinterpret_cast<LPARAM>(nativePath.c_str())))
+            return 138;
+        QFile sessionFile(sessionPath);
+        if (!sessionFile.open(QIODevice::ReadOnly)
+            || !sessionFile.readAll().contains("<Session"))
+            return 138;
+        wchar_t nppDirectory[MAX_PATH]{};
+        if (!SendMessageW(win32Plugins->mainWindowHandle(),
+                          NppMessageGetNppDirectory, MAX_PATH,
+                          reinterpret_cast<LPARAM>(nppDirectory))
+            || QString::fromWCharArray(nppDirectory).isEmpty())
+            return 138;
+        const quintptr bufferId = mainWindow.currentBufferIdForPlugin();
+        if (SendMessageW(win32Plugins->mainWindowHandle(),
+                         NppMessageGetPosFromBufferId,
+                         static_cast<WPARAM>(bufferId), 0) < 0)
+            return 138;
+        return 0;
+    }
+    if (documentPolicyPluginsMode) {
+        const QStringList names = win32Plugins->loadedPluginNames();
+        const QStringList expected = {
+            QStringLiteral("AutoCodepage"),
+            QStringLiteral("AutoEolFormat"),
+            QStringLiteral("Auto Detect Indention")
+        };
+        if (names.isEmpty())
+            return 139;
+        if (names.contains(expected.at(1))) {
+            if (!mainWindow.openFileForPlugin(autoEolSamplePath))
+                return 139;
+            for (int i = 0; i < 5; ++i) {
+                QApplication::processEvents();
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+            if (mainTabs->editor()->eolMode() != EolUnix
+                || mainTabs->editor()->text().contains(QStringLiteral("\r")))
+                return 139;
+        }
+        if (names.contains(expected.at(0))) {
+            if (!mainWindow.openFileForPlugin(autoCodepageSamplePath))
+                return 139;
+            for (int i = 0; i < 5; ++i) {
+                QApplication::processEvents();
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+            Buffer* codepageBuffer = mainTabs->currentBuffer();
+            if (!codepageBuffer
+                || codepageBuffer->getEncoding().compare(
+                    QStringLiteral("windows-1251"),
+                    Qt::CaseInsensitive) != 0)
+                return 139;
+        }
+        if (names.contains(expected.at(2))) {
+            if (!mainWindow.openFileForPlugin(autoIndentSamplePath))
+                return 139;
+            for (int i = 0; i < 5; ++i) {
+                QApplication::processEvents();
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+            if (!mainTabs->editor()->SendScintillaNpp(SCI_GETUSETABS))
+                return 139;
+        }
+        return 0;
+    }
+    if (pluginEnablementMode) {
+        const QString enablementPath =
+            PluginEnablementConfig::filePathForConfigDirectory(
+                parameters.getUserPath());
+        if (win32Plugins->loadedPluginCount() != 0
+            || QFileInfo(enablementPath).exists()) {
+            return 93;
+        }
+        const QString pluginRoot = QDir(parameters.getNppPath())
+            .filePath(QStringLiteral("plugins"));
+        PluginAdminModel model(
+            pluginRoot, PluginCatalog::embedded(),
+            PluginVersion(QCoreApplication::applicationVersion()),
+            enablementPath);
+        PluginAdminDialog dialog(&model, &mainWindow);
+        QTableWidget* installed = dialog.findChild<QTableWidget*>(
+            QStringLiteral("installedPluginsTable"));
+        if (!installed || installed->columnCount() != 3
+            || installed->rowCount() == 0 || !installed->item(0, 1)
+            || installed->item(0, 1)->checkState() != Qt::Unchecked) {
+            return 94;
+        }
+        installed->item(0, 1)->setCheckState(Qt::Checked);
+        QApplication::processEvents();
+        PluginEnablementConfig saved(enablementPath);
+        QString error;
+        if (!saved.load(&error) || saved.enabledPlugins().size() != 1
+            || win32Plugins->loadedPluginCount() != 0) {
+            return 95;
+        }
+        return 0;
     }
 #ifdef NPP_PLUGIN_REGISTRATION_TEST
     if (pluginRecoveryMode) {
@@ -653,6 +1032,588 @@ int main(int argc, char* argv[])
             win32Plugins->secondaryEditorHandle(), subTabs->editor())) {
         return 38;
     }
+    if (betterMultiSelectionMode) {
+        const QStringList pluginNames = win32Plugins->loadedPluginNames();
+        const int pluginIndex = pluginNames.indexOf(
+            QStringLiteral("BetterMultiSelection"));
+        QAction* enableAction = pluginIndex < 0 ? nullptr
+            : mainWindow.findChild<QAction*>(
+                QStringLiteral("win32PluginAction_%1_0").arg(pluginIndex));
+        if (pluginNames.size() != 1 || pluginIndex < 0
+            || win32Plugins->loadedPluginFunctionCount(pluginIndex) != 3
+            || !enableAction || !enableAction->isCheckable()
+            || !enableAction->isChecked()
+            || mainTabs->editor()->SendScintillaNpp(SCI_AUTOCGETMULTI)
+                != SC_MULTIAUTOC_EACH) {
+            return 87;
+        }
+        enableAction->trigger();
+        QApplication::processEvents();
+        if (enableAction->isChecked())
+            return 88;
+        enableAction->trigger();
+        QApplication::processEvents();
+        if (!enableAction->isChecked()
+            || mainTabs->editor()->SendScintillaNpp(SCI_AUTOCGETMULTI)
+                != SC_MULTIAUTOC_EACH) {
+            return 89;
+        }
+        return 0;
+    }
+    if (p0PluginsMode) {
+        const QStringList pluginNames = win32Plugins->loadedPluginNames();
+        auto markStage = [&](const QByteArray& stage) {
+            QFile progress(output + QStringLiteral("/p0-progress.txt"));
+            if (progress.open(QIODevice::WriteOnly))
+                progress.write(stage);
+        };
+        markStage("loaded");
+        struct PluginExpectation {
+            const char* name;
+            int commandCount;
+        };
+        const PluginExpectation expectations[] = {
+            {"DoxyIt", 7},
+            {"Elastic Tabstops", 6},
+            {"S&urroundSelection", 3},
+            {"XML Tools", 37}
+        };
+        for (const PluginExpectation& expectation : expectations) {
+            const int index = pluginNames.indexOf(
+                QString::fromLatin1(expectation.name));
+            if (index < 0 || win32Plugins->loadedPluginFunctionCount(index)
+                    != expectation.commandCount) {
+                return 110;
+            }
+        }
+
+        auto actionFor = [&](const QString& pluginName,
+                             const QString& commandName) -> QAction* {
+            const int pluginIndex = pluginNames.indexOf(pluginName);
+            if (pluginIndex < 0)
+                return nullptr;
+            for (int functionIndex = 0;
+                 functionIndex < win32Plugins->loadedPluginFunctionCount(
+                     pluginIndex); ++functionIndex) {
+                if (win32Plugins->loadedPluginFunctionName(
+                        pluginIndex, functionIndex) == commandName) {
+                    return mainWindow.findChild<QAction*>(
+                        QStringLiteral("win32PluginAction_%1_%2")
+                            .arg(pluginIndex).arg(functionIndex));
+                }
+            }
+            return nullptr;
+        };
+        auto actionStartingWith = [&](const QString& pluginName,
+                                      const QString& commandPrefix) {
+            const int pluginIndex = pluginNames.indexOf(pluginName);
+            if (pluginIndex < 0)
+                return static_cast<QAction*>(nullptr);
+            for (int functionIndex = 0;
+                 functionIndex < win32Plugins->loadedPluginFunctionCount(
+                     pluginIndex); ++functionIndex) {
+                if (win32Plugins->loadedPluginFunctionName(
+                        pluginIndex, functionIndex).startsWith(commandPrefix)) {
+                    return mainWindow.findChild<QAction*>(
+                        QStringLiteral("win32PluginAction_%1_%2")
+                            .arg(pluginIndex).arg(functionIndex));
+                }
+            }
+            return static_cast<QAction*>(nullptr);
+        };
+        auto setSelection = [&](const QByteArray& text) {
+            SendMessageW(win32Plugins->mainEditorHandle(),
+                         SCI_CLEARSELECTIONS, 0, 0);
+            mainTabs->editor()->setText(QString::fromUtf8(text));
+            SendMessageW(win32Plugins->mainEditorHandle(), SCI_SETSEL, 0,
+                         static_cast<LPARAM>(text.size()));
+        };
+
+        mainTabs->editor()->setBuiltinLanguage(QStringLiteral("cpp"));
+        win32Plugins->notifyLanguageChanged(
+            mainWindow.currentBufferIdForPlugin());
+        int currentLanguageType = -1;
+        SendMessageW(win32Plugins->mainWindowHandle(),
+                     NppMessageGetCurrentLangType, 0,
+                     reinterpret_cast<LPARAM>(&currentLanguageType));
+        if (currentLanguageType != 3)
+            return 119;
+        wchar_t languageName[16]{};
+        if (SendMessageW(win32Plugins->mainWindowHandle(),
+                         NppMessageGetLanguageName, 3,
+                         reinterpret_cast<LPARAM>(languageName)) != 3
+            || QString::fromWCharArray(languageName)
+                != QStringLiteral("C++")) {
+            return 119;
+        }
+        setSelection(QByteArray("int add(int a, int b);\n"));
+        SendMessageW(win32Plugins->mainEditorHandle(), SCI_SETSEL, 0, 0);
+        QAction* doxyFile = actionFor(
+            QStringLiteral("DoxyIt"), QStringLiteral("Comment File"));
+        if (!doxyFile)
+            return 111;
+        doxyFile->trigger();
+        QApplication::processEvents();
+        const QByteArray doxyText = mainTabs->editor()->text().toUtf8();
+        if (!doxyText.contains("\\file") || !doxyText.contains("/**")) {
+            QFile diagnostic(output + QStringLiteral("/doxyit-output.txt"));
+            if (diagnostic.open(QIODevice::WriteOnly))
+                diagnostic.write(doxyText);
+            return 120;
+        }
+        markStage("doxy-command");
+        setSelection(QByteArray("int add(int a, int b);\n"));
+        SendMessageW(win32Plugins->mainEditorHandle(), SCI_SETSEL, 0, 0);
+        QAction* doxyFunction = actionFor(
+            QStringLiteral("DoxyIt"), QStringLiteral("Comment Function"));
+        if (!doxyFunction)
+            return 124;
+        doxyFunction->trigger();
+        QApplication::processEvents();
+        const QByteArray doxyFunctionText =
+            mainTabs->editor()->text().toUtf8();
+        if (!doxyFunctionText.contains("\\param [in] a")
+            || !doxyFunctionText.contains("\\param [in] b")) {
+            QFile diagnostic(
+                output + QStringLiteral("/doxyit-function-output.txt"));
+            if (diagnostic.open(QIODevice::WriteOnly))
+                diagnostic.write(doxyFunctionText);
+            return 124;
+        }
+
+        QAction* doxySettings = actionFor(
+            QStringLiteral("DoxyIt"), QStringLiteral("Settings..."));
+        if (!doxySettings)
+            return 112;
+        doxySettings->trigger();
+        QApplication::processEvents();
+        bool exactSettingsTitle = false;
+        HWND settingsDialog = findCurrentProcessDialog(
+            L"DoxyIt - Settings", &exactSettingsTitle);
+        if (!settingsDialog || !exactSettingsTitle
+            || GetWindow(settingsDialog, GW_OWNER)
+                != win32Plugins->mainWindowHandle()) {
+            return 112;
+        }
+        PostMessageW(settingsDialog, WM_CLOSE, 0, 0);
+        QApplication::processEvents();
+        markStage("doxy-settings");
+
+        setSelection(QByteArray("a\t1\nlonger\t2\n"));
+        markStage("elastic-text");
+        win32Plugins->notifyBufferActivated(
+            mainWindow.currentBufferIdForPlugin());
+        markStage("elastic-activated");
+        QApplication::processEvents();
+        const LRESULT tabStop = SendMessageW(
+            win32Plugins->mainEditorHandle(), SCI_GETNEXTTABSTOP, 0, 0);
+        markStage("elastic-tabstop");
+        QAction* convertTabs = actionFor(
+            QStringLiteral("Elastic Tabstops"),
+            QStringLiteral("Convert Tabstops to Spaces"));
+        if (!convertTabs)
+            return 121;
+        if (tabStop <= 0) {
+            QFile diagnostic(output + QStringLiteral("/elastic-tabstop.txt"));
+            if (diagnostic.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                diagnostic.write(QByteArray::number(tabStop));
+                diagnostic.write("\n");
+                diagnostic.write(mainTabs->editor()->text().toUtf8());
+            }
+            return 122;
+        }
+        convertTabs->trigger();
+        markStage("elastic-command");
+        QApplication::processEvents();
+        if (mainTabs->editor()->text().contains(QLatin1Char('\t')))
+            return 113;
+        markStage("elastic");
+
+        QAction* surroundEnable = actionFor(
+            QStringLiteral("S&urroundSelection"), QStringLiteral("&Enable"));
+        if (!surroundEnable || !surroundEnable->isCheckable()
+            || !surroundEnable->isChecked()) {
+            return 114;
+        }
+        surroundEnable->trigger();
+        QApplication::processEvents();
+        if (surroundEnable->isChecked())
+            return 114;
+        surroundEnable->trigger();
+        QApplication::processEvents();
+        if (!surroundEnable->isChecked())
+            return 114;
+        markStage("surround");
+
+        mainTabs->editor()->setBuiltinLanguage(QStringLiteral("xml"));
+        win32Plugins->notifyLanguageChanged(
+            mainWindow.currentBufferIdForPlugin());
+        setSelection(QByteArray("<root><item a=\"1\">x</item></root>"));
+        QAction* prettyPrint = actionFor(
+            QStringLiteral("XML Tools"), QStringLiteral("Pretty print"));
+        QAction* linearize = actionFor(
+            QStringLiteral("XML Tools"), QStringLiteral("Linearize"));
+        if (!prettyPrint || !linearize)
+            return 115;
+        prettyPrint->trigger();
+        QApplication::processEvents();
+        if (!mainTabs->editor()->text().contains(QLatin1Char('\n')))
+            return 115;
+        linearize->trigger();
+        QApplication::processEvents();
+        if (mainTabs->editor()->text().contains(QLatin1Char('\n'))
+            || !mainTabs->editor()->text().contains(
+                QStringLiteral("<item a=\"1\">x</item>"))) {
+            return 115;
+        }
+        markStage("xml-format");
+
+        QAction* escape = actionStartingWith(
+            QStringLiteral("XML Tools"),
+            QStringLiteral("Escape characters in selection"));
+        QAction* unescape = actionStartingWith(
+            QStringLiteral("XML Tools"),
+            QStringLiteral("Unescape characters in selection"));
+        QAction* comment = actionFor(
+            QStringLiteral("XML Tools"), QStringLiteral("Comment selection"));
+        QAction* uncomment = actionFor(
+            QStringLiteral("XML Tools"), QStringLiteral("Uncomment selection"));
+        if (!escape || !unescape || !comment || !uncomment)
+            return 123;
+        setSelection(QByteArray("<node>&</node>"));
+        escape->trigger();
+        QApplication::processEvents();
+        if (!mainTabs->editor()->text().contains(
+                QStringLiteral("&lt;node&gt;"))) {
+            QFile diagnostic(output + QStringLiteral("/xml-escape.txt"));
+            if (diagnostic.open(QIODevice::WriteOnly))
+                diagnostic.write(mainTabs->editor()->text().toUtf8());
+            return 116;
+        }
+        SendMessageW(win32Plugins->mainEditorHandle(), SCI_SELECTALL, 0, 0);
+        unescape->trigger();
+        QApplication::processEvents();
+        if (mainTabs->editor()->text() != QStringLiteral("<node>&</node>"))
+            return 116;
+        setSelection(QByteArray("value"));
+        comment->trigger();
+        QApplication::processEvents();
+        if (mainTabs->editor()->text() != QStringLiteral("<!--value-->"))
+            return 117;
+        SendMessageW(win32Plugins->mainEditorHandle(), SCI_SELECTALL, 0, 0);
+        uncomment->trigger();
+        QApplication::processEvents();
+        if (mainTabs->editor()->text() != QStringLiteral("value"))
+            return 117;
+        markStage("xml-text");
+
+        QAction* checkXml = actionFor(
+            QStringLiteral("XML Tools"),
+            QStringLiteral("Check XML syntax now"));
+        if (!checkXml)
+            return 118;
+        setSelection(QByteArray("<root><item></root>"));
+        markStage("xml-malformed-text");
+        checkXml->trigger();
+        markStage("xml-check-triggered");
+        QApplication::processEvents();
+        if (mainTabs->editor()->SendScintillaNpp(
+                SCI_ANNOTATIONGETTEXT, 0, 0) <= 0) {
+            return 118;
+        }
+        markStage("xml-annotation");
+        mainTabs->editor()->SendScintillaNpp(SCI_ANNOTATIONCLEARALL);
+        mainTabs->editor()->setText(QStringLiteral("<root>"));
+        mainTabs->editor()->SendScintillaNpp(
+            SCI_SETSEL, mainTabs->editor()->text().size(),
+            mainTabs->editor()->text().size());
+        Scintilla::NotificationData charAdded{};
+        charAdded.nmhdr.code = Scintilla::Notification::CharAdded;
+        charAdded.ch = '>';
+        win32Plugins->notifyScintilla(charAdded, true);
+        QApplication::processEvents();
+        markStage("xml-char-added");
+        if (mainTabs->editor()->text()
+                != QStringLiteral("<root></root>")) {
+            return 125;
+        }
+
+        QAction* preventXxe = actionFor(
+            QStringLiteral("XML Tools"), QStringLiteral("Prevent XXE"));
+        if (!preventXxe || !preventXxe->isCheckable()
+            || !preventXxe->isChecked()) {
+            return 126;
+        }
+        preventXxe->trigger();
+        QApplication::processEvents();
+        if (preventXxe->isChecked())
+            return 126;
+        preventXxe->trigger();
+        QApplication::processEvents();
+        if (!preventXxe->isChecked())
+            return 126;
+        markStage("xml-toggle");
+
+        QAction* xmlOptions = actionFor(
+            QStringLiteral("XML Tools"), QStringLiteral("Options..."));
+        if (!xmlOptions)
+            return 127;
+        xmlOptions->trigger();
+        QApplication::processEvents();
+        markStage("xml-options-opened");
+        bool exactOptionsTitle = false;
+        HWND optionsDialog = findCurrentProcessDialog(
+            L"Options", &exactOptionsTitle);
+        if (!optionsDialog || !exactOptionsTitle)
+            return 127;
+        PostMessageW(optionsDialog, WM_CLOSE, 0, 0);
+        QApplication::processEvents();
+        markStage("complete");
+        return 0;
+    }
+    if (configurationPluginsMode) {
+        const QStringList pluginNames = win32Plugins->loadedPluginNames();
+        const auto windowProc = reinterpret_cast<const void*>(
+            GetWindowLongPtrW(win32Plugins->mainWindowHandle(),
+                              GWLP_WNDPROC));
+        HMODULE windowProcModule = nullptr;
+        wchar_t modulePath[MAX_PATH]{};
+        if (windowProc
+            && GetModuleHandleExW(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+                    | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                reinterpret_cast<LPCWSTR>(windowProc),
+                &windowProcModule)) {
+            GetModuleFileNameW(windowProcModule, modulePath, MAX_PATH);
+        }
+        const QString windowProcModulePath =
+            QString::fromWCharArray(modulePath);
+        QFile report(output + QStringLiteral(
+            "/configuration-plugin-functions.txt"));
+        if (report.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            for (int pluginIndex = 0;
+                 pluginIndex < win32Plugins->loadedPluginCount();
+                 ++pluginIndex) {
+                report.write(QStringLiteral("[%1]\n")
+                    .arg(pluginNames.value(pluginIndex)).toUtf8());
+                for (int functionIndex = 0;
+                     functionIndex < win32Plugins->loadedPluginFunctionCount(
+                         pluginIndex); ++functionIndex) {
+                    report.write(QStringLiteral("%1:%2\n")
+                        .arg(functionIndex)
+                        .arg(win32Plugins->loadedPluginFunctionName(
+                            pluginIndex, functionIndex)).toUtf8());
+                }
+            }
+            report.write(QStringLiteral("wndproc:%1\n")
+                .arg(windowProcModulePath).toUtf8());
+        }
+        if (win32Plugins->loadedPluginCount() != 2
+            || !pluginNames.contains(QStringLiteral("Auto Save"))
+            || !pluginNames.contains(QStringLiteral("EditorConfig"))
+            || !windowProcModulePath.endsWith(
+                QStringLiteral("AutoSave.dll"), Qt::CaseInsensitive)
+            || !mainWindow.property("win32PluginLoadErrors")
+                    .toStringList().isEmpty()) {
+            return 128;
+        }
+
+        if (!mainWindow.openFileForPlugin(editorConfigSamplePath))
+            return 130;
+        QApplication::processEvents();
+        win32Plugins->notifyBufferActivated(
+            mainWindow.currentBufferIdForPlugin());
+        QApplication::processEvents();
+        const sptr_t useTabs = mainTabs->editor()->SendScintillaNpp(
+            SCI_GETUSETABS);
+        const sptr_t indent = mainTabs->editor()->SendScintillaNpp(
+            SCI_GETINDENT);
+        const sptr_t tabWidth = mainTabs->editor()->SendScintillaNpp(
+            SCI_GETTABWIDTH);
+        const sptr_t eolMode = mainTabs->editor()->SendScintillaNpp(
+            SCI_GETEOLMODE);
+        if (useTabs != 0 || indent != 3 || tabWidth != 6
+            || eolMode != SC_EOL_LF) {
+            QFile diagnostic(output + QStringLiteral(
+                "/editor-config-values.txt"));
+            if (diagnostic.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                diagnostic.write(QStringLiteral(
+                    "path=%1\nuseTabs=%2\nindent=%3\ntabWidth=%4\neol=%5\n")
+                    .arg(mainWindow.currentPathForPlugin())
+                    .arg(useTabs).arg(indent).arg(tabWidth).arg(eolMode)
+                    .toUtf8());
+            }
+            return 130;
+        }
+        mainTabs->editor()->setText(
+            QStringLiteral("first   \r\nsecond   "));
+        QApplication::processEvents();
+        if (!mainWindow.executePluginMenuCommand(41006))
+            return 131;
+        QFile editorConfigResult(editorConfigSamplePath);
+        if (!editorConfigResult.open(QIODevice::ReadOnly)
+            || editorConfigResult.readAll() != QByteArray("first\nsecond\n")) {
+            return 131;
+        }
+
+        const int editorConfigIndex = pluginNames.indexOf(
+            QStringLiteral("EditorConfig"));
+        if (editorConfigIndex < 0
+            || !win32Plugins->executePluginCommand(
+                editorConfigIndex, 0)) {
+            return 132;
+        }
+
+        const int autoSaveIndex = pluginNames.indexOf(
+            QStringLiteral("Auto Save"));
+        if (autoSaveIndex < 0)
+            return 134;
+        std::atomic_bool appliedOptions{false};
+        std::thread applyOptionsWorker([&] {
+            for (int attempt = 0; attempt < 300; ++attempt) {
+                bool exactMatch = false;
+                HWND dialog = findCurrentProcessDialog(
+                    L"AutoSave Options", &exactMatch);
+                if (dialog) {
+                    appliedOptions = true;
+                    PostMessageW(dialog, WM_COMMAND,
+                                 MAKEWPARAM(IDOK, BN_CLICKED), 0);
+                    return;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        });
+        const bool optionsApplied = win32Plugins->executePluginCommand(
+            autoSaveIndex, 2);
+        applyOptionsWorker.join();
+        QApplication::processEvents();
+        if (!optionsApplied || !appliedOptions.load())
+            return 134;
+
+        if (!mainWindow.openFileForPlugin(autoSaveSamplePath))
+            return 133;
+        QApplication::processEvents();
+        mainTabs->editor()->setText(QStringLiteral("saved on deactivate\n"));
+        QApplication::processEvents();
+        QDir autoSaveDirectory(QFileInfo(autoSaveSamplePath).absolutePath());
+        const QStringList filesBeforeCopyList =
+            autoSaveDirectory.entryList(QDir::Files);
+        const QSet<QString> filesBeforeCopy =
+            QSet<QString>::fromList(filesBeforeCopyList);
+        if (!win32Plugins->executePluginCommand(autoSaveIndex, 0))
+            return 136;
+        QApplication::processEvents();
+        const QStringList filesAfterCopyList =
+            autoSaveDirectory.entryList(QDir::Files);
+        const QSet<QString> filesAfterCopy =
+            QSet<QString>::fromList(filesAfterCopyList);
+        const QSet<QString> copiedFiles = filesAfterCopy - filesBeforeCopy;
+        if (copiedFiles.size() != 1)
+            return 136;
+        QFile copiedFile(autoSaveDirectory.filePath(*copiedFiles.cbegin()));
+        QFile originalFile(autoSaveSamplePath);
+        if (!copiedFile.open(QIODevice::ReadOnly)
+            || copiedFile.readAll() != QByteArray("saved on deactivate\n")
+            || !originalFile.open(QIODevice::ReadOnly)
+            || originalFile.readAll() != QByteArray("initial\n")
+            || !mainTabs->editor()->isModified()) {
+            return 136;
+        }
+        copiedFile.close();
+        originalFile.close();
+        if (qEnvironmentVariableIsSet("NPP_QT_TEST_AUTOSAVE_TIMER")) {
+            const QDeadlineTimer deadline(75000);
+            QByteArray diskContents;
+            do {
+                QApplication::processEvents();
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                QFile result(autoSaveSamplePath);
+                if (result.open(QIODevice::ReadOnly))
+                    diskContents = result.readAll();
+            } while (diskContents != QByteArray("saved on deactivate\n")
+                     && !deadline.hasExpired());
+            if (diskContents != QByteArray("saved on deactivate\n")
+                || mainTabs->editor()->isModified())
+                return 140;
+        }
+        if (qEnvironmentVariableIsSet("NPP_QT_TEST_REAL_FOCUS")) {
+            SetForegroundWindow(win32Plugins->mainWindowHandle());
+            QApplication::processEvents();
+#ifdef NPP_WIN32_FOCUS_WINDOW
+            QProcess focusWindow;
+            focusWindow.start(
+                QString::fromUtf8(NPP_WIN32_FOCUS_WINDOW),
+                {QString::number(reinterpret_cast<quintptr>(
+                    win32Plugins->mainWindowHandle()))});
+            if (!focusWindow.waitForStarted(3000))
+                return 133;
+            while (focusWindow.state() != QProcess::NotRunning) {
+                QApplication::processEvents();
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            if (focusWindow.exitStatus() != QProcess::NormalExit
+                || focusWindow.exitCode() != 0) {
+                QFile diagnostic(output + QStringLiteral(
+                    "/auto-save-focus.txt"));
+                if (diagnostic.open(
+                        QIODevice::WriteOnly | QIODevice::Text)) {
+                    diagnostic.write(QStringLiteral(
+                        "status=%1\nexit=%2\nforeground=%3\nmain=%4\n")
+                        .arg(static_cast<int>(focusWindow.exitStatus()))
+                        .arg(focusWindow.exitCode())
+                        .arg(reinterpret_cast<quintptr>(
+                            GetForegroundWindow()))
+                        .arg(reinterpret_cast<quintptr>(
+                            win32Plugins->mainWindowHandle()))
+                        .toUtf8());
+                }
+                return 135;
+            }
+#endif
+            QApplication::processEvents();
+            QFile autoSaveResult(autoSaveSamplePath);
+            if (!autoSaveResult.open(QIODevice::ReadOnly)
+                || autoSaveResult.readAll()
+                    != QByteArray("saved on deactivate\n")) {
+                QFile diagnostic(output + QStringLiteral(
+                    "/auto-save-values.txt"));
+                if (diagnostic.open(
+                        QIODevice::WriteOnly | QIODevice::Text)) {
+                    QFile current(autoSaveSamplePath);
+                    current.open(QIODevice::ReadOnly);
+                    diagnostic.write(QStringLiteral(
+                        "path=%1\nmodified=%2\ndisk=%3\n")
+                        .arg(mainWindow.currentPathForPlugin())
+                        .arg(mainTabs->editor()->isModified())
+                        .arg(QString::fromUtf8(current.readAll()))
+                        .toUtf8());
+                }
+                return 133;
+            }
+        }
+
+        std::atomic_bool optionsFound{false};
+        std::thread optionsWorker([&] {
+            for (int attempt = 0; attempt < 300; ++attempt) {
+                bool exactMatch = false;
+                HWND dialog = findCurrentProcessDialog(
+                    L"AutoSave Options", &exactMatch);
+                if (dialog) {
+                    optionsFound = true;
+                    PostMessageW(dialog, WM_CLOSE, 0, 0);
+                    return;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        });
+        const bool optionsExecuted = win32Plugins->executePluginCommand(
+            autoSaveIndex, 2);
+        optionsWorker.join();
+        QApplication::processEvents();
+        if (!optionsExecuted || !optionsFound.load())
+            return 134;
+        return 0;
+    }
 #ifdef NPP_MIMETOOLS_MANAGED_TEST
     QFile receipt(QDir(QCoreApplication::applicationDirPath()).filePath(
         QStringLiteral("plugins/mimeTools/.npp-package.json")));
@@ -873,8 +1834,9 @@ int main(int argc, char* argv[])
         }
     }
 
-    const QStringList expectedSynchronousPlugins = {
+    const QStringList expectedAuditedPlugins = {
         QStringLiteral("BracketsCheck"),
+        QStringLiteral("BetterMultiSelection"),
         QStringLiteral("Code alignment"),
         QStringLiteral("Converter"),
         QStringLiteral("Goto Line, Column"),
@@ -908,17 +1870,33 @@ int main(int argc, char* argv[])
         }
         jsonViewerDiagnostic.close();
     }
-    for (const QString& pluginName : expectedSynchronousPlugins) {
+    for (const QString& pluginName : expectedAuditedPlugins) {
         if (!loadedPluginNames.contains(pluginName))
             return 71;
     }
     const QStringList loadErrors =
         mainWindow.property("win32PluginLoadErrors").toStringList();
-    if (loadedPluginNames.contains(QStringLiteral("BetterMultiSelection"))
-        || loadedPluginNames.contains(
+    if (loadedPluginNames.contains(
             QStringLiteral("Poor Man's T-Sql Formatter"))
         || !loadErrors.isEmpty()) {
         return 71;
+    }
+    const int betterMultiSelectionIndex = loadedPluginNames.indexOf(
+        QStringLiteral("BetterMultiSelection"));
+    QAction* betterMultiSelectionEnable =
+        betterMultiSelectionIndex < 0 ? nullptr
+        : mainWindow.findChild<QAction*>(
+            QStringLiteral("win32PluginAction_%1_0")
+                .arg(betterMultiSelectionIndex));
+    if (betterMultiSelectionIndex < 0
+        || win32Plugins->loadedPluginFunctionCount(
+               betterMultiSelectionIndex) != 3
+        || !betterMultiSelectionEnable
+        || !betterMultiSelectionEnable->isCheckable()
+        || !betterMultiSelectionEnable->isChecked()
+        || mainTabs->editor()->SendScintillaNpp(SCI_AUTOCGETMULTI)
+            != SC_MULTIAUTOC_EACH) {
+        return 72;
     }
 
     auto pluginAction = [&](const QString& pluginName, int functionIndex) {

@@ -1,5 +1,72 @@
 # 本地缓存：最新分析
 
+## 2026-08-12 Session 与文档策略插件
+
+- SessionMgr 1.4.4、AutoCodepage 1.2.4、AutoEolFormat 1.0.2 和
+  nppAutoDetectIndent 2.3 官方 x64 DLL 已按 v8.4.6 清单哈希固定并通过 updater 安装。
+- SessionMgr 的 session 保存/加载、Buffer 位置和应用目录宿主接口已补齐。
+- 文件打开通知顺序修正为原版语义；编码菜单恢复原版 command ID；扩展名查询不含点号。
+- Scintilla direct adapter 可在旧 TextRange ABI 与 Scintilla 5 ABI 间按插件回调切换。
+- AutoSave 真实失焦覆盖保存和 1 分钟计时覆盖保存均已通过；此前的
+  `cannot save file` 是测试进程未关闭只读文件句柄造成，不是产品保存失败。
+- Debug 全构建成功，完整 CTest `44/44` 通过。
+- 详情：`codex/changes/2026-08-12-session-document-policy-plugins.md`。
+
+## 2026-08-11 EditorConfig 与 AutoSave 原版 DLL 兼容
+
+- 官方未修改的 NppEditorConfig 0.4.0 与 AutoSave 1.6.1.0 x64 包已加入固定语料，
+  SHA-256 与 v8.4.6 插件清单一致，并通过 updater 事务安装。
+- EditorConfig 的缩进、Tab、EOL、保存前尾空白清理、最终换行和 reload 已由真实 DLL
+  自动验证。
+- AutoSave 的配置、Options、主 HWND WndProc 挂接和时间戳副本已由真实 DLL自动验证；
+  新增的关键宿主接口是 `NPPM_SAVECURRENTFILEAS`，副本保存不改变当前 Buffer。
+- 全量主窗口消息广播在 Qt 销毁阶段会使既有插件组合阻塞，因此未采用；AutoSave 使用
+  自装 WndProc，EditorConfig 使用 NPPN/SCI，两者均不依赖全广播。
+- Release 全量构建及 CTest `42/42` 通过。真实失焦覆盖保存与分钟定时触发保留为
+  有交互 Windows 桌面下的人工验证项。
+- 详细记录：`codex/changes/2026-08-11-editorconfig-autosave-win32-compatibility.md`。
+
+## 2026-08-11 原版 DLL 优先决策
+
+- NppEditorConfig 0.4.0 与 AutoSave 1.6.1.0 下一步先尝试兼容官方未修改的原版
+  Windows DLL。
+- NppTextFX 0.2.6 暂不决定实现路线，后续取得功能和源码证据后再单独决策。
+- 后续重要插件难以兼容原 DLL 时，优先保持插件边界并重构为 Qt 版插件；默认不再
+  建议直接并入 Qt 主程序原生实现。
+- 详细决策见 `codex/decisions/2026-08-11-original-dll-first-plugin-porting.md`。
+
+## 2026-08-11 后续重要插件建议
+
+- 近期优先重新评估原版 DLL：XMLTools、DoxyIt、SurroundSelection、
+  ElasticTabstops。Scintilla direct ABI 已补齐，剩余重点是命令覆盖、线程键盘 Hook、
+  MSXML/MFC UI 和物理输入验证。
+- SessionMgr 可继续原版 DLL 路线，但应先补完整 Session Host Services、文档生命周期
+  通知和插件间消息。
+- ComparePlus/Compare、DSpellCheck、Explorer、Markdown 预览、NppExec、PythonScript、
+  NppFTP 和 HexEditor 应以源码移植或新 Host Services 为主，不为它们扩大旧 Win32
+  窗口树和内部指针模拟。
+- 本节此前关于 EditorConfig、AutoSave 优先并入 Qt 主线的建议已被上述新决策取代。
+
+## 2026-08-11 插件启用清单配置化
+
+- 新增配置目录独立文件 `pluginsEnabled.xml`，以插件目录名为键，仅显式
+  `enabled="yes"` 时加载；缺失、无条目、禁用、非法属性或损坏 XML 均默认不加载。
+- Plugins Admin 已安装页增加独立 Enabled 列，修改后立即原子保存，重启生效；卸载
+  改为当前行操作。
+- Windows 原版 DLL 与跨平台插件管理器共用同一启用列表，主窗口不再硬编码插件目录。
+- 单元测试覆盖 XML 往返、损坏配置和默认禁用；`win32-plugin-enablement` 覆盖无配置
+  启动不加载、三列表格、勾选持久化和本次运行不热加载。
+
+## 2026-08-11 BetterMultiSelection 1.5 兼容
+
+- Win32 编辑器接收 HWND 已透传 Scintilla Qt 的
+  `SCI_GETDIRECTFUNCTION/SCI_GETDIRECTPOINTER`，修复插件 READY 阶段空 direct
+  function 调用。
+- 插件已加入审核加载集合；单独 READY、Enable Hook 开关、direct 状态和卸载通过，
+  与 XMLTools 组合也不再出现 `0xC0000005`。
+- 新增 `win32-better-multi-selection` 专项测试，完整 CTest `39/39` 通过。
+- 物理键盘的多选移动、删除、换行和剪贴板操作需要人工界面验证。
+
 ## 2026-08-11 无白名单 Win32 插件加载验证
 
 - 临时移除审核白名单并无过滤加载固定真实插件语料；18 个 DLL 注册成功，
@@ -10,6 +77,11 @@
 - 当前回调期故障没有加载中标记，不能靠下一次启动恢复机制自动归因。
 - 已恢复审核白名单。当前同进程原版 ABI 不能保证任意不兼容 DLL 仅失去功能而不影响
   主程序；详见 `codex/validation/2026-08-11-unfiltered-win32-plugin-loading/README.md`。
+- BetterMultiSelection v1.5 的直接根因已由源码确认：插件在 `setInfo()` 获取
+  `SCI_GETDIRECTFUNCTION/SCI_GETDIRECTPOINTER`，当前隐藏编辑器 HWND 返回空值，随后
+  READY 阶段的 `SCI_AUTOCSETMULTI` direct 调用解引用空函数指针。Scintilla 5 Qt 本体
+  已提供对应 ABI，可由 Win32 编辑器适配层透传；之后仍需验证线程键盘 Hook、双视图
+  及与 XMLTools 的组合故障。
 
 ## 2026-08-09 高、中优先级插件兼容
 
@@ -679,3 +751,11 @@
 - Qt 窗口、Dock/面板和插件宿主服务：`src/MainWindow.cpp`。
 - Release 全目标构建和 CTest `38/38` 通过；详见
   `codex/validation/2026-08-10-main-controller-structure-split/README.md`。
+
+## 2026-08-11 P0 Win32 插件兼容
+
+- 完成官方未修改的 XMLTools、DoxyIt、SurroundSelection 和 ElasticTabstops x64
+  安装、加载与核心功能兼容。
+- 修正旧 direct Scintilla ABI 与当前 HWND 消息 ABI 混用导致的访问冲突风险。
+- Release 全目标构建成功，CTest `41/41` 通过；详见
+  `codex/changes/2026-08-11-p0-win32-plugin-compatibility.md`。

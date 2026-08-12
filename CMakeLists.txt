@@ -165,6 +165,7 @@ set(SOURCES
     src/WinControls/ProjectPanel/ProjectPanel.cpp
     src/MISC/PluginsManager/PluginArtifactResolver.cpp
     src/MISC/PluginsManager/PluginCatalog.cpp
+    src/MISC/PluginsManager/PluginEnablementConfig.cpp
     src/WinControls/PluginsAdmin/PluginAdminModel.cpp
     src/WinControls/PluginsAdmin/PluginAdminDialog.cpp
     src/MISC/PluginsManager/PluginUpdatePlan.cpp
@@ -396,6 +397,7 @@ if(BUILD_TESTING)
         tests/PluginAdminTests.cpp
         src/MISC/PluginsManager/PluginArtifactResolver.cpp
         src/MISC/PluginsManager/PluginCatalog.cpp
+        src/MISC/PluginsManager/PluginEnablementConfig.cpp
         src/WinControls/PluginsAdmin/PluginAdminModel.cpp
         src/MISC/PluginsManager/PluginUpdatePlan.cpp
         ${RESOURCES}
@@ -534,6 +536,8 @@ if(BUILD_TESTING)
     set(UI_PARITY_SOURCES ${SOURCES})
     list(REMOVE_ITEM UI_PARITY_SOURCES src/main.cpp)
     if(WIN32)
+        add_executable(win32-focus-window WIN32
+            tests/Win32FocusWindow.cpp)
         add_library(win32-invalid-registration-plugin SHARED
             tests/plugins/Win32InvalidRegistrationPlugin.cpp)
         add_library(win32-valid-registration-plugin SHARED
@@ -569,10 +573,12 @@ if(BUILD_TESTING)
         target_link_libraries(ui-parity-capture
             shell32 advapi32 version comctl32 ${NPP_ZLIB_TARGET})
         add_dependencies(ui-parity-capture
+            win32-focus-window
             win32-invalid-registration-plugin
             win32-valid-registration-plugin)
         target_compile_definitions(ui-parity-capture PRIVATE
             NPP_PLUGIN_REGISTRATION_TEST=1
+            NPP_WIN32_FOCUS_WINDOW="$<TARGET_FILE:win32-focus-window>"
             NPP_INVALID_REGISTRATION_PLUGIN="$<TARGET_FILE:win32-invalid-registration-plugin>"
             NPP_VALID_REGISTRATION_PLUGIN="$<TARGET_FILE:win32-valid-registration-plugin>")
         if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND
@@ -634,6 +640,36 @@ if(BUILD_TESTING)
             npp_prepare_plugin_archive(NPP_BETTER_MULTI_SELECTION_ARCHIVE
                 "third_party/win32-plugins/BetterMultiSelection/1.5/x64/BetterMultiSelection_v1.5_x64.zip"
                 "a33dddd93d40a2bb595ea44eeb5bcdaefd3189c5fae3c40a052da9d02597bb63")
+            npp_prepare_plugin_archive(NPP_DOXYIT_ARCHIVE
+                "third_party/win32-plugins/DoxyIt/0.4.4/x64/DoxyIt_v0.4.4_x64.zip"
+                "1f3970b0fa2a87f76de0fee921e9c52ce931d552d9be73a4b820cd321457510c")
+            npp_prepare_plugin_archive(NPP_ELASTIC_TABSTOPS_ARCHIVE
+                "third_party/win32-plugins/ElasticTabstops/1.3.1/x64/ElasticTabstops_v1.3.1_x64.zip"
+                "657f343f135e9af2d9db8b94dee991ff0c3931151ed7faea3a40822c0bc295a6")
+            npp_prepare_plugin_archive(NPP_SURROUND_SELECTION_ARCHIVE
+                "third_party/win32-plugins/SurroundSelection/1.4.1/x64/SurroundSelection_v1.4.1_x64.zip"
+                "6fc0687506f09b31d0b4e7033a4185306199a4242796f7653b27a942428bfef4")
+            npp_prepare_plugin_archive(NPP_XML_TOOLS_ARCHIVE
+                "third_party/win32-plugins/XMLTools/3.1.1.13/x64/XMLTools-3.1.1.13-x64.zip"
+                "7631ea990e731172e28e9fe85ac4861185c0292143603b9486bc969cc8e8e046")
+            npp_prepare_plugin_archive(NPP_AUTO_SAVE_ARCHIVE
+                "third_party/win32-plugins/AutoSave/1.6.1.0/x64/AutoSave_dll_1v61_x64.zip"
+                "572d748449aaea0ce72f2dfa7b36172419386d827b1db1536fc6b57ae23dc104")
+            npp_prepare_plugin_archive(NPP_EDITOR_CONFIG_ARCHIVE
+                "third_party/win32-plugins/NppEditorConfig/0.4.0/x64/NppEditorConfig-040-x64.zip"
+                "ae43152e91d8310ab28859992d3661aba24d8d69a64b93cd12b2f531a1038f56")
+            npp_prepare_plugin_archive(NPP_SESSION_MGR_ARCHIVE
+                "third_party/win32-plugins/SessionMgr/1.4.4/x64/SessionMgr_v1.4.4_x64.zip"
+                "478f7057863dd998b26c37083d785106a65853063d820b365ec18a02e755da9d")
+            npp_prepare_plugin_archive(NPP_AUTO_DETECT_INDENT_ARCHIVE
+                "third_party/win32-plugins/nppAutoDetectIndent/2.3/x64/nppAutoDetectIndent_v2.3_x64.zip"
+                "5d1982a3fb4609d74dde0deaf631526646d393fc26e6d7a11c72f9d0456d69f1")
+            npp_prepare_plugin_archive(NPP_AUTO_CODEPAGE_ARCHIVE
+                "third_party/win32-plugins/AutoCodepage/1.2.4/x64/AutoCodepage_v1.2.4_x64.zip"
+                "88744cda8c4a6be373af2fa23c86156adaf3dc000fde8834957f9352a6f34fec")
+            npp_prepare_plugin_archive(NPP_AUTO_EOL_FORMAT_ARCHIVE
+                "third_party/win32-plugins/AutoEolFormat/1.0.2/x64/AutoEolFormat_v1.0.2_x64.zip"
+                "9488d63c983050d65af7911d3a3f19dbba6d3fc5a14ad1660ecfbadf31343a85")
             npp_prepare_plugin_archive(NPP_JSON_VIEWER_ARCHIVE
                 "third_party/win32-plugins/NPPJSONViewer/1.41/x64/NPPJSONViewer_x64.zip"
                 "f9e3f6e1d93e088f7477cd6bc3cb9767b803acc4171533155435fbc02ae8926a")
@@ -706,6 +742,32 @@ if(BUILD_TESTING)
             COMMAND ui-parity-capture
                 "${CMAKE_BINARY_DIR}/ui-plugin-load-recovery"
                 pluginRecovery)
+        if(WIN32)
+            add_test(NAME win32-better-multi-selection
+                COMMAND ui-parity-capture
+                    "${CMAKE_BINARY_DIR}/win32-better-multi-selection"
+                    betterMultiSelection)
+            add_test(NAME win32-plugin-enablement
+                COMMAND ui-parity-capture
+                    "${CMAKE_BINARY_DIR}/win32-plugin-enablement"
+                    pluginEnablement)
+            add_test(NAME win32-p0-plugins
+                COMMAND ui-parity-capture
+                    "${CMAKE_BINARY_DIR}/win32-p0-plugins"
+                    p0Plugins)
+            add_test(NAME win32-configuration-plugins
+                COMMAND ui-parity-capture
+                    "${CMAKE_BINARY_DIR}/win32-configuration-plugins"
+                    configurationPlugins)
+            add_test(NAME win32-session-manager
+                COMMAND ui-parity-capture
+                    "${CMAKE_BINARY_DIR}/win32-session-manager"
+                    sessionManager)
+            add_test(NAME win32-document-policy-plugins
+                COMMAND ui-parity-capture
+                    "${CMAKE_BINARY_DIR}/win32-document-policy-plugins"
+                    documentPolicyPlugins)
+        endif()
     endif()
     if(WIN32)
         add_test(NAME ui-plugin-registration-rollback
@@ -733,6 +795,33 @@ if(BUILD_TESTING)
     if(NPP_MIMETOOLS_MANAGED_FIXTURE)
         set_tests_properties(ui-plugin-load-recovery PROPERTIES
             ENVIRONMENT "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM}")
+        if(WIN32)
+            set_tests_properties(
+                win32-better-multi-selection
+                win32-plugin-enablement
+                win32-p0-plugins
+                win32-configuration-plugins
+                win32-session-manager
+                win32-document-policy-plugins
+                PROPERTIES
+                ENVIRONMENT
+                    "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM};NPP_QT_TEST_WIN32_PLUGIN_FILTER=BetterMultiSelection"
+                FIXTURES_REQUIRED mimetools-managed-plugin)
+            set_tests_properties(win32-plugin-enablement PROPERTIES
+                ENVIRONMENT "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM}")
+            set_tests_properties(win32-p0-plugins PROPERTIES
+                ENVIRONMENT
+                    "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM};NPP_QT_TEST_WIN32_PLUGIN_FILTER=DoxyIt|ElasticTabstops|SurroundSelection|XMLTools")
+            set_tests_properties(win32-configuration-plugins PROPERTIES
+                ENVIRONMENT
+                    "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM};NPP_QT_TEST_WIN32_PLUGIN_FILTER=AutoSave|NppEditorConfig")
+            set_tests_properties(win32-session-manager PROPERTIES
+                ENVIRONMENT
+                    "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM};NPP_QT_TEST_WIN32_PLUGIN_FILTER=SessionMgr")
+            set_tests_properties(win32-document-policy-plugins PROPERTIES
+                ENVIRONMENT
+                    "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM};NPP_QT_TEST_WIN32_PLUGIN_FILTER=nppAutoDetectIndent|AutoCodepage|AutoEolFormat")
+        endif()
     endif()
     if(WIN32)
         set_tests_properties(ui-plugin-registration-rollback PROPERTIES

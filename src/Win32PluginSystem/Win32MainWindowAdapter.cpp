@@ -1,5 +1,7 @@
 #include "Win32PluginSystem/Win32MainWindowAdapter.h"
 
+#include <QDebug>
+
 #include "MainWindow.h"
 #include "Win32PluginSystem/Win32PluginDockAdapter.h"
 #include "Win32PluginSystem/Win32PluginInterface.h"
@@ -46,13 +48,49 @@ int currentLanguageType(const ScintillaEditView* editor)
     if (!editor)
         return 0;
     const QString language = editor->lexerLanguage().toLower();
+    if (language == QStringLiteral("php"))
+        return 1;
+    if (language == QStringLiteral("c"))
+        return 2;
+    if (language == QStringLiteral("cpp")
+        || language == QStringLiteral("c++"))
+        return 3;
+    if (language == QStringLiteral("csharp")
+        || language == QStringLiteral("c#"))
+        return 4;
+    if (language == QStringLiteral("java"))
+        return 6;
     if (language == QStringLiteral("html"))
         return 8;
     if (language == QStringLiteral("xml"))
         return 9;
+    if (language == QStringLiteral("javascript")
+        || language == QStringLiteral("js"))
+        return 58;
+    if (language == QStringLiteral("python"))
+        return 22;
     if (language == QStringLiteral("json"))
         return 57;
     return 0;
+}
+
+QString languageName(int languageType)
+{
+    switch (languageType) {
+        case 0: return QStringLiteral("Normal Text");
+        case 1: return QStringLiteral("PHP");
+        case 2: return QStringLiteral("C");
+        case 3: return QStringLiteral("C++");
+        case 4: return QStringLiteral("C#");
+        case 6: return QStringLiteral("Java");
+        case 8: return QStringLiteral("HTML");
+        case 9: return QStringLiteral("XML");
+        case 19:
+        case 58: return QStringLiteral("JavaScript");
+        case 22: return QStringLiteral("Python");
+        case 57: return QStringLiteral("JSON");
+        default: return QString();
+    }
 }
 
 } // namespace
@@ -110,6 +148,12 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         return copyPluginString(QDir::toNativeSeparators(path),
                                 wParam, lParam);
     }
+    if (message == NppMessageGetNppDirectory) {
+        if (handled)
+            *handled = true;
+        return copyLegacyPathString(QDir::toNativeSeparators(
+            NppParameters::getInstance().getNppPath()), wParam, lParam);
+    }
     if (message == NppMessageGetEnableThemeTextureFunc) {
         if (handled)
             *handled = true;
@@ -137,6 +181,23 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         return nppWindow->executePluginMenuCommand(
             static_cast<int>(lParam)) ? TRUE : FALSE;
     }
+    if (message == NppMessageSaveCurrentFile
+        || message == NppMessageSaveAllFiles) {
+        if (handled)
+            *handled = true;
+        const int commandId = message == NppMessageSaveCurrentFile
+            ? 41006 : 41007;
+        return nppWindow->executePluginMenuCommand(commandId)
+            ? TRUE : FALSE;
+    }
+    if (message == WM_COMMAND && lParam == 0) {
+        const int commandId = LOWORD(wParam);
+        if (nppWindow->executePluginMenuCommand(commandId)) {
+            if (handled)
+                *handled = true;
+            return TRUE;
+        }
+    }
     if (message == NppMessageDoOpen) {
         if (handled)
             *handled = true;
@@ -145,6 +206,28 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         const QString path = QString::fromWCharArray(
             reinterpret_cast<const wchar_t*>(lParam));
         return nppWindow->openFileForPlugin(path) ? TRUE : FALSE;
+    }
+    if (message == NppMessageSaveCurrentFileAs) {
+        if (handled)
+            *handled = true;
+        if (!lParam)
+            return FALSE;
+        const QString path = QString::fromWCharArray(
+            reinterpret_cast<const wchar_t*>(lParam));
+        return nppWindow->saveCurrentFileAsForPlugin(
+            path, wParam == TRUE) ? TRUE : FALSE;
+    }
+    if (message == NppMessageSaveCurrentSession
+        || message == NppMessageLoadSession) {
+        if (handled)
+            *handled = true;
+        if (!lParam)
+            return FALSE;
+        const QString path = QString::fromWCharArray(
+            reinterpret_cast<const wchar_t*>(lParam));
+        return (message == NppMessageSaveCurrentSession
+            ? nppWindow->saveCurrentSessionForPlugin(path)
+            : nppWindow->loadSessionForPlugin(path)) ? TRUE : FALSE;
     }
     if (message == NppMessageGetCurrentBufferId) {
         if (handled)
@@ -157,6 +240,12 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         return copyLegacyPathString(
             QDir::toNativeSeparators(nppWindow->pathForPluginBuffer(
                 static_cast<quintptr>(wParam))), MAX_PATH, lParam);
+    }
+    if (message == NppMessageGetPosFromBufferId) {
+        if (handled)
+            *handled = true;
+        return nppWindow->positionForPluginBuffer(
+            static_cast<quintptr>(wParam), static_cast<int>(lParam));
     }
     if (message == NppMessageGetNbOpenFiles) {
         if (handled)
@@ -291,9 +380,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         if (handled)
             *handled = true;
         const QString suffix = QFileInfo(nppWindow->currentFilePath()).suffix();
-        const QString extension = suffix.isEmpty()
-            ? QString() : QStringLiteral(".") + suffix;
-        return copyPluginString(extension, wParam, lParam);
+        return copyPluginString(suffix, wParam, lParam);
     }
     if (message == NppMessageGetCurrentLangType) {
         if (handled)
@@ -304,14 +391,34 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         *language = currentLanguageType(nppWindow->currentView());
         return TRUE;
     }
+    if (message == NppMessageGetLanguageName) {
+        if (handled)
+            *handled = true;
+        const QString name = languageName(static_cast<int>(wParam));
+        if (name.isEmpty())
+            return 0;
+        if (!lParam)
+            return name.size();
+        memcpy(reinterpret_cast<void*>(lParam), name.utf16(),
+               static_cast<size_t>(name.size() + 1) * sizeof(wchar_t));
+        return name.size();
+    }
     if (message == NppMessageSetCurrentLangType) {
         if (handled)
             *handled = true;
         return nppWindow->setCurrentLanguageTypeFromPlugin(
             static_cast<int>(lParam)) ? TRUE : FALSE;
     }
-    if (message != NppMessageGetCurrentScintilla)
+    if (message != NppMessageGetCurrentScintilla) {
+        if (qEnvironmentVariableIsSet(
+                "NPP_QT_TEST_PLUGIN_MESSAGE_TRACE")
+            && (message >= WM_USER || message == WM_COMMAND
+                || message == WM_ACTIVATEAPP || message == WM_ACTIVATE)) {
+            qWarning() << "Unhandled Win32 plugin NPP message"
+                       << message << "wParam" << wParam;
+        }
         return 0;
+    }
 
     if (handled)
         *handled = true;
@@ -336,6 +443,6 @@ LRESULT CALLBACK Win32MainWindowAdapter::subclassProc(
     bool handled = false;
     const LRESULT result = adapter
         ? adapter->handleMessage(message, wParam, lParam, &handled) : 0;
-    return handled ? result
-                   : DefSubclassProc(window, message, wParam, lParam);
+    return handled
+        ? result : DefSubclassProc(window, message, wParam, lParam);
 }

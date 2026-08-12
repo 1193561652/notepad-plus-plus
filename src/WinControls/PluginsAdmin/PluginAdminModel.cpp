@@ -64,11 +64,14 @@ PluginAdminItem catalogItem(const PluginCatalogEntry& entry)
 
 PluginAdminModel::PluginAdminModel(const QString& pluginRoot,
                                    const PluginCatalog& catalog,
-                                   const PluginVersion& hostVersion)
+                                   const PluginVersion& hostVersion,
+                                   const QString& enablementFilePath)
     : _pluginRoot(QDir::cleanPath(pluginRoot)),
       _catalog(catalog),
-      _hostVersion(hostVersion)
+      _hostVersion(hostVersion),
+      _enablement(enablementFilePath)
 {
+    _enablement.load();
     refresh();
 }
 
@@ -122,6 +125,7 @@ void PluginAdminModel::refresh()
             item.displayName = folderName;
         }
         item.installed = true;
+        item.enabled = _enablement.isEnabled(folderName);
         item.binaryPath = binaryPath;
         item.installedVersion =
             installedVersion(folderName, binaryPath, &item.managedInstall);
@@ -185,4 +189,26 @@ QVector<PluginAdminItem> PluginAdminModel::incompatibleItems() const
             result.append(item);
     }
     return result;
+}
+
+bool PluginAdminModel::setPluginEnabled(
+    const QString& folderName, bool enabled, QString* error)
+{
+    if (error)
+        error->clear();
+    const bool previous = _enablement.isEnabled(folderName);
+    if (!_enablement.setEnabled(folderName, enabled)) {
+        if (error)
+            *error = QStringLiteral("Invalid plugin folder name");
+        return false;
+    }
+    if (!_enablement.save(error)) {
+        _enablement.setEnabled(folderName, previous);
+        return false;
+    }
+    for (PluginAdminItem& item : _items) {
+        if (item.folderName.compare(folderName, Qt::CaseInsensitive) == 0)
+            item.enabled = enabled;
+    }
+    return true;
 }

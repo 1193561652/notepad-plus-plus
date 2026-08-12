@@ -4040,7 +4040,8 @@ void MainWindow::createEncodingMenu()
 
     // 辅助：构造 "以...编码" 动作
     auto makeEncodeIn = [&](const QString& label,
-                             const QString& codec, bool bom)
+                             const QString& codec, bool bom,
+                             int commandId)
     {
         QAction* a = _encodingMenu->addAction(label);
         const QString normalized = TextFileCodec::normalizedEncoding(codec);
@@ -4049,6 +4050,7 @@ void MainWindow::createEncodingMenu()
         a->setProperty("encodingSelector", true);
         a->setProperty("encodingName", normalized);
         a->setProperty("encodingBom", bom);
+        a->setProperty("nppCommandId", commandId);
         connect(a, &QAction::triggered, this,
                 [this, codec, bom]() { encodeIn(codec, bom); });
     };
@@ -4064,11 +4066,11 @@ void MainWindow::createEncodingMenu()
     };
 
     // ── 以...编码（Encode in）────────────────────────────────
-    makeEncodeIn(tr("Encode in ANSI"),                  "windows-1252", false);
-    makeEncodeIn(tr("Encode in UTF-8"),                 "UTF-8",        false);
-    makeEncodeIn(tr("Encode in UTF-8 with BOM"),        "UTF-8",        true);
-    makeEncodeIn(tr("Encode in UTF-16 BE BOM"),         "UTF-16BE",     true);
-    makeEncodeIn(tr("Encode in UTF-16 LE BOM"),         "UTF-16LE",     true);
+    makeEncodeIn(tr("Encode in ANSI"),           "windows-1252", false, 45004);
+    makeEncodeIn(tr("Encode in UTF-8"),          "UTF-8",        false, 45008);
+    makeEncodeIn(tr("Encode in UTF-8 with BOM"), "UTF-8",        true,  45005);
+    makeEncodeIn(tr("Encode in UTF-16 BE BOM"),  "UTF-16BE",     true,  45006);
+    makeEncodeIn(tr("Encode in UTF-16 LE BOM"),  "UTF-16LE",     true,  45007);
 
     _encodingMenu->addSeparator();
 
@@ -4086,7 +4088,7 @@ void MainWindow::createEncodingMenu()
     QMenu* charsets = _encodingMenu->addMenu(tr("Character sets"));
 
     auto addCharset = [&](QMenu* sub, const QString& label,
-                           const QString& codec)
+                           const QString& codec, int commandId)
     {
         QAction* a = sub->addAction(label);
         const QString normalized = TextFileCodec::normalizedEncoding(codec);
@@ -4095,6 +4097,7 @@ void MainWindow::createEncodingMenu()
         a->setProperty("encodingSelector", true);
         a->setProperty("encodingName", normalized);
         a->setProperty("encodingBom", false);
+        a->setProperty("nppCommandId", commandId);
         connect(a, &QAction::triggered, this,
                 [this, codec]() { reinterpretAs(codec); });
     };
@@ -4102,97 +4105,97 @@ void MainWindow::createEncodingMenu()
     // Arabic
     {
         QMenu* m = charsets->addMenu(tr("Arabic"));
-        addCharset(m, "1256 (Windows)",     "windows-1256");
-        addCharset(m, "ISO-8859-6",         "ISO-8859-6");
+        addCharset(m, "1256 (Windows)",     "windows-1256", 45026);
+        addCharset(m, "ISO-8859-6",         "ISO-8859-6",   45034);
     }
     // Baltic
     {
         QMenu* m = charsets->addMenu(tr("Baltic"));
-        addCharset(m, "1257 (Windows)",     "windows-1257");
-        addCharset(m, "ISO-8859-4",         "ISO-8859-4");
-        addCharset(m, "ISO-8859-13",        "ISO-8859-13");
+        addCharset(m, "1257 (Windows)",     "windows-1257", 45027);
+        addCharset(m, "ISO-8859-4",         "ISO-8859-4",   45032);
+        addCharset(m, "ISO-8859-13",        "ISO-8859-13",  45040);
     }
     // Celtic
     {
         QMenu* m = charsets->addMenu(tr("Celtic"));
-        addCharset(m, "ISO-8859-14",        "ISO-8859-14");
+        addCharset(m, "ISO-8859-14",        "ISO-8859-14", 45041);
     }
     // Central European
     {
         QMenu* m = charsets->addMenu(tr("Central European"));
-        addCharset(m, "1250 (Windows)",     "windows-1250");
-        addCharset(m, "ISO-8859-2",         "ISO-8859-2");
+        addCharset(m, "1250 (Windows)",     "windows-1250", 45020);
+        addCharset(m, "ISO-8859-2",         "ISO-8859-2",   45030);
     }
     // Chinese
     {
         QMenu* m = charsets->addMenu(tr("Chinese"));
-        addCharset(m, "GB18030 (Simplified)",  "GB18030");
-        addCharset(m, "Big5 (Traditional)",    "Big5");
+        addCharset(m, "GB18030 (Simplified)",  "GB18030", 45061);
+        addCharset(m, "Big5 (Traditional)",    "Big5",    45060);
     }
     // Cyrillic
     {
         QMenu* m = charsets->addMenu(tr("Cyrillic"));
-        addCharset(m, "1251 (Windows)",     "windows-1251");
-        addCharset(m, "ISO-8859-5",         "ISO-8859-5");
-        addCharset(m, "KOI8-R",             "KOI8-R");
-        addCharset(m, "KOI8-U",             "KOI8-U");
+        addCharset(m, "1251 (Windows)",     "windows-1251", 45021);
+        addCharset(m, "ISO-8859-5",         "ISO-8859-5",   45033);
+        addCharset(m, "KOI8-R",             "KOI8-R",       45068);
+        addCharset(m, "KOI8-U",             "KOI8-U",       45067);
     }
     // Greek
     {
         QMenu* m = charsets->addMenu(tr("Greek"));
-        addCharset(m, "1253 (Windows)",     "windows-1253");
-        addCharset(m, "ISO-8859-7",         "ISO-8859-7");
+        addCharset(m, "1253 (Windows)",     "windows-1253", 45023);
+        addCharset(m, "ISO-8859-7",         "ISO-8859-7",   45035);
     }
     // Hebrew
     {
         QMenu* m = charsets->addMenu(tr("Hebrew"));
-        addCharset(m, "1255 (Windows)",     "windows-1255");
-        addCharset(m, "ISO-8859-8",         "ISO-8859-8");
+        addCharset(m, "1255 (Windows)",     "windows-1255", 45025);
+        addCharset(m, "ISO-8859-8",         "ISO-8859-8",   45036);
     }
     // Japanese
     {
         QMenu* m = charsets->addMenu(tr("Japanese"));
-        addCharset(m, "Shift-JIS",          "Shift-JIS");
-        addCharset(m, "EUC-JP",             "EUC-JP");
+        addCharset(m, "Shift-JIS",          "Shift-JIS", 45062);
+        addCharset(m, "EUC-JP",             "EUC-JP",    0);
     }
     // Korean
     {
         QMenu* m = charsets->addMenu(tr("Korean"));
-        addCharset(m, "EUC-KR",             "EUC-KR");
-        addCharset(m, "949 (Windows)",       "windows-949");
+        addCharset(m, "EUC-KR",             "EUC-KR",       45064);
+        addCharset(m, "949 (Windows)",       "windows-949",  45063);
     }
     // Nordic
     {
         QMenu* m = charsets->addMenu(tr("Nordic"));
-        addCharset(m, "ISO-8859-10",        "ISO-8859-10");
+        addCharset(m, "ISO-8859-10",        "ISO-8859-10", 0);
     }
     // Romanian
     {
         QMenu* m = charsets->addMenu(tr("Romanian"));
-        addCharset(m, "ISO-8859-16",        "ISO-8859-16");
+        addCharset(m, "ISO-8859-16",        "ISO-8859-16", 0);
     }
     // Thai
     {
         QMenu* m = charsets->addMenu(tr("Thai"));
-        addCharset(m, "874 (Windows)",      "windows-874");
-        addCharset(m, "TIS-620",            "TIS-620");
+        addCharset(m, "874 (Windows)",      "windows-874", 0);
+        addCharset(m, "TIS-620",            "TIS-620",     45065);
     }
     // Turkish
     {
         QMenu* m = charsets->addMenu(tr("Turkish"));
-        addCharset(m, "1254 (Windows)",     "windows-1254");
-        addCharset(m, "ISO-8859-9",         "ISO-8859-9");
+        addCharset(m, "1254 (Windows)",     "windows-1254", 45024);
+        addCharset(m, "ISO-8859-9",         "ISO-8859-9",   45037);
     }
     // Vietnamese
     {
         QMenu* m = charsets->addMenu(tr("Vietnamese"));
-        addCharset(m, "1258 (Windows)",     "windows-1258");
+        addCharset(m, "1258 (Windows)",     "windows-1258", 45028);
     }
     // Western European
     {
         QMenu* m = charsets->addMenu(tr("Western European"));
-        addCharset(m, "ISO-8859-1 (Latin-1)",  "ISO-8859-1");
-        addCharset(m, "ISO-8859-15 (Latin-9)", "ISO-8859-15");
+        addCharset(m, "ISO-8859-1 (Latin-1)",  "ISO-8859-1",  45029);
+        addCharset(m, "ISO-8859-15 (Latin-9)", "ISO-8859-15", 45042);
     }
 }
 

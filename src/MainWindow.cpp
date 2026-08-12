@@ -25,6 +25,7 @@
 #include "WinControls/PluginsAdmin/PluginAdminDialog.h"
 #include "WinControls/PluginsAdmin/PluginAdminModel.h"
 #include "MISC/PluginsManager/PluginCatalog.h"
+#include "MISC/PluginsManager/PluginEnablementConfig.h"
 #include "MISC/PluginsManager/PluginUpdatePlan.h"
 #include "ScintillaComponent/Printer.h"
 #ifdef Q_OS_WIN
@@ -417,6 +418,22 @@ QString MainWindow::currentFilePath() const
     return (buf && !buf->isUntitled()) ? buf->getFullPath() : QString();
 }
 
+int MainWindow::positionForPluginBuffer(quintptr bufferId,
+                                        int priorityView) const
+{
+    const DocTabView* views[] = {_mainDocTab, _subDocTab};
+    const int first = priorityView == 1 ? 1 : 0;
+    for (int pass = 0; pass < 2; ++pass) {
+        const int view = pass == 0 ? first : 1 - first;
+        const DocTabView* tab = views[view];
+        for (int index = 0; tab && index < tab->count(); ++index) {
+            if (reinterpret_cast<quintptr>(tab->bufferAt(index)) == bufferId)
+                return (view << 30) | index;
+        }
+    }
+    return -1;
+}
+
 QString MainWindow::currentPathForPlugin() const
 {
     Buffer* buf = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
@@ -441,8 +458,16 @@ bool MainWindow::setCurrentLanguageTypeFromPlugin(int languageType)
     const QString previousLanguage = view->lexerLanguage();
     switch (languageType) {
         case 0: view->setBuiltinLanguage(QStringLiteral("normal")); break;
+        case 1: view->setBuiltinLanguage(QStringLiteral("php")); break;
+        case 2: view->setBuiltinLanguage(QStringLiteral("c")); break;
+        case 3: view->setBuiltinLanguage(QStringLiteral("cpp")); break;
+        case 4: view->setBuiltinLanguage(QStringLiteral("csharp")); break;
+        case 6: view->setBuiltinLanguage(QStringLiteral("java")); break;
         case 8: view->setBuiltinLanguage(QStringLiteral("html")); break;
         case 9: view->setBuiltinLanguage(QStringLiteral("xml")); break;
+        case 19:
+        case 58: view->setBuiltinLanguage(QStringLiteral("javascript")); break;
+        case 22: view->setBuiltinLanguage(QStringLiteral("python")); break;
         case 57: view->setBuiltinLanguage(QStringLiteral("json")); break;
         default: return false;
     }
@@ -918,12 +943,20 @@ FindReplaceDlg* MainWindow::ensureFindReplaceDialog()
 
 void MainWindow::setupPluginSystem()
 {
+    NppParameters& parameters = NppParameters::getInstance();
     const QString pluginDir =
-        QDir(NppParameters::getInstance().getNppPath())
+        QDir(parameters.getNppPath())
             .filePath(QStringLiteral("plugins"));
+    PluginEnablementConfig enablement(
+        PluginEnablementConfig::filePathForConfigDirectory(
+            parameters.getUserPath()));
+    QString enablementError;
+    if (!enablement.load(&enablementError)) {
+        qWarning() << "Plugin enablement config could not be loaded:"
+                   << enablementError;
+    }
+    QStringList enabledPluginFolders = enablement.enabledPlugins();
 #ifdef Q_OS_WIN
-    // Only plugins with an audited synchronous Win32 message surface are
-    // admitted here. Notification-heavy plugins remain excluded.
     connect(_mainDocTab->editor(), &ScintillaEditBase::notify, this,
             [this](Scintilla::NotificationData* notification) {
         if (_win32PluginManager && notification)
@@ -935,35 +968,19 @@ void MainWindow::setupPluginSystem()
             _win32PluginManager->notifyScintilla(*notification, false);
     });
     QStringList win32PluginErrors;
-    QStringList win32PluginFolders = {
-        QStringLiteral("mimeTools"),
-        QStringLiteral("qkNppReverseLines"),
-        QStringLiteral("Remove Duplicate Lines"),
-        QStringLiteral("SelectQuotedText"),
-        QStringLiteral("BracketsCheck"),
-        QStringLiteral("SecurePad"),
-        QStringLiteral("CodeAlignmentNpp"),
-        QStringLiteral("NPPJSONViewer"),
-        QStringLiteral("JsonTools"),
-        QStringLiteral("nppConverter"),
-        QStringLiteral("NppPluginDemo"),
-        QStringLiteral("GotoLineCol"),
-        QStringLiteral("RandomValuesNppPlugin"),
-        QStringLiteral("Merge files in one"),
-        QStringLiteral("SelectToClipboard"),
-        QStringLiteral("urlPlugin")
-    };
 #ifdef NPP_PLUGIN_REGISTRATION_TEST
     const QString testPluginFilter =
         qEnvironmentVariable("NPP_QT_TEST_WIN32_PLUGIN_FILTER");
     if (!testPluginFilter.isEmpty()) {
-        win32PluginFolders = testPluginFilter.split(
+        enabledPluginFolders = testPluginFilter.split(
             QLatin1Char('|'), QString::SkipEmptyParts);
     }
 #endif
-    _win32PluginManager->loadPlugins(
-        pluginDir, win32PluginFolders,
-        &win32PluginErrors);
+    if (!enabledPluginFolders.isEmpty()) {
+        _win32PluginManager->loadPlugins(
+            pluginDir, enabledPluginFolders,
+            &win32PluginErrors);
+    }
     setProperty("win32PluginLoadErrors", win32PluginErrors);
     for (const QString& error : win32PluginErrors)
         qWarning() << "Win32 plugin load failed:" << error;
@@ -990,7 +1007,7 @@ void MainWindow::setupPluginSystem()
 #endif
 #ifdef ENABLE_PLUGIN_SYSTEM
     _pluginManager = new PluginManager(this);
-    _pluginManager->loadPlugins(pluginDir, this);
+    _pluginManager->loadPlugins(pluginDir, this, enabledPluginFolders);
 #endif
 }
 
@@ -1056,12 +1073,23 @@ void MainWindow::populateWin32PluginMenu()
             if (!shortcut.isEmpty())
                 action->setShortcut(shortcut);
             connect(action, &QAction::triggered, this,
-                    [this, pluginIndex, functionIndex]() {
+                    [this, action, pluginIndex, functionIndex]() {
+                const bool checkedBefore = _win32PluginManager
+                    ->isLoadedPluginFunctionInitiallyChecked(
+                        pluginIndex, functionIndex);
                 QString error;
                 if (!_win32PluginManager->executePluginCommand(
                         pluginIndex, functionIndex, &error)) {
                     QMessageBox::warning(this, tr("Plugin command failed"),
                                          error);
+                    return;
+                }
+                const bool checked = _win32PluginManager
+                    ->isLoadedPluginFunctionInitiallyChecked(
+                        pluginIndex, functionIndex);
+                if (checked != checkedBefore) {
+                    action->setCheckable(true);
+                    action->setChecked(checked);
                 }
             });
         }
@@ -1085,7 +1113,9 @@ void MainWindow::showPluginAdmin()
 
     PluginAdminModel model(
         pluginRoot, catalog,
-        PluginVersion(QCoreApplication::applicationVersion()));
+        PluginVersion(QCoreApplication::applicationVersion()),
+        PluginEnablementConfig::filePathForConfigDirectory(
+            NppParameters::getInstance().getUserPath()));
     PluginAdminDialog dialog(&model, this);
     dialog.applyLocalization(
         NppParameters::getInstance().getNativeLangSpeaker());

@@ -357,7 +357,9 @@ Buffer* MainWindow::doNewBuffer(DocTabView* targetTab)
             break;
     }
 
+    _openingBuffer = true;
     targetTab->addBuffer(buf);
+    _openingBuffer = false;
     if (targetTab == _activeDocTab)
         updateWindowTitle(buf);
     updateActionStates();
@@ -451,6 +453,9 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
 #ifdef Q_OS_WIN
     if (_win32PluginManager)
         _win32PluginManager->notifyFileOpened(
+            reinterpret_cast<quintptr>(buf));
+    if (_win32PluginManager)
+        _win32PluginManager->notifyBufferActivated(
             reinterpret_cast<quintptr>(buf));
 #endif
     return true;
@@ -549,6 +554,22 @@ bool MainWindow::doSaveAs(Buffer* buf)
         return false;
 
     return doSave(buf, filePath);
+}
+
+bool MainWindow::saveCurrentFileAsForPlugin(
+    const QString& path, bool asCopy)
+{
+    Buffer* buffer = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
+    if (!buffer || path.isEmpty())
+        return false;
+    if (!asCopy)
+        return doSave(buffer, path);
+    if (!activateBufferView(buffer)
+        || !MainFileManager.saveBufferCopy(buffer, path)) {
+        return false;
+    }
+    statusBar()->showMessage(tr("Copy saved"), 2000);
+    return true;
 }
 
 bool MainWindow::closeBufferList(const QList<Buffer*>& buffers)
@@ -886,6 +907,26 @@ void MainWindow::saveSessionFile()
     NppParameters& params = NppParameters::getInstance();
     if (!params.writeSession(path, params.getSession()))
         QMessageBox::warning(this, tr("Save Session"), tr("Cannot save session file."));
+}
+
+bool MainWindow::saveCurrentSessionForPlugin(const QString& path)
+{
+    if (path.isEmpty())
+        return false;
+    saveSession();
+    return NppParameters::getInstance().writeSession(path,
+        NppParameters::getInstance().getSession());
+}
+
+bool MainWindow::loadSessionForPlugin(const QString& path)
+{
+    if (path.isEmpty())
+        return false;
+    NppParameters& params = NppParameters::getInstance();
+    if (!params.loadSession(path))
+        return false;
+    restoreSession();
+    return true;
 }
 
 void MainWindow::loadSessionFile()

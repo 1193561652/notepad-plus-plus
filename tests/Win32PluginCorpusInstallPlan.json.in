@@ -68,6 +68,76 @@
         },
         {
             "operation": "update",
+            "folder-name": "DoxyIt",
+            "version": "0.4.4",
+            "repository": "file:///@NPP_DOXYIT_ARCHIVE_URL_PATH@",
+            "sha256": "1f3970b0fa2a87f76de0fee921e9c52ce931d552d9be73a4b820cd321457510c"
+        },
+        {
+            "operation": "update",
+            "folder-name": "ElasticTabstops",
+            "version": "1.3.1",
+            "repository": "file:///@NPP_ELASTIC_TABSTOPS_ARCHIVE_URL_PATH@",
+            "sha256": "657f343f135e9af2d9db8b94dee991ff0c3931151ed7faea3a40822c0bc295a6"
+        },
+        {
+            "operation": "update",
+            "folder-name": "SurroundSelection",
+            "version": "1.4.1",
+            "repository": "file:///@NPP_SURROUND_SELECTION_ARCHIVE_URL_PATH@",
+            "sha256": "6fc0687506f09b31d0b4e7033a4185306199a4242796f7653b27a942428bfef4"
+        },
+        {
+            "operation": "update",
+            "folder-name": "XMLTools",
+            "version": "3.1.1.13",
+            "repository": "file:///@NPP_XML_TOOLS_ARCHIVE_URL_PATH@",
+            "sha256": "7631ea990e731172e28e9fe85ac4861185c0292143603b9486bc969cc8e8e046"
+        },
+        {
+            "operation": "update",
+            "folder-name": "AutoSave",
+            "version": "1.6.1.0",
+            "repository": "file:///@NPP_AUTO_SAVE_ARCHIVE_URL_PATH@",
+            "sha256": "572d748449aaea0ce72f2dfa7b36172419386d827b1db1536fc6b57ae23dc104"
+        },
+        {
+            "operation": "update",
+            "folder-name": "NppEditorConfig",
+            "version": "0.4.0",
+            "repository": "file:///@NPP_EDITOR_CONFIG_ARCHIVE_URL_PATH@",
+            "sha256": "ae43152e91d8310ab28859992d3661aba24d8d69a64b93cd12b2f531a1038f56"
+        },
+        {
+            "operation": "update",
+            "folder-name": "SessionMgr",
+            "version": "1.4.4",
+            "repository": "file:///@NPP_SESSION_MGR_ARCHIVE_URL_PATH@",
+            "sha256": "478f7057863dd998b26c37083d785106a65853063d820b365ec18a02e755da9d"
+        },
+        {
+            "operation": "update",
+            "folder-name": "nppAutoDetectIndent",
+            "version": "2.3",
+            "repository": "file:///@NPP_AUTO_DETECT_INDENT_ARCHIVE_URL_PATH@",
+            "sha256": "5d1982a3fb4609d74dde0deaf631526646d393fc26e6d7a11c72f9d0456d69f1"
+        },
+        {
+            "operation": "update",
+            "folder-name": "AutoCodepage",
+            "version": "1.2.4",
+            "repository": "file:///@NPP_AUTO_CODEPAGE_ARCHIVE_URL_PATH@",
+            "sha256": "88744cda8c4a6be373af2fa23c86156adaf3dc000fde8834957f9352a6f34fec"
+        },
+        {
+            "operation": "update",
+            "folder-name": "AutoEolFormat",
+            "version": "1.0.2",
+            "repository": "file:///@NPP_AUTO_EOL_FORMAT_ARCHIVE_URL_PATH@",
+            "sha256": "9488d63c983050d65af7911d3a3f19dbba6d3fc5a14ad1660ecfbadf31343a85"
+        },
+        {
+            "operation": "update",
             "folder-name": "NPPJSONViewer",
             "version": "1.41",
             "repository": "file:///@NPP_JSON_VIEWER_ARCHIVE_URL_PATH@",

@@ -11,6 +11,8 @@
 #endif
 #include <windows.h>
 
+#include "Scintilla.h"
+
 class ScintillaEditView;
 
 class Win32EditorMessageAdapter
@@ -24,6 +26,10 @@ public:
     {
         _selectionTextLengthIncludesTerminator = enabled;
     }
+    void setLegacyTextRangeAbi(bool enabled)
+    {
+        _legacyTextRangeAbi = enabled;
+    }
     bool isValid() const
         { return _editor != nullptr && _handle && IsWindow(_handle); }
 
@@ -31,7 +37,13 @@ public:
                           bool* handled) const;
 
 private:
+    static sptr_t directFunction(sptr_t pointer, unsigned int message,
+                                 uptr_t wParam, sptr_t lParam);
+    sptr_t sendLegacyDirectMessage(unsigned int message, uptr_t wParam,
+                                   sptr_t lParam) const;
+
     ScintillaEditView* _editor = nullptr;
     HWND _handle = nullptr;
     bool _selectionTextLengthIncludesTerminator = false;
+    bool _legacyTextRangeAbi = true;
 };

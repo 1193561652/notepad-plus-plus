@@ -109,7 +109,8 @@ private:
 
     void unloadPlugins();
     void notifyPlugins(unsigned int code, quintptr idFrom = 0,
-                       HWND hwndFrom = nullptr) const;
+                       HWND hwndFrom = nullptr);
+    void setEditorAbiForPlugin(const LoadedPlugin& plugin);
     bool executeMimeToolsSamlDecode(QString* errorMessage);
     void showMimeToolsAbout();
     void showJsonViewerAbout();

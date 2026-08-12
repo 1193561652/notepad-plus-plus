@@ -24,15 +24,19 @@ v8.4.6 的使用习惯。
 1. **简单且常用的插件**：主程序在 Windows 上提供有限兼容层，支持经过验证的
    插件加载、常用 `NPPM_*`、`SCI_*` 和基础通知，使选定的原版 DLL 可以直接
    运行。
-2. **常用但难以兼容的插件**：基于新的跨平台插件 API 修改插件源码，保留核心
-   业务逻辑，重写宿主调用和 Win32 UI。JSON Viewer、ComparePlus、XML Tools、
-   DSpellCheck、HexEditor 等类型的插件优先按此路线评估。
+2. **常用但难以兼容的插件**：先以官方未修改 DLL 做有限兼容评估；有真实证据
+   证明无法合理兼容后，基于新的跨平台插件 API 重构为 Qt 版插件，保留插件边界和
+   核心业务逻辑，重写宿主调用和 Win32 UI。默认不把插件功能并入 Qt 主程序。
 3. **不常用且移植成本高的插件**：不提供官方移植；新 API 和 SDK 稳定后允许
    社区自行实现或维护。
 
 总体原则为：
 
 > 有限兼容旧插件，正式发展新插件 API，移植常用复杂插件，放弃低价值长尾插件。
+
+2026-08-11 的具体决策：NppEditorConfig 与 AutoSave 先尝试原版 DLL 兼容；
+NppTextFX 的实现路线延期。后续重要插件若难以兼容原 DLL，优先重构为 Qt 版插件，
+只有经过单独核心职责决策后才允许改为 Qt 主程序原生功能。
 
 旧插件兼容层和新插件 API 必须调用同一套 Host Services，不得形成两套文档、
 编辑器、命令或事件实现。
@@ -454,12 +458,21 @@ Plugin Admin、清单/兼容模型、退出后安装/更新/卸载、SHA-256、Z
 - 每个插件单独批准消息增量；失败不得留下 QAction、命令、回调或 Dock。
 - mimeTools、Reverse Lines、Remove Duplicate Lines、SelectQuotedText、BracketsCheck、
   SecurePad、Code Alignment、JSON Viewer、JsonTools、Converter 和 NppPluginDemo 已通过
-  官方 DLL 的有限兼容回归；XMLTools 尚未进入实现。
+  官方 DLL 的有限兼容回归。XMLTools、DoxyIt、SurroundSelection 和
+  ElasticTabstops 已于 2026-08-11 完成 P0 核心功能回归。
 
 2026-08-11 的无过滤真实语料验证表明，`BetterMultiSelection` 单独在 READY 阶段
 卡死，与 `XMLTools` 同时运行时产生 `0xC0000005` 访问冲突；`XMLTools` 单独运行不
 崩溃。当前同进程兼容层不得以“未知消息返回 0”为依据宣称任意插件可安全降级；
 在新的隔离方案获批前继续保留审核白名单。
+
+同日后续源码归因确认，BetterMultiSelection 的直接故障是隐藏编辑器 HWND 未透传
+`SCI_GETDIRECTFUNCTION/SCI_GETDIRECTPOINTER`。宿主 thunk 接入后，插件单独运行和与
+XMLTools 组合运行均不再崩溃，BetterMultiSelection 已进入已验证集合。P0 回归又确认
+DoxyIt/ElasticTabstops 使用旧 `Sci_PositionCR=long` direct ABI，而 XMLTools 的 HWND
+消息使用 `intptr_t` 结构；旧结构转换因此只允许存在于 direct thunk，不能覆盖普通
+`SendMessage`。XMLTools 的格式化、文本转换、语法注解、自动闭合、菜单状态和 Options
+窗口现均已验证。此修复不改变上述对“任意未知插件安全降级”的限制。
 
 ### 阶段 6：跨平台 ABI v1
 

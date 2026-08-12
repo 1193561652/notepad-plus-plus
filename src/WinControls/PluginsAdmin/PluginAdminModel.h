@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MISC/PluginsManager/PluginCatalog.h"
+#include "MISC/PluginsManager/PluginEnablementConfig.h"
 
 #include <QString>
 #include <QVector>
@@ -22,6 +23,7 @@ struct PluginAdminItem
     bool updateAvailable = false;
     bool incompatible = false;
     bool managedInstall = false;
+    bool enabled = false;
 };
 
 class PluginAdminModel
@@ -29,7 +31,8 @@ class PluginAdminModel
 public:
     PluginAdminModel(const QString& pluginRoot,
                      const PluginCatalog& catalog,
-                     const PluginVersion& hostVersion);
+                     const PluginVersion& hostVersion,
+                     const QString& enablementFilePath = QString());
 
     void refresh();
 
@@ -41,6 +44,8 @@ public:
     QVector<PluginAdminItem> updateItems() const;
     QVector<PluginAdminItem> installedItems() const;
     QVector<PluginAdminItem> incompatibleItems() const;
+    bool setPluginEnabled(const QString& folderName, bool enabled,
+                          QString* error = nullptr);
 
     static QString installReceiptPath(const QString& pluginRoot,
                                       const QString& folderName);
@@ -53,5 +58,6 @@ private:
     QString _pluginRoot;
     PluginCatalog _catalog;
     PluginVersion _hostVersion;
+    PluginEnablementConfig _enablement;
     QVector<PluginAdminItem> _items;
 };

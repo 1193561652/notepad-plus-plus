@@ -44,6 +44,34 @@
 因此，初始段错误不能归因为“XMLTools 单独崩溃”。当前确认的独立故障插件是
 `BetterMultiSelection`；访问冲突是它与 `XMLTools` 同时运行时的组合故障。
 
+## BetterMultiSelection 源码归因
+
+对发布版本对应的 `v1.5` 源码复核后，READY 故障的首要原因不是普通 `SCI_*`
+覆盖不足。插件在 `setInfo()` 中向主编辑器 HWND 请求 `SCI_GETDIRECTFUNCTION` 和
+`SCI_GETDIRECTPOINTER`，随后在 `NPPN_READY` 中启用键盘 Hook 并通过保存的 direct
+函数调用 `SCI_AUTOCSETMULTI`。当前隐藏编辑器接收 HWND 对这两个请求返回 0，因此
+插件会调用空函数指针。
+
+项目内 Scintilla 5 Qt 已实现 direct function/pointer，故可通过 Win32 编辑器适配层
+透传来修复首要故障。该修复不能自动证明完整兼容：插件还安装 UI 线程
+`WH_KEYBOARD` Hook，必须继续验证焦点通知、主副视图切换、Hook 卸载，以及与
+XMLTools 共存时的 `0xC0000005` 组合故障。
+
+## 修复后验证
+
+Win32 编辑器适配层透传 `SCI_GETDIRECTFUNCTION/SCI_GETDIRECTPOINTER` 后：
+
+- BetterMultiSelection 单独完成注册、READY、Enable Hook 禁用/重启用和卸载；
+- 主、副编辑器 direct function/pointer 均非空，可读取对应 Scintilla 实例；
+- READY 设置的 `SCI_AUTOCSETMULTI(SC_MULTIAUTOC_EACH)` 状态正确；
+- BetterMultiSelection 与 XMLTools 同时加载、READY 和退出，不再出现
+  `0xC0000005`；
+- 审核插件 UI 回归及完整 CTest `39/39` 通过。
+
+自动化无法用 `PostMessage` 或无前台桌面的 `SendInput` 可靠触发线程
+`WH_KEYBOARD`，因此物理键盘下的多光标方向键、删除、换行、复制和粘贴仍保留为
+人工操作验证项。
+
 ## 结论
 
 “移除白名单后，不兼容插件只降级功能”的期望在当前同进程 Win32 ABI 兼容层上不成立。

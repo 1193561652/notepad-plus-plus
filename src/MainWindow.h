@@ -62,9 +62,13 @@ public:
     QString currentPathForPlugin() const;
     bool executePluginMenuCommand(int commandId);
     bool openFileForPlugin(const QString& path);
+    bool saveCurrentFileAsForPlugin(const QString& path, bool asCopy);
+    bool saveCurrentSessionForPlugin(const QString& path);
+    bool loadSessionForPlugin(const QString& path);
     bool setCurrentLanguageTypeFromPlugin(int languageType);
     quintptr currentBufferIdForPlugin() const;
     QString pathForPluginBuffer(quintptr bufferId) const;
+    int positionForPluginBuffer(quintptr bufferId, int priorityView) const;
     int openFileCountForPlugin(int scope) const;
     int currentDocumentIndexForPlugin(int view) const;
     bool activateDocumentForPlugin(int view, int index);
@@ -343,6 +347,7 @@ private:
     CommandLineOptions _startupOptions;
     QString _titleAddition;
     bool _suppressSessionPersistence = false;
+    bool _openingBuffer = false;
     ClosedFileHistory _closedFileHistory;
 
     // ── 状态栏 ────────────────────────────────────────────

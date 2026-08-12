@@ -301,7 +301,7 @@ void MainWindow::onCurrentTabChanged(int /*index*/)
     if (_funcListDock && _funcListDock->isVisible())
         _funcListPanel->updateForView(currentActiveView());
 #ifdef Q_OS_WIN
-    if (buf && _win32PluginManager)
+    if (buf && _win32PluginManager && !_openingBuffer)
         _win32PluginManager->notifyBufferActivated(
             reinterpret_cast<quintptr>(buf));
 #endif

@@ -10,6 +10,7 @@ class QLineEdit;
 class QPushButton;
 class QTabWidget;
 class QTableWidget;
+class QTableWidgetItem;
 class QTextEdit;
 class NativeLangSpeaker;
 
@@ -36,6 +37,7 @@ private:
     void updateDescription(QTableWidget* table);
     void runCurrentOperation();
     void filterAvailable(const QString& text);
+    void updatePluginEnabled(QTableWidgetItem* item);
     static PluginAdminItem rowItem(QTableWidget* table, int row);
 
     PluginAdminModel* _model = nullptr;
@@ -52,4 +54,5 @@ private:
     QString _installText;
     QString _updateText;
     QString _removeText;
+    bool _updatingEnablement = false;
 };

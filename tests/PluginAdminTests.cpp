@@ -1,6 +1,7 @@
 #include "WinControls/PluginsAdmin/PluginAdminModel.h"
 #include "MISC/PluginsManager/PluginArtifactResolver.h"
 #include "MISC/PluginsManager/PluginCatalog.h"
+#include "MISC/PluginsManager/PluginEnablementConfig.h"
 #include "MISC/PluginsManager/PluginUpdatePlan.h"
 
 #include <QCoreApplication>
@@ -141,6 +142,44 @@ void writeReceipt(const QString& root, const QString& version)
     file.write(QJsonDocument(object).toJson(QJsonDocument::Compact));
 }
 
+void testPluginEnablementConfig()
+{
+    QTemporaryDir temporary;
+    check(temporary.isValid(), "temporary config directory should exist");
+    const QString path =
+        PluginEnablementConfig::filePathForConfigDirectory(temporary.path());
+
+    PluginEnablementConfig missing(path);
+    QString error;
+    check(missing.load(&error) && error.isEmpty(),
+          "a missing enablement file should be an empty valid config");
+    check(missing.enabledPlugins().isEmpty()
+              && !missing.isEnabled(QStringLiteral("Sample")),
+          "plugins without explicit configuration should be disabled");
+    check(missing.setEnabled(QStringLiteral("Sample"), true)
+              && missing.setEnabled(QStringLiteral("Disabled Plugin"), false)
+              && missing.save(&error),
+          "plugin enablement should save atomically");
+
+    PluginEnablementConfig loaded(path);
+    check(loaded.load(&error) && error.isEmpty(),
+          "saved plugin enablement XML should load");
+    check(loaded.isEnabled(QStringLiteral("sample"))
+              && !loaded.isEnabled(QStringLiteral("Disabled Plugin"))
+              && loaded.enabledPlugins()
+                     == QStringList{QStringLiteral("Sample")},
+          "enablement should be case-insensitive and explicit");
+
+    QFile malformed(path);
+    check(malformed.open(QFile::WriteOnly | QFile::Truncate),
+          "malformed enablement fixture should open");
+    malformed.write("<NotepadPlus><Plugins>");
+    malformed.close();
+    PluginEnablementConfig invalid(path);
+    check(!invalid.load(&error) && invalid.enabledPlugins().isEmpty(),
+          "malformed XML should disable every plugin");
+}
+
 void testArtifactsAndModel()
 {
     QTemporaryDir temporary;
@@ -178,6 +217,27 @@ void testArtifactsAndModel()
           "installed plugin should not also be available");
     check(model.incompatibleItems().isEmpty(),
           "mapped old plugin should be compatible");
+    check(!model.installedItems().first().enabled,
+          "an installed plugin without configuration should be disabled");
+
+    const QString enablementPath =
+        PluginEnablementConfig::filePathForConfigDirectory(temporary.path());
+    PluginEnablementConfig enablement(enablementPath);
+    check(enablement.setEnabled(QStringLiteral("Sample"), true)
+              && enablement.save(&error),
+          "model enablement fixture should save");
+    PluginAdminModel enabledModel(
+        temporary.path(), catalog,
+        PluginVersion(QStringLiteral("8.4.6")), enablementPath);
+    check(enabledModel.installedItems().first().enabled,
+          "the model should expose explicitly enabled plugins");
+    check(enabledModel.setPluginEnabled(
+              QStringLiteral("Sample"), false, &error),
+          "the model should persist enablement changes");
+    PluginEnablementConfig disabled(enablementPath);
+    check(disabled.load(&error)
+              && !disabled.isEnabled(QStringLiteral("Sample")),
+          "model changes should round-trip through XML");
 
     const PluginCatalog incompatibleCatalog =
         PluginCatalog::fromJson(
@@ -238,6 +298,7 @@ int main(int argc, char** argv)
     QCoreApplication application(argc, argv);
     testVersionsAndCatalog();
     testBundledWindowsCatalogs();
+    testPluginEnablementConfig();
     testArtifactsAndModel();
     testUpdatePlan();
     if (failures == 0)

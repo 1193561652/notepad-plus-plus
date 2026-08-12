@@ -17,11 +17,18 @@ PluginManager::~PluginManager()
     qDeleteAll(_libs);
 }
 
-void PluginManager::loadPlugins(const QString& pluginDir, IPluginHost* host)
+void PluginManager::loadPlugins(
+    const QString& pluginDir, IPluginHost* host,
+    const QStringList& enabledFolders)
 {
+    QSet<QString> enabled;
+    for (const QString& folder : enabledFolders)
+        enabled.insert(folder.toCaseFolded());
     const QVector<PluginArtifact> artifacts =
         PluginArtifactResolver::discover(pluginDir);
     for (const PluginArtifact& artifact : artifacts) {
+        if (!enabled.contains(artifact.folderName.toCaseFolded()))
+            continue;
         const QString canonicalPath =
             QFileInfo(artifact.binaryPath).canonicalFilePath();
         if (!_loadedPaths.contains(canonicalPath))

@@ -121,12 +121,37 @@
 - 跨平台稳定插件 ABI 及 SDK。
 - Linux/macOS 原生插件生态清单、签名、公证和发布策略。
 
+## 2026-08-11 可配置插件启用清单
+
+- 启用状态独立保存在当前应用配置目录的 `pluginsEnabled.xml`，不修改
+  `config.xml`、插件目录或原版配置文件。
+- XML 使用插件目录名作为稳定键：
+
+```xml
+<?xml version="1.0"?>
+<NotepadPlus>
+    <Plugins>
+        <Plugin folderName="mimeTools" enabled="yes"/>
+    </Plugins>
+</NotepadPlus>
+```
+
+- 仅 `enabled="yes"` 的插件会传入 Windows 原版 ABI 管理器和跨平台插件管理器；
+  文件缺失、插件条目缺失、显式禁用、非法属性或 XML 解析失败都按禁用处理。
+- Plugins Admin 的“已安装”页使用 `插件 | 已启用 | 版本` 三列；启用复选框即时原子
+  保存，下一次启动生效。卸载操作改为作用于当前选中行，不再复用启用复选框。
+- 清单由用户配置，不代表插件已经通过兼容审核；不兼容的同进程 DLL 仍可能影响宿主。
+
 ## 2026-08-08 简单插件兼容语料
 
 - 当前同步消息白名单已从 mimeTools 扩展到 Reverse Lines、Remove Duplicate Lines、SelectQuotedText、BracketsCheck、SecurePad 和 Code Alignment。
 - 这些插件继续使用原版 `NppData`、`FuncItem`、`NPPM_*` 和 `SCI_*`；编辑行为由 Scintilla 5 原样执行，Qt adapter 只负责 HWND 到现有对象的映射。
 - CTest 使用项目 updater 从 `third_party/win32-plugins` 的固定官方包安装 9 个语料（mimeTools 加本轮 8 个），验证 SHA-256、安装回执、加载诊断、菜单和真实命令。
-- Poor Man's T-SQL Formatter 需要 CLR 2.0/4.0 激活策略；BetterMultiSelection 需要 Hook、`NPPN_*`/`SCN_*` 通知与多选输入状态，二者未进入当前加载白名单。
+- Poor Man's T-SQL Formatter 需要 CLR 2.0/4.0 激活策略，仍未进入当前加载白名单。
+- BetterMultiSelection 1.5 已在 2026-08-11 补齐
+  `SCI_GETDIRECTFUNCTION/SCI_GETDIRECTPOINTER` 后进入审核加载集合；READY、Hook
+  开关、direct 调用、卸载及与 XMLTools 共存均已自动验证，真实物理键盘下的多光标
+  移动手感仍需人工确认。
 - BracketsCheck 的核心检查已兼容；它直接调用 `GetMenu/CheckMenuItem` 的旧式菜单勾选回写尚未映射到 Qt 菜单。
 
 ## 2026-08-08 插件加载恢复基线
@@ -167,3 +192,14 @@
   安装、白名单加载、`FuncItem` 命令和 DockingManager，不建立插件专属架构。
 - 编辑器适配层新增源码证实需要的 `SCI_ADDTEXT` 与 `SCI_ENSUREVISIBLE`。Converter 已验证
   双向转换、配置和面板插入；Demo 已验证 Hello、Dock 和行跳转。
+
+## 2026-08-11 P0 原版插件兼容
+
+- 官方未修改的 XMLTools 3.1.1.13、DoxyIt 0.4.4、SurroundSelection 1.4.1 和
+  ElasticTabstops 1.3.1 x64 已进入固定包语料与插件管理安装计划。
+- 编辑器适配器必须区分 Scintilla 调用通道：窗口 `SendMessage` 使用插件自身的当前
+  Win32 结构；为旧插件提供的 direct thunk 才转换 `Sci_PositionCR=long` 结构。
+  不能把旧 ABI 转换无条件应用到全部 `SCI_*`，否则会截断 XMLTools 的 64 位结构。
+- 自动回归覆盖四个插件的核心命令、配置/选项窗口、菜单勾选、XML 注解和输入通知；
+  四插件组合加载并正常退出。详细记录见
+  `codex/changes/2026-08-11-p0-win32-plugin-compatibility.md`。

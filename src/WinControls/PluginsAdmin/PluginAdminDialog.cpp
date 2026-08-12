@@ -79,7 +79,16 @@ PluginAdminDialog::PluginAdminDialog(PluginAdminModel* model, QWidget* parent)
     _tabs->tabBar()->setObjectName(QStringLiteral("pluginsAdminTabs"));
     _available = createTable(QStringLiteral("availablePluginsTable"), true);
     _updates = createTable(QStringLiteral("updatedPluginsTable"), true);
-    _installed = createTable(QStringLiteral("installedPluginsTable"), true);
+    _installed = createTable(QStringLiteral("installedPluginsTable"), false);
+    _installed->setColumnCount(3);
+    _installed->setHorizontalHeaderLabels(
+        {tr("Plugin"), tr("Enabled"), tr("Version")});
+    _installed->horizontalHeader()->setSectionResizeMode(
+        0, QHeaderView::Stretch);
+    _installed->horizontalHeader()->setSectionResizeMode(
+        1, QHeaderView::ResizeToContents);
+    _installed->horizontalHeader()->setSectionResizeMode(
+        2, QHeaderView::ResizeToContents);
     _incompatible =
         createTable(QStringLiteral("incompatiblePluginsTable"), false);
     _tabs->addTab(_available, tr("Available"));
@@ -132,7 +141,11 @@ PluginAdminDialog::PluginAdminDialog(PluginAdminModel* model, QWidget* parent)
         connect(table, &QTableWidget::itemSelectionChanged, this,
                 [this, table]() { updateDescription(table); });
         connect(table, &QTableWidget::itemChanged, this,
-                [this](QTableWidgetItem*) { updateCurrentPage(); });
+                [this, table](QTableWidgetItem* item) {
+                    if (table == _installed && item && item->column() == 1)
+                        updatePluginEnabled(item);
+                    updateCurrentPage();
+                });
     }
     updateCurrentPage();
 }
@@ -154,10 +167,14 @@ void PluginAdminDialog::applyLocalization(NativeLangSpeaker& speaker)
         QStringLiteral("pluginAdminPluginColumn"), tr("Plugin"));
     const QString versionHeader = speaker.getLocalizedStrFromID(
         QStringLiteral("pluginAdminVersionColumn"), tr("Version"));
-    for (QTableWidget* table :
-         {_available, _updates, _installed, _incompatible}) {
+    for (QTableWidget* table : {_available, _updates, _incompatible}) {
         table->setHorizontalHeaderLabels({pluginHeader, versionHeader});
     }
+    _installed->setHorizontalHeaderLabels(
+        {pluginHeader,
+         speaker.getLocalizedStrFromID(
+             QStringLiteral("pluginAdminEnabledColumn"), tr("Enabled")),
+         versionHeader});
     _catalogVersion->setText(
         speaker.getLocalizedStrFromID(
             QStringLiteral("pluginAdminListVersion"),
@@ -195,18 +212,28 @@ void PluginAdminDialog::populateTable(
         const PluginAdminItem& item = items.at(row);
         QTableWidgetItem* name = new QTableWidgetItem(item.displayName);
         name->setData(kItemRole, itemVariant(item));
-        if (checkable) {
+        if (checkable && table != _installed) {
             name->setFlags(name->flags() | Qt::ItemIsUserCheckable);
             name->setCheckState(Qt::Unchecked);
         }
         table->setItem(row, 0, name);
 
+        int versionColumn = 1;
+        if (table == _installed) {
+            QTableWidgetItem* enabled = new QTableWidgetItem;
+            enabled->setFlags(enabled->flags() | Qt::ItemIsUserCheckable);
+            enabled->setCheckState(
+                item.enabled ? Qt::Checked : Qt::Unchecked);
+            table->setItem(row, 1, enabled);
+            versionColumn = 2;
+        }
         QString version = item.availableVersion.toString();
         if (table == _installed || table == _incompatible)
             version = item.installedVersion.toString();
         if (version.isEmpty())
             version = tr("Unknown");
-        table->setItem(row, 1, new QTableWidgetItem(version));
+        table->setItem(
+            row, versionColumn, new QTableWidgetItem(version));
     }
     table->sortItems(0, Qt::AscendingOrder);
 }
@@ -234,18 +261,18 @@ void PluginAdminDialog::updateCurrentPage()
 
     QTableWidget* table = qobject_cast<QTableWidget*>(
         _tabs->currentWidget());
-    bool hasChecked = false;
+    bool canOperate = page == 2 && table && table->currentRow() >= 0;
     if (table && table->property("checkable").toBool()) {
         for (int row = 0; row < table->rowCount(); ++row) {
             QTableWidgetItem* item = table->item(row, 0);
             if (item && !table->isRowHidden(row) &&
                 item->checkState() == Qt::Checked) {
-                hasChecked = true;
+                canOperate = true;
                 break;
             }
         }
     }
-    _operationButton->setEnabled(page != 3 && hasChecked);
+    _operationButton->setEnabled(page != 3 && canOperate);
 }
 
 void PluginAdminDialog::updateDescription(QTableWidget* table)
@@ -275,6 +302,25 @@ void PluginAdminDialog::filterAvailable(const QString& text)
     updateCurrentPage();
 }
 
+void PluginAdminDialog::updatePluginEnabled(QTableWidgetItem* checkItem)
+{
+    if (_updatingEnablement || !_model || !checkItem)
+        return;
+    const PluginAdminItem item = rowItem(_installed, checkItem->row());
+    const bool enabled = checkItem->checkState() == Qt::Checked;
+    QString error;
+    if (_model->setPluginEnabled(item.folderName, enabled, &error))
+        return;
+
+    _updatingEnablement = true;
+    checkItem->setCheckState(enabled ? Qt::Unchecked : Qt::Checked);
+    _updatingEnablement = false;
+    QMessageBox::warning(
+        this, tr("Plugins Admin"),
+        tr("Could not save the plugin enablement configuration:\n%1")
+            .arg(error));
+}
+
 void PluginAdminDialog::runCurrentOperation()
 {
     QTableWidget* table = qobject_cast<QTableWidget*>(
@@ -289,9 +335,14 @@ void PluginAdminDialog::runCurrentOperation()
         type = PluginOperationType::Remove;
 
     QVector<PluginOperation> operations;
-    for (int row = 0; row < table->rowCount(); ++row) {
+    const int firstRow = _tabs->currentIndex() == 2
+        ? table->currentRow() : 0;
+    const int rowLimit = _tabs->currentIndex() == 2
+        ? firstRow + 1 : table->rowCount();
+    for (int row = firstRow; row >= 0 && row < rowLimit; ++row) {
         QTableWidgetItem* check = table->item(row, 0);
-        if (!check || check->checkState() != Qt::Checked)
+        if (!check || (_tabs->currentIndex() != 2
+                       && check->checkState() != Qt::Checked))
             continue;
         const PluginAdminItem item = rowItem(table, row);
         PluginOperation operation;

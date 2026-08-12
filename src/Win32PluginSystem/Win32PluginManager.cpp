@@ -433,9 +433,13 @@ void Win32PluginManager::notifyScintilla(
     notification.characterSource = static_cast<int>(source.characterSource);
 
     for (const LoadedPlugin& plugin : _loadedPlugins) {
-        if (plugin.beNotified)
+        if (plugin.beNotified) {
+            setEditorAbiForPlugin(plugin);
             plugin.beNotified(&notification);
+        }
     }
+    _mainEditorAdapter.setLegacyTextRangeAbi(true);
+    _subEditorAdapter.setLegacyTextRangeAbi(true);
 }
 
 void Win32PluginManager::notifyReady()
@@ -521,16 +525,28 @@ void Win32PluginManager::notifyCancelShutdown()
 }
 
 void Win32PluginManager::notifyPlugins(
-    unsigned int code, quintptr idFrom, HWND hwndFrom) const
+    unsigned int code, quintptr idFrom, HWND hwndFrom)
 {
     SCNotification notification{};
     notification.nmhdr.code = code;
     notification.nmhdr.hwndFrom = hwndFrom ? hwndFrom : mainWindowHandle();
     notification.nmhdr.idFrom = static_cast<uptr_t>(idFrom);
     for (const LoadedPlugin& plugin : _loadedPlugins) {
-        if (plugin.beNotified)
+        if (plugin.beNotified) {
+            setEditorAbiForPlugin(plugin);
             plugin.beNotified(&notification);
+        }
     }
+    _mainEditorAdapter.setLegacyTextRangeAbi(true);
+    _subEditorAdapter.setLegacyTextRangeAbi(true);
+}
+
+void Win32PluginManager::setEditorAbiForPlugin(const LoadedPlugin& plugin)
+{
+    const bool legacy = plugin.name != QStringLiteral(
+        "Auto Detect Indention");
+    _mainEditorAdapter.setLegacyTextRangeAbi(legacy);
+    _subEditorAdapter.setLegacyTextRangeAbi(legacy);
 }
 
 QStringList Win32PluginManager::loadedPluginNames() const
@@ -652,7 +668,10 @@ bool Win32PluginManager::executePluginCommand(
         _mainEditorAdapter.setSelectionTextLengthIncludesTerminator(true);
         _subEditorAdapter.setSelectionTextLengthIncludesTerminator(true);
     }
+    setEditorAbiForPlugin(plugin);
     plugin.functions[functionIndex]._pFunc();
+    _mainEditorAdapter.setLegacyTextRangeAbi(true);
+    _subEditorAdapter.setLegacyTextRangeAbi(true);
     if (mimeToolsUrlCommand) {
         _mainEditorAdapter.setSelectionTextLengthIncludesTerminator(false);
         _subEditorAdapter.setSelectionTextLengthIncludesTerminator(false);

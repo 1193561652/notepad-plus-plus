@@ -7,6 +7,7 @@
 #include <QObject>
 #include <QList>
 #include <QSet>
+#include <QStringList>
 #include "IPlugin.h"
 
 class QLibrary;
@@ -20,7 +21,8 @@ public:
     ~PluginManager();
 
     // 扫描目录并加载所有插件 DLL
-    void loadPlugins(const QString& pluginDir, IPluginHost* host);
+    void loadPlugins(const QString& pluginDir, IPluginHost* host,
+                     const QStringList& enabledFolders);
 
     // 卸载所有已加载的插件
     void unloadAll(IPluginHost* host);

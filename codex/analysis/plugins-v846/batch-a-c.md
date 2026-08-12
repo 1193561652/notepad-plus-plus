@@ -87,11 +87,19 @@
   `SCN_CHARADDED/FOCUSIN/FOCUSOUT`。向当前视图同步发送
   `SCI_CHARLEFT/RIGHT`、`SCI_WORDLEFT/RIGHT`、行移动、换行、删除及其 Extend
   变体。
-- **Win32/Dock**：使用 `SendMessage`，未在对应版本业务源码发现 Dock、窗口
-  subclass、Hook 或 direct function。
-- **双 HWND 难点**：要求通知来源 HWND 正确区分主副视图，并保持按键命令同步
-  及重入顺序。
-- **初评**：`A`；基础通知和同步 SCI 命令覆盖后可直接测试原版 DLL。
+- **Win32/Dock**：不使用 Dock 或窗口 subclass，但在 `NPPN_READY` 中通过
+  `SetWindowsHookEx(WH_KEYBOARD, ..., GetCurrentThreadId())` 安装 UI 线程键盘 Hook。
+  `setInfo()` 还会向主编辑器请求 `SCI_GETDIRECTFUNCTION` 和
+  `SCI_GETDIRECTPOINTER`，后续所有编辑操作均通过 Scintilla direct-function ABI
+  执行，而不是逐条 `SendMessage(SCI_*)`。
+- **当前 Qt 故障根因**：Win32 编辑器适配层传给插件的是隐藏消息接收 HWND；它没有
+  处理上述两个 direct 接口，因此插件保存空函数指针，并在 `NPPN_READY` 调用
+  `SCI_AUTOCSETMULTI` 时解引用。Scintilla 5 Qt 本体已经实现两个 direct 接口，兼容
+  层可从真实编辑器透传函数和实例指针。
+- **双 HWND/输入难点**：还需验证主副视图切换、`SCN_FOCUSIN/OUT`、
+  `NPPN_BUFFERACTIVATED`，以及线程键盘 Hook 与其他插件共存时的链式调用和卸载顺序。
+- **修订初评**：原版 DLL 可兼容，最小入口是透传 Scintilla direct ABI；完成后仍须
+  对多选移动、连续输入、双视图和与 XMLTools 同时加载进行独立进程验证。
 - **证据**：[tag v1.5](https://github.com/dail8859/BetterMultiSelection/tree/v1.5)
   的 `src/Main.cpp`。
 - **未验证**：通知顺序、连续多选输入、双视图切换和六导出。
