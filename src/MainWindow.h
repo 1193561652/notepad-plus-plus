@@ -61,6 +61,7 @@ public:
     bool executePluginMenuCommand(int commandId);
     bool openFileForPlugin(const QString& path);
     bool saveCurrentFileAsForPlugin(const QString& path, bool asCopy);
+    bool saveCurrentFileForPlugin();
     bool saveCurrentSessionForPlugin(const QString& path);
     bool loadSessionForPlugin(const QString& path);
     bool setCurrentLanguageTypeFromPlugin(int languageType);
@@ -75,6 +76,10 @@ public:
     bool setBufferEncodingForPlugin(quintptr bufferId, int encoding);
     void setPluginStatusBarText(int section, const QString& text);
     bool addPluginToolbarCommand(int commandId);
+    bool createDocumentForPlugin(const QByteArray& data);
+    int currentViewIndexForPlugin() const;
+    ScintillaEditView* pluginView(int view) const;
+    bool showPluginBufferInView(quintptr bufferId, int view);
 #ifdef Q_OS_WIN
     Win32PluginManager* win32PluginManager() const
     {

@@ -15,6 +15,15 @@
 - `third_party/boostregex/`：原版 Boost.Regex 适配源码及 Boost headers。
 - `codex/`：代码知识库、索引、决策、变更和本地缓存。
 
+## 工作区插件源码仓库
+
+- `../comparePlus/`：用户 fork 的 ComparePlus 独立仓库，官方仓库配置为 `upstream`。
+- `../NPP_HexEditor/`：用户 fork 的 HEX-Editor 独立仓库，官方仓库配置为 `upstream`。
+- 路径、远程仓库、v8.4.6 tag 基线和同步方法见
+  `codex/index/plugin-source-repositories.md`。
+
+这两个兄弟目录用于插件源码分析与移植，不属于 Qt 主线仓库的构建目录。
+
 旧 `third_party/qscintilla/`、qmake 静态子构建和
 `cmake/BuildNppQScintilla.cmake` 已在 Scintilla 5 迁移中删除。
 

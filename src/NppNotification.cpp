@@ -237,6 +237,11 @@ void MainWindow::onBufferCloseRequested(Buffer* buf)
     if (_win32PluginManager)
         _win32PluginManager->notifyFileBeforeClose(bufferId);
 #endif
+#ifdef ENABLE_PLUGIN_SYSTEM
+    if (_pluginManager)
+        _pluginManager->notifyPlugins(
+            NPP_PLUGIN_NOTIFICATION_FILE_BEFORE_CLOSE, bufferId);
+#endif
 
     if (idx >= 0)
         srcTab->removeTab(idx);
@@ -255,6 +260,11 @@ void MainWindow::onBufferCloseRequested(Buffer* buf)
 #ifdef Q_OS_WIN
         if (_win32PluginManager)
             _win32PluginManager->notifyFileClosed(bufferId);
+#endif
+#ifdef ENABLE_PLUGIN_SYSTEM
+        if (_pluginManager)
+            _pluginManager->notifyPlugins(
+                NPP_PLUGIN_NOTIFICATION_FILE_CLOSED, bufferId);
 #endif
     }
     updateActionStates();
@@ -304,6 +314,13 @@ void MainWindow::onCurrentTabChanged(int /*index*/)
     if (buf && _win32PluginManager && !_openingBuffer)
         _win32PluginManager->notifyBufferActivated(
             reinterpret_cast<quintptr>(buf));
+#endif
+#ifdef ENABLE_PLUGIN_SYSTEM
+    if (buf && _pluginManager && !_openingBuffer)
+        _pluginManager->notifyPlugins(
+            NPP_PLUGIN_NOTIFICATION_BUFFER_ACTIVATED,
+            reinterpret_cast<quintptr>(buf),
+            _activeDocTab == _subDocTab ? SUB_VIEW : MAIN_VIEW);
 #endif
 }
 
@@ -365,6 +382,16 @@ void MainWindow::onCursorPositionChanged(int line, int col)
 
 void MainWindow::notifyCurrentLanguageChanged()
 {
+#ifdef ENABLE_PLUGIN_SYSTEM
+    Buffer* crossPlatformBuffer =
+        _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
+    if (crossPlatformBuffer && _pluginManager) {
+        _pluginManager->notifyPlugins(
+            NPP_PLUGIN_NOTIFICATION_LANGUAGE_CHANGED,
+            reinterpret_cast<quintptr>(crossPlatformBuffer),
+            _activeDocTab == _subDocTab ? SUB_VIEW : MAIN_VIEW);
+    }
+#endif
 #ifdef Q_OS_WIN
     Buffer* buffer = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
     if (buffer && _win32PluginManager) {

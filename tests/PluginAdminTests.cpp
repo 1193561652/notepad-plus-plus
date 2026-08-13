@@ -282,6 +282,20 @@ void testCrossPlatformArtifactDiscovery()
               && artifacts.first().binaryPath == binaryPath,
           "ABI v1 platform directory should be discovered");
 
+    const QString primaryPath = PluginArtifactResolver::binaryPath(
+        temporary.path(), QStringLiteral("PortableSample"));
+    QDir().mkpath(QFileInfo(primaryPath).absolutePath());
+    QFile primary(primaryPath);
+    check(primary.open(QFile::WriteOnly),
+          "dual ABI primary binary should open");
+    primary.write("test");
+    primary.close();
+    const QVector<PluginArtifact> preferred =
+        PluginArtifactResolver::discoverCrossPlatform(temporary.path());
+    check(preferred.size() == 1
+              && preferred.first().binaryPath == primaryPath,
+          "the standard plugin binary should be probed before compatibility layout");
+
     PluginAdminModel model(
         temporary.path(), PluginCatalog(),
         PluginVersion(QStringLiteral("8.4.6")));

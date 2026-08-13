@@ -390,9 +390,17 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
     if (_win32PluginManager)
         _win32PluginManager->notifyFileBeforeLoad();
 #endif
+#ifdef ENABLE_PLUGIN_SYSTEM
+    if (_pluginManager)
+        _pluginManager->notifyPlugins(NPP_PLUGIN_NOTIFICATION_FILE_BEFORE_LOAD);
+#endif
 
     Buffer* buf = MainFileManager.loadBuffer(filePath);
     if (!buf) {
+#ifdef ENABLE_PLUGIN_SYSTEM
+        if (_pluginManager)
+            _pluginManager->notifyPlugins(NPP_PLUGIN_NOTIFICATION_FILE_LOAD_FAILED);
+#endif
 #ifdef Q_OS_WIN
         if (_win32PluginManager)
             _win32PluginManager->notifyFileLoadFailed(0);
@@ -408,6 +416,13 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
             reinterpret_cast<quintptr>(buf));
 #endif
 
+#ifdef ENABLE_PLUGIN_SYSTEM
+    if (_pluginManager)
+        _pluginManager->notifyPlugins(
+            NPP_PLUGIN_NOTIFICATION_FILE_BEFORE_OPEN,
+            reinterpret_cast<quintptr>(buf));
+#endif
+
     ScintillaEditView* view = targetTab->editor();
     view->createStandardDocument();
     buf->setView(view);
@@ -416,6 +431,12 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
     if (!MainFileManager.loadBufferContent(
             buf, view, decodingOptionsForPath(filePath), forcedEncoding,
             &loadError)) {
+#ifdef ENABLE_PLUGIN_SYSTEM
+        if (_pluginManager)
+            _pluginManager->notifyPlugins(
+                NPP_PLUGIN_NOTIFICATION_FILE_LOAD_FAILED,
+                reinterpret_cast<quintptr>(buf));
+#endif
 #ifdef Q_OS_WIN
         if (_win32PluginManager)
             _win32PluginManager->notifyFileLoadFailed(
@@ -457,6 +478,15 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
     if (_win32PluginManager)
         _win32PluginManager->notifyBufferActivated(
             reinterpret_cast<quintptr>(buf));
+#endif
+#ifdef ENABLE_PLUGIN_SYSTEM
+    if (_pluginManager) {
+        const quintptr id = reinterpret_cast<quintptr>(buf);
+        _pluginManager->notifyPlugins(NPP_PLUGIN_NOTIFICATION_FILE_OPENED, id);
+        _pluginManager->notifyPlugins(
+            NPP_PLUGIN_NOTIFICATION_BUFFER_ACTIVATED, id,
+            targetTab == _subDocTab ? SUB_VIEW : MAIN_VIEW);
+    }
 #endif
     return true;
 }
@@ -501,6 +531,12 @@ bool MainWindow::doSave(Buffer* buf, const QString& filePath)
         _win32PluginManager->notifyFileBeforeSave(
             reinterpret_cast<quintptr>(buf));
 #endif
+#ifdef ENABLE_PLUGIN_SYSTEM
+    if (_pluginManager)
+        _pluginManager->notifyPlugins(
+            NPP_PLUGIN_NOTIFICATION_FILE_BEFORE_SAVE,
+            reinterpret_cast<quintptr>(buf));
+#endif
     if (!MainFileManager.saveBuffer(buf, filePath, &errorMessage)) {
         if (!canonical.isEmpty())
             _savingPaths.remove(canonical);
@@ -511,6 +547,12 @@ bool MainWindow::doSave(Buffer* buf, const QString& filePath)
 #ifdef Q_OS_WIN
     if (_win32PluginManager)
         _win32PluginManager->notifyFileSaved(
+            reinterpret_cast<quintptr>(buf));
+#endif
+#ifdef ENABLE_PLUGIN_SYSTEM
+    if (_pluginManager)
+        _pluginManager->notifyPlugins(
+            NPP_PLUGIN_NOTIFICATION_FILE_SAVED,
             reinterpret_cast<quintptr>(buf));
 #endif
     if (!canonical.isEmpty())
@@ -570,6 +612,15 @@ bool MainWindow::saveCurrentFileAsForPlugin(
     }
     statusBar()->showMessage(tr("Copy saved"), 2000);
     return true;
+}
+
+bool MainWindow::saveCurrentFileForPlugin()
+{
+    Buffer* buffer = _activeDocTab ? _activeDocTab->currentBuffer() : nullptr;
+    if (!buffer)
+        return false;
+    return buffer->isUntitled()
+        ? doSaveAs(buffer) : doSave(buffer, buffer->getFullPath());
 }
 
 bool MainWindow::closeBufferList(const QList<Buffer*>& buffers)

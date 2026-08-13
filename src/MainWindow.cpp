@@ -609,6 +609,53 @@ bool MainWindow::addPluginToolbarCommand(int commandId)
     return false;
 }
 
+bool MainWindow::createDocumentForPlugin(const QByteArray& data)
+{
+    if (!doNewBuffer(_activeDocTab))
+        return false;
+    ScintillaEditView* view = currentActiveView();
+    if (!view)
+        return false;
+    view->execute(SCI_CLEARALL);
+    if (!data.isEmpty()) {
+        view->execute(SCI_ADDTEXT, static_cast<uptr_t>(data.size()),
+                      reinterpret_cast<sptr_t>(data.constData()));
+    }
+    return true;
+}
+
+int MainWindow::currentViewIndexForPlugin() const
+{
+    return _activeDocTab == _subDocTab ? SUB_VIEW : MAIN_VIEW;
+}
+
+ScintillaEditView* MainWindow::pluginView(int view) const
+{
+    if (view != MAIN_VIEW && view != SUB_VIEW)
+        return nullptr;
+    return view == SUB_VIEW
+        ? (_subDocTab ? _subDocTab->editor() : nullptr)
+        : (_mainDocTab ? _mainDocTab->editor() : nullptr);
+}
+
+bool MainWindow::showPluginBufferInView(quintptr bufferId, int view)
+{
+    if (view != MAIN_VIEW && view != SUB_VIEW)
+        return false;
+    Buffer* requested = reinterpret_cast<Buffer*>(bufferId);
+    if (!MainFileManager.buffers().contains(requested))
+        return false;
+    DocTabView* target = view == SUB_VIEW ? _subDocTab : _mainDocTab;
+    if (!target)
+        return false;
+    if (target == _subDocTab && !target->isVisible())
+        showSubView();
+    if (target->indexOfBuffer(requested) < 0)
+        target->addClone(requested, target->editor());
+    target->activateBuffer(requested);
+    return true;
+}
+
 
 void MainWindow::setBufferReadOnly(Buffer* buffer, bool readOnly)
 {
@@ -984,17 +1031,59 @@ void MainWindow::setupPluginSystem()
             enabledPluginFolders.removeAt(index);
     }
 #endif
-#ifdef Q_OS_WIN
     connect(_mainDocTab->editor(), &ScintillaEditBase::notify, this,
             [this](Scintilla::NotificationData* notification) {
+#ifdef ENABLE_PLUGIN_SYSTEM
+        if (_pluginManager && notification) {
+            const quint32 code = static_cast<quint32>(notification->nmhdr.code);
+            if (code == SCN_MODIFIED || code == SCN_UPDATEUI) {
+                const QByteArray text = notification->text && notification->length > 0
+                    ? QByteArray(notification->text,
+                                 static_cast<int>(notification->length))
+                    : QByteArray();
+                _pluginManager->notifyPlugins(
+                    code == SCN_MODIFIED
+                        ? NPP_PLUGIN_NOTIFICATION_TEXT_MODIFIED
+                        : NPP_PLUGIN_NOTIFICATION_UPDATE_UI,
+                    currentBufferIdForPlugin(), MAIN_VIEW,
+                    notification->position, notification->length,
+                    static_cast<quint32>(notification->modificationType),
+                    static_cast<quint32>(notification->updated), text);
+            }
+        }
+#endif
+#ifdef Q_OS_WIN
         if (_win32PluginManager && notification)
             _win32PluginManager->notifyScintilla(*notification, true);
+#endif
     });
     connect(_subDocTab->editor(), &ScintillaEditBase::notify, this,
             [this](Scintilla::NotificationData* notification) {
+#ifdef ENABLE_PLUGIN_SYSTEM
+        if (_pluginManager && notification) {
+            const quint32 code = static_cast<quint32>(notification->nmhdr.code);
+            if (code == SCN_MODIFIED || code == SCN_UPDATEUI) {
+                const QByteArray text = notification->text && notification->length > 0
+                    ? QByteArray(notification->text,
+                                 static_cast<int>(notification->length))
+                    : QByteArray();
+                _pluginManager->notifyPlugins(
+                    code == SCN_MODIFIED
+                        ? NPP_PLUGIN_NOTIFICATION_TEXT_MODIFIED
+                        : NPP_PLUGIN_NOTIFICATION_UPDATE_UI,
+                    currentBufferIdForPlugin(), SUB_VIEW,
+                    notification->position, notification->length,
+                    static_cast<quint32>(notification->modificationType),
+                    static_cast<quint32>(notification->updated), text);
+            }
+        }
+#endif
+#ifdef Q_OS_WIN
         if (_win32PluginManager && notification)
             _win32PluginManager->notifyScintilla(*notification, false);
+#endif
     });
+#ifdef Q_OS_WIN
     QStringList win32PluginErrors;
 #ifdef NPP_PLUGIN_REGISTRATION_TEST
     const QString testPluginFilter =
@@ -1385,10 +1474,15 @@ void MainWindow::applyDarkMode()
     _hasAppliedDarkMode = true;
     _appliedDarkMode = dark;
     const auto notifyDarkModeChanged = [this, changed]() {
+#ifdef ENABLE_PLUGIN_SYSTEM
+        if (changed && _pluginManager)
+            _pluginManager->notifyPlugins(
+                NPP_PLUGIN_NOTIFICATION_DARK_MODE_CHANGED);
+#endif
 #ifdef Q_OS_WIN
         if (changed && _win32PluginManager)
             _win32PluginManager->notifyDarkModeChanged();
-#else
+#elif !defined(ENABLE_PLUGIN_SYSTEM)
         Q_UNUSED(changed)
 #endif
     };

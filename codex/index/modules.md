@@ -2,6 +2,8 @@
 
 - `codex/changes/2026-08-09-priority-plugin-compatibility.md`：高、中优先级插件真实 DLL 接入结果、SCN 桥接和跳过边界。
 - `codex/cache/2026-08-09-priority-plugin-compatibility.md`：上述批次的快速本地缓存入口。
+- `codex/index/plugin-source-repositories.md`：ComparePlus 与 HEX-Editor 本地源码仓库、
+  Git 远程和 v8.4.6 tag 基线。
 
 ## Notepad++ Qt 主线
 

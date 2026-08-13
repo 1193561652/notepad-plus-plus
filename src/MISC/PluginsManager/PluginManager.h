@@ -26,6 +26,10 @@ public:
                     const QStringList& enabledFolders,
                     QStringList* errors = nullptr);
     void notifyReady();
+    void notifyPlugins(uint32_t code, quintptr bufferId = 0,
+                       int sourceView = -1, qint64 position = 0,
+                       qint64 length = 0, quint32 modificationType = 0,
+                       quint32 updated = 0, const QByteArray& text = {});
     void unloadAll();
 
     int loadedPluginCount() const { return _plugins.size(); }
@@ -66,7 +70,49 @@ private:
     static int NPP_PLUGIN_CALL openFile(void* context, const char* path);
     static void NPP_PLUGIN_CALL log(void* context, uint32_t level,
                                     const char* message);
-    void notify(const LoadedPlugin& plugin, uint32_t code) const;
+    static uint64_t NPP_PLUGIN_CALL currentBufferId(void* context);
+    static int32_t NPP_PLUGIN_CALL currentView(void* context);
+    static size_t NPP_PLUGIN_CALL copyCurrentDocument(
+        void* context, uint8_t* output, size_t capacity);
+    static int NPP_PLUGIN_CALL replaceCurrentDocument(
+        void* context, const uint8_t* data, size_t size);
+    static size_t NPP_PLUGIN_CALL copyCurrentSelection(
+        void* context, uint8_t* output, size_t capacity,
+        int64_t* start, int64_t* end);
+    static int NPP_PLUGIN_CALL replaceCurrentSelection(
+        void* context, const uint8_t* data, size_t size);
+    static int NPP_PLUGIN_CALL setCurrentSelection(
+        void* context, int64_t start, int64_t end);
+    static int NPP_PLUGIN_CALL createDocument(
+        void* context, const uint8_t* data, size_t size);
+    static size_t NPP_PLUGIN_CALL copyClipboardText(
+        void* context, char* output, size_t capacity);
+    static int NPP_PLUGIN_CALL setClipboardText(
+        void* context, const char* text);
+    static void NPP_PLUGIN_CALL setStatusText(
+        void* context, const char* text);
+    static size_t NPP_PLUGIN_CALL copyViewDocument(
+        void* context, int32_t view, uint8_t* output, size_t capacity);
+    static int NPP_PLUGIN_CALL showBufferInView(
+        void* context, uint64_t bufferId, int32_t view);
+    static void NPP_PLUGIN_CALL clearCompareMarks(void* context, int32_t view);
+    static int NPP_PLUGIN_CALL addCompareMark(
+        void* context, int32_t view, int64_t line, uint32_t kind);
+    static int64_t NPP_PLUGIN_CALL firstVisibleLine(void* context, int32_t view);
+    static int NPP_PLUGIN_CALL setFirstVisibleLine(
+        void* context, int32_t view, int64_t line);
+    static int NPP_PLUGIN_CALL gotoLine(
+        void* context, int32_t view, int64_t line);
+    static intptr_t NPP_PLUGIN_CALL sendScintilla(
+        void* context, int32_t view, uint32_t message,
+        uintptr_t wParam, intptr_t lParam);
+    static size_t NPP_PLUGIN_CALL copyBufferFilePath(
+        void* context, uint64_t bufferId, char* output, size_t capacity);
+    static int NPP_PLUGIN_CALL saveCurrentFile(void* context);
+    static int NPP_PLUGIN_CALL executeMenuCommand(
+        void* context, int32_t commandId);
+    void notify(const LoadedPlugin& plugin,
+                const NppPluginNotification& notification) const;
 
     PluginHostServices* _hostServices = nullptr;
     QVector<LoadedPlugin*> _plugins;

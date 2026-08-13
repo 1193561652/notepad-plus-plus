@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QString>
 
 class MainWindow;
@@ -46,6 +47,25 @@ public:
     virtual bool setBufferEncoding(quintptr bufferId, int encoding) = 0;
     virtual void setStatusBarText(int section, const QString& text) = 0;
     virtual bool addToolbarCommand(int commandId) = 0;
+    virtual QByteArray currentDocumentBytes() const = 0;
+    virtual bool replaceCurrentDocument(const QByteArray& data) = 0;
+    virtual QByteArray currentSelectionBytes(qint64* start,
+                                             qint64* end) const = 0;
+    virtual bool replaceCurrentSelection(const QByteArray& data) = 0;
+    virtual bool setCurrentSelection(qint64 start, qint64 end) = 0;
+    virtual bool createDocument(const QByteArray& data) = 0;
+    virtual int currentViewIndex() const = 0;
+    virtual QString clipboardText() const = 0;
+    virtual bool setClipboardText(const QString& text) = 0;
+    virtual QByteArray viewDocumentBytes(int) const { return {}; }
+    virtual bool showBufferInView(quintptr, int) { return false; }
+    virtual void clearCompareMarks(int) {}
+    virtual bool addCompareMark(int, qint64, quint32) { return false; }
+    virtual qint64 firstVisibleLine(int) const { return -1; }
+    virtual bool setFirstVisibleLine(int, qint64) { return false; }
+    virtual bool gotoLine(int, qint64) { return false; }
+    virtual qintptr sendScintilla(int, quint32, quintptr, qintptr) { return 0; }
+    virtual bool saveCurrentFile() { return false; }
 };
 
 class MainWindowPluginHostServices final : public PluginHostServices
@@ -78,6 +98,25 @@ public:
     bool setBufferEncoding(quintptr bufferId, int encoding) override;
     void setStatusBarText(int section, const QString& text) override;
     bool addToolbarCommand(int commandId) override;
+    QByteArray currentDocumentBytes() const override;
+    bool replaceCurrentDocument(const QByteArray& data) override;
+    QByteArray currentSelectionBytes(qint64* start, qint64* end) const override;
+    bool replaceCurrentSelection(const QByteArray& data) override;
+    bool setCurrentSelection(qint64 start, qint64 end) override;
+    bool createDocument(const QByteArray& data) override;
+    int currentViewIndex() const override;
+    QString clipboardText() const override;
+    bool setClipboardText(const QString& text) override;
+    QByteArray viewDocumentBytes(int view) const override;
+    bool showBufferInView(quintptr bufferId, int view) override;
+    void clearCompareMarks(int view) override;
+    bool addCompareMark(int view, qint64 line, quint32 kind) override;
+    qint64 firstVisibleLine(int view) const override;
+    bool setFirstVisibleLine(int view, qint64 line) override;
+    bool gotoLine(int view, qint64 line) override;
+    qintptr sendScintilla(int view, quint32 message,
+                          quintptr wParam, qintptr lParam) override;
+    bool saveCurrentFile() override;
 
 private:
     MainWindow* _mainWindow = nullptr;

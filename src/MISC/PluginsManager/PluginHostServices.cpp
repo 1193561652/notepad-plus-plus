@@ -1,12 +1,16 @@
 #include "MISC/PluginsManager/PluginHostServices.h"
 
 #include <QCoreApplication>
+#include <QApplication>
+#include <QClipboard>
+#include <QColor>
 #include <QDir>
 #include <QSysInfo>
 
 #include "MainWindow.h"
 #include "Parameters.h"
 #include "CrossPlatformPluginSystem/PluginInterface.h"
+#include "ScintillaComponent/ScintillaEditView.h"
 
 namespace {
 
@@ -192,4 +196,173 @@ void MainWindowPluginHostServices::setStatusBarText(
 bool MainWindowPluginHostServices::addToolbarCommand(int commandId)
 {
     return _mainWindow && _mainWindow->addPluginToolbarCommand(commandId);
+}
+
+QByteArray MainWindowPluginHostServices::currentDocumentBytes() const
+{
+    ScintillaEditView* view = currentView();
+    if (!view)
+        return QByteArray();
+    const sptr_t length = view->execute(SCI_GETLENGTH);
+    QByteArray data(static_cast<int>(length) + 1, '\0');
+    view->execute(SCI_GETTEXT, length + 1,
+                  reinterpret_cast<sptr_t>(data.data()));
+    data.truncate(static_cast<int>(length));
+    return data;
+}
+
+bool MainWindowPluginHostServices::replaceCurrentDocument(const QByteArray& data)
+{
+    ScintillaEditView* view = currentView();
+    if (!view || view->isReadOnly())
+        return false;
+    view->execute(SCI_BEGINUNDOACTION);
+    view->execute(SCI_CLEARALL);
+    if (!data.isEmpty()) {
+        view->execute(SCI_ADDTEXT, static_cast<uptr_t>(data.size()),
+                      reinterpret_cast<sptr_t>(data.constData()));
+    }
+    view->execute(SCI_ENDUNDOACTION);
+    return true;
+}
+
+QByteArray MainWindowPluginHostServices::currentSelectionBytes(
+    qint64* start, qint64* end) const
+{
+    ScintillaEditView* view = currentView();
+    if (!view)
+        return QByteArray();
+    const sptr_t begin = view->execute(SCI_GETSELECTIONSTART);
+    const sptr_t finish = view->execute(SCI_GETSELECTIONEND);
+    if (start)
+        *start = begin;
+    if (end)
+        *end = finish;
+    QByteArray data(static_cast<int>(qMax<sptr_t>(0, finish - begin)) + 1, '\0');
+    Sci_TextRange range{};
+    range.chrg.cpMin = begin;
+    range.chrg.cpMax = finish;
+    range.lpstrText = data.data();
+    view->execute(SCI_GETTEXTRANGE, 0, reinterpret_cast<sptr_t>(&range));
+    data.truncate(static_cast<int>(qMax<sptr_t>(0, finish - begin)));
+    return data;
+}
+
+bool MainWindowPluginHostServices::replaceCurrentSelection(const QByteArray& data)
+{
+    ScintillaEditView* view = currentView();
+    if (!view || view->isReadOnly())
+        return false;
+    const sptr_t start = view->execute(SCI_GETSELECTIONSTART);
+    const sptr_t end = view->execute(SCI_GETSELECTIONEND);
+    view->execute(SCI_SETTARGETRANGE, static_cast<uptr_t>(start), end);
+    view->execute(SCI_REPLACETARGET, static_cast<uptr_t>(data.size()),
+                  reinterpret_cast<sptr_t>(data.constData()));
+    view->execute(SCI_SETSEL, static_cast<uptr_t>(start),
+                  start + static_cast<sptr_t>(data.size()));
+    return true;
+}
+
+bool MainWindowPluginHostServices::setCurrentSelection(qint64 start, qint64 end)
+{
+    ScintillaEditView* view = currentView();
+    if (!view || start < 0 || end < 0)
+        return false;
+    view->execute(SCI_SETSEL, static_cast<uptr_t>(start), static_cast<sptr_t>(end));
+    return true;
+}
+
+bool MainWindowPluginHostServices::createDocument(const QByteArray& data)
+{
+    return _mainWindow && _mainWindow->createDocumentForPlugin(data);
+}
+
+int MainWindowPluginHostServices::currentViewIndex() const
+{
+    return _mainWindow ? _mainWindow->currentViewIndexForPlugin() : -1;
+}
+
+QString MainWindowPluginHostServices::clipboardText() const
+{
+    return QApplication::clipboard()->text();
+}
+
+bool MainWindowPluginHostServices::setClipboardText(const QString& text)
+{
+    QApplication::clipboard()->setText(text);
+    return true;
+}
+
+QByteArray MainWindowPluginHostServices::viewDocumentBytes(int view) const
+{
+    ScintillaEditView* editor = _mainWindow ? _mainWindow->pluginView(view) : nullptr;
+    if (!editor) return {};
+    const sptr_t length = editor->execute(SCI_GETLENGTH);
+    QByteArray data(static_cast<int>(length) + 1, '\0');
+    editor->execute(SCI_GETTEXT, length + 1, reinterpret_cast<sptr_t>(data.data()));
+    data.truncate(static_cast<int>(length));
+    return data;
+}
+
+bool MainWindowPluginHostServices::showBufferInView(quintptr bufferId, int view)
+{
+    return _mainWindow && _mainWindow->showPluginBufferInView(bufferId, view);
+}
+
+void MainWindowPluginHostServices::clearCompareMarks(int view)
+{
+    ScintillaEditView* editor = _mainWindow ? _mainWindow->pluginView(view) : nullptr;
+    if (!editor) return;
+    for (int marker = 10; marker <= 13; ++marker)
+        editor->execute(SCI_MARKERDELETEALL, marker);
+}
+
+bool MainWindowPluginHostServices::addCompareMark(int view, qint64 line, quint32 kind)
+{
+    ScintillaEditView* editor = _mainWindow ? _mainWindow->pluginView(view) : nullptr;
+    if (!editor || line < 0 || line >= editor->lines() || kind > 3)
+        return false;
+    const int marker = 10 + static_cast<int>(kind);
+    const QColor colors[] = {QColor(210,245,218), QColor(255,220,220),
+                             QColor(255,242,188), QColor(215,228,255)};
+    editor->execute(SCI_MARKERDEFINE, marker, SC_MARK_BACKGROUND);
+    editor->setMarkerBackgroundColor(colors[kind], marker);
+    editor->execute(SCI_MARKERADD, static_cast<uptr_t>(line), marker);
+    return true;
+}
+
+qint64 MainWindowPluginHostServices::firstVisibleLine(int view) const
+{
+    ScintillaEditView* editor = _mainWindow ? _mainWindow->pluginView(view) : nullptr;
+    return editor ? editor->execute(SCI_GETFIRSTVISIBLELINE) : -1;
+}
+
+bool MainWindowPluginHostServices::setFirstVisibleLine(int view, qint64 line)
+{
+    ScintillaEditView* editor = _mainWindow ? _mainWindow->pluginView(view) : nullptr;
+    if (!editor || line < 0) return false;
+    editor->execute(SCI_SETFIRSTVISIBLELINE, static_cast<uptr_t>(line));
+    return true;
+}
+
+bool MainWindowPluginHostServices::gotoLine(int view, qint64 line)
+{
+    ScintillaEditView* editor = _mainWindow ? _mainWindow->pluginView(view) : nullptr;
+    if (!editor || line < 0 || line >= editor->lines()) return false;
+    editor->execute(SCI_GOTOLINE, static_cast<uptr_t>(line));
+    editor->setFocus();
+    return true;
+}
+
+qintptr MainWindowPluginHostServices::sendScintilla(
+    int view, quint32 message, quintptr wParam, qintptr lParam)
+{
+    ScintillaEditView* editor = _mainWindow ? _mainWindow->pluginView(view) : nullptr;
+    return editor ? editor->execute(message, static_cast<uptr_t>(wParam),
+                                    static_cast<sptr_t>(lParam)) : 0;
+}
+
+bool MainWindowPluginHostServices::saveCurrentFile()
+{
+    return _mainWindow && _mainWindow->saveCurrentFileForPlugin();
 }

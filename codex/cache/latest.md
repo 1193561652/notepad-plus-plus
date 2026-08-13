@@ -1,5 +1,16 @@
 # 本地缓存：最新分析
 
+## 2026-08-13 ComparePlus 与 HEX-Editor Qt 插件
+
+- 两个插件已在各自 `qt-port` 分支建立新 ABI 实现，显示名和产物名带 `-qt`。
+- ComparePlus 复用 `cp_1.0.0` 的 Myers/Hirschberg `DiffCalc`；HEX-Editor 通过显式长度
+  回调读写含 NUL 的原始字节，并使用虚拟表格避免逐行创建控件。
+- 同一 DLL 新旧 ABI 并存时宿主优先调用 `npp*` 新 ABI；只有旧 ABI 时回退原版加载器。
+- 两个插件各自 `2/2` 测试通过，宿主完整 CTest `47/47` 通过；完整应用人工交互验证及
+  原版深层 UI 行为差异已记录为后续项。
+- 详情见 `codex/changes/2026-08-13-compareplus-hexeditor-qt-abi.md` 和
+  `codex/index/plugin-source-repositories.md`。
+
 ## 2026-08-13 Plugin Host Services 与跨平台 ABI v1
 
 - 已按 v8.4.6 原版 PluginsManager 职责建立薄 `PluginHostServices`；文档和编辑器业务仍
@@ -784,3 +795,33 @@
 - 修正旧 direct Scintilla ABI 与当前 HWND 消息 ABI 混用导致的访问冲突风险。
 - Release 全目标构建成功，CTest `41/41` 通过；详见
   `codex/changes/2026-08-11-p0-win32-plugin-compatibility.md`。
+
+## 2026-08-13 ComparePlus/HEX-Editor 深层功能
+
+- 跨平台 ABI v1 以尾部追加方式增加按视图文档读取、Buffer 双视图布置、差异标记、
+  首可见行同步和行跳转服务，不暴露 Qt 或宿主内部对象。
+- ComparePlus-qt 已实现永久主副编辑器比较、四类编辑器内标记、垂直同步、差异跳转和
+  可点击导航缩略条。
+- HEX-Editor-qt 已实现 1/2/4/8 字节位宽、大小端、二进制显示/回写、书签导航和块
+  剪贴板操作。
+- 宿主 Release 全目标构建和 CTest `47/47` 通过；两个插件各自模型/算法与动态 ABI
+  烟雾测试均为 `2/2` 通过。
+
+## 2026-08-13 高优先级 Qt 插件首版
+
+- 八个插件已同步官方 tag，并从对应移植基线 tag 创建 `qt-port`。
+- DSpellCheck、MarkdownViewerPlusPlus、Explorer、NppExec、NppFTP、
+  NppMarkdownPanel、NPPTextFX2、PythonScript 已提供名称带 `-qt` 的跨平台 ABI v1 实现。
+- Windows 原 ABI 导出保留为空实现；独立构建测试共 13/13、宿主测试 47/47 通过，
+  八插件联合启动和正常退出通过。
+- 当前是覆盖主要流程的首版，不等同于完整功能复刻；深层差异和源码位置见
+  `codex/index/high-priority-plugin-ports.md`。
+
+## 2026-08-13 高优先级插件深层行为
+
+- ABI v1 尾部增加 Scintilla、Buffer 路径、保存、菜单命令回调，以及完整文件和编辑器通知。
+- 完成实时拼写标记、Markdown 事件刷新/滚动同步、Explorer `Favorites.dat`、NppExec
+  串行脚本和错误导航、NppFTP 队列/保存上传/私钥、TextFX 扩展转换及 Python 状态桥。
+- 宿主完整 CTest `47/47`、八插件独立 CTest `13/13` 通过。
+- 外部运行时和原版专属功能边界见
+  `codex/changes/2026-08-13-high-priority-plugin-deep-parity.md`。

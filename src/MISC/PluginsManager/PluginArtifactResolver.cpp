@@ -93,11 +93,18 @@ QVector<PluginArtifact> PluginArtifactResolver::discoverCrossPlatform(
                 QStringLiteral("Config"), Qt::CaseInsensitive) == 0) {
             continue;
         }
-        const QString path = crossPlatformBinaryPath(
-            pluginRoot, directory.fileName());
-        const QFileInfo binary(path);
-        if (binary.isFile() && !binary.isSymLink())
-            artifacts.push_back({directory.fileName(), path});
+        const QString folderName = directory.fileName();
+        const QString primaryPath = binaryPath(pluginRoot, folderName);
+        const QFileInfo primaryBinary(primaryPath);
+        if (primaryBinary.isFile() && !primaryBinary.isSymLink()) {
+            artifacts.push_back({folderName, primaryPath});
+            continue;
+        }
+        const QString compatibilityPath = crossPlatformBinaryPath(
+            pluginRoot, folderName);
+        const QFileInfo compatibilityBinary(compatibilityPath);
+        if (compatibilityBinary.isFile() && !compatibilityBinary.isSymLink())
+            artifacts.push_back({folderName, compatibilityPath});
     }
     return artifacts;
 }

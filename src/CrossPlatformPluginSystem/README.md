@@ -24,8 +24,9 @@ item strings until shutdown.
 - `nppSetInfo`: retain only the host pointer or copy required values; return
   non-zero when initialization succeeds.
 - `nppGetFuncsArray`: return a stable array of `NppPluginFuncItem` values.
-- `nppBeNotified`: handle lifecycle notifications. Version 1 sends `READY`
-  once and `SHUTDOWN` once.
+- `nppBeNotified`: handle lifecycle, document, Buffer, language, editor
+  modification, UI-update, and dark-mode notifications. `READY` and
+  `SHUTDOWN` are each sent once per load lifetime.
 - `nppMessageProc`: optional plugin-specific synchronous messages; return zero
   for unsupported messages.
 
@@ -38,7 +39,15 @@ contains:
 - CPU architecture;
 - application name and software version;
 - plugin installation and writable configuration paths;
-- UTF-8 current-file query, file-open, and logging callbacks.
+- UTF-8 current-file query, file-open, and logging callbacks;
+- append-only raw document and selection callbacks with explicit byte counts;
+- current Buffer/View identity, new-document, clipboard, and status callbacks.
+- view-specific document access and Buffer placement in the permanent main and
+  secondary editor views;
+- line-background compare markers, first-visible-line synchronization, and
+  line navigation.
+- a platform-independent Scintilla message channel, Buffer-path lookup,
+  current-file save, and Notepad++ menu-command execution.
 
 Plugins should branch on `system_type` only where behavior is genuinely
 platform-specific. They must check `struct_size` before reading fields added by
@@ -51,8 +60,11 @@ size; changing its layout requires a new ABI version.
 Define `NPP_PLUGIN_BUILD` while compiling the shared library and include only
 `PluginInterface.h`. Use the platform library format selected by the host:
 `.dll` on Windows, `.so` on Linux, and `.dylib` on macOS. The plugin folder and
-binary base name must match. ABI v1 binaries use a distinct path so probing a
-cross-platform plugin never executes an original Windows plugin DLL:
+binary base name must match. The host first probes the standard plugin binary
+path. If it exports `nppGetPluginAbiVersion`, the new ABI owns that folder and
+the legacy loader is skipped. If the symbol is absent, Windows falls back to
+the original ABI. A binary exporting both interfaces is loaded through the new
+ABI. The earlier distinct path remains a supported compatibility layout:
 
 ```text
 plugins/<plugin-id>/cross-platform/windows/<plugin-id>.dll
@@ -60,6 +72,28 @@ plugins/<plugin-id>/cross-platform/linux/<plugin-id>.so
 plugins/<plugin-id>/cross-platform/macos/<plugin-id>.dylib
 ```
 
+The preferred layout is the normal platform layout:
+
+```text
+plugins/<plugin-id>/<plugin-id>.dll
+plugins/<plugin-id>/linux/<plugin-id>.so
+plugins/<plugin-id>/macos/<plugin-id>.dylib
+```
+
+Document callbacks are binary-safe: returned sizes exclude terminators and
+replacement callbacks consume exactly the supplied byte count, including
+embedded NUL bytes.
+
+Views use stable integer identifiers: `0` is the main editor and `1` is the
+secondary editor. Compare marker kinds are `0` added, `1` removed, `2` changed,
+and `3` moved. Plugins must bounds-check the host structure before using these
+append-only callbacks.
+
 Callbacks run synchronously on the host UI thread in ABI v1. Plugins must not
 allow exceptions to cross the C boundary, retain temporary callback buffers,
 or call host functions after the shutdown notification.
+
+`NppPluginNotification::text_utf8` is valid only for the duration of the
+notification callback. Plugins that defer work must copy it. Scintilla pointer
+parameters are valid only for synchronous in-process calls and must use the
+public Scintilla ABI structures, never Qt or host-private objects.

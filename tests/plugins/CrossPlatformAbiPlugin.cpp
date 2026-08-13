@@ -10,12 +10,64 @@ bool hostInfoValid = false;
 bool currentPathReceived = false;
 int readyCount = 0;
 int commandCount = 0;
+bool extendedCallbacksValid = false;
+bool notificationPayloadValid = false;
 
 void NPP_PLUGIN_CALL runCommand(void*)
 {
     ++commandCount;
     if (host && host->open_file)
         host->open_file(host->host_context, "abi-plugin-open.txt");
+    if (host && host->get_current_document
+        && host->replace_current_document && host->create_document
+        && host->get_clipboard_text && host->set_clipboard_text
+        && host->set_current_selection && host->set_status_text) {
+        uint8_t document[16]{};
+        const size_t size = host->get_current_document(
+            host->host_context, document, sizeof(document));
+        const uint8_t replacement[] = {'u','p','d','a','t','e','d'};
+        const uint8_t created[] = {'n','e','w'};
+        char clipboard[16]{};
+        extendedCallbacksValid = size == 8
+            && std::memcmp(document, "document", 8) == 0
+            && host->get_current_buffer_id(host->host_context) == 0
+            && host->get_current_view(host->host_context) == 1
+            && host->replace_current_document(host->host_context,
+                   replacement, sizeof(replacement))
+            && host->create_document(host->host_context, created, sizeof(created))
+            && host->get_clipboard_text(host->host_context,
+                   clipboard, sizeof(clipboard)) == 4
+            && std::strcmp(clipboard, "clip") == 0
+            && host->set_clipboard_text(host->host_context, "updated clipboard")
+            && host->set_current_selection(host->host_context, 2, 5);
+        if (extendedCallbacksValid && host->get_view_document
+            && host->show_buffer_in_view && host->clear_compare_marks
+            && host->add_compare_mark && host->get_first_visible_line
+            && host->set_first_visible_line && host->goto_line) {
+            uint8_t viewDocument[32]{};
+            extendedCallbacksValid = host->get_view_document(host->host_context,
+                    0, viewDocument, sizeof(viewDocument)) == 13
+                && std::memcmp(viewDocument, "view-document", 13) == 0
+                && host->show_buffer_in_view(host->host_context, 42, 1);
+            host->clear_compare_marks(host->host_context, 1);
+            extendedCallbacksValid = extendedCallbacksValid
+                && host->add_compare_mark(host->host_context, 0, 7, 2)
+                && host->get_first_visible_line(host->host_context, 0) == 12;
+            host->set_first_visible_line(host->host_context, 1, 12);
+            host->goto_line(host->host_context, 0, 7);
+            char bufferPath[32]{};
+            extendedCallbacksValid = extendedCallbacksValid
+                && host->send_scintilla && host->get_buffer_file_path
+                && host->save_current_file && host->execute_menu_command
+                && host->send_scintilla(host->host_context,1,2006,2,3)==99
+                && host->get_buffer_file_path(host->host_context,42,
+                       bufferPath,sizeof(bufferPath))==10
+                && std::strcmp(bufferPath,"buffer.txt")==0
+                && host->save_current_file(host->host_context)
+                && host->execute_menu_command(host->host_context,41007);
+        }
+        host->set_status_text(host->host_context, "updated status");
+    }
 }
 
 NppPluginFuncItem functions[] = {{
@@ -90,6 +142,12 @@ NPP_PLUGIN_EXPORT void NPP_PLUGIN_CALL nppBeNotified(
         host->log(host->host_context, NPP_PLUGIN_LOG_INFO, "abi-ready");
     } else if (notification->code == NPP_PLUGIN_NOTIFICATION_SHUTDOWN) {
         host->log(host->host_context, NPP_PLUGIN_LOG_INFO, "abi-shutdown");
+    } else if (notification->code == NPP_PLUGIN_NOTIFICATION_TEXT_MODIFIED) {
+        notificationPayloadValid = notification->buffer_id==42
+            && notification->source_view==1 && notification->position==5
+            && notification->length==3 && notification->modification_type==7
+            && notification->text_utf8
+            && std::strcmp(notification->text_utf8,"abc")==0;
     }
 }
 
@@ -103,8 +161,22 @@ NPP_PLUGIN_EXPORT intptr_t NPP_PLUGIN_CALL nppMessageProc(
         case 4: return commandCount;
         case 5: return host ? host->system_type : 0;
         case 6: return host ? host->cpu_architecture : 0;
+        case 7: return extendedCallbacksValid ? 1 : 0;
+        case 8: return notificationPayloadValid ? 1 : 0;
         default: return 0;
     }
 }
+
+struct LegacyNppData { void* npp; void* mainEditor; void* subEditor; };
+struct LegacyFuncItem { wchar_t name[64]; void (*command)(); int commandId; bool checked; void* shortcut; };
+NPP_PLUGIN_EXPORT void NPP_PLUGIN_CALL setInfo(LegacyNppData) {}
+NPP_PLUGIN_EXPORT const wchar_t* NPP_PLUGIN_CALL getName()
+    { return L"Legacy ABI test"; }
+NPP_PLUGIN_EXPORT LegacyFuncItem* NPP_PLUGIN_CALL getFuncsArray(int* count)
+    { if (count) *count = 0; return nullptr; }
+NPP_PLUGIN_EXPORT void NPP_PLUGIN_CALL beNotified(void*) {}
+NPP_PLUGIN_EXPORT intptr_t NPP_PLUGIN_CALL messageProc(
+    uint32_t, uintptr_t, intptr_t) { return 1; }
+NPP_PLUGIN_EXPORT int NPP_PLUGIN_CALL isUnicode() { return 1; }
 
 } // extern "C"

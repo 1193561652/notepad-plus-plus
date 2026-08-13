@@ -54,6 +54,11 @@ bool PluginManager::loadPlugin(const QString& filePath,
 
     const auto getAbiVersion = reinterpret_cast<NppGetPluginAbiVersionFn>(
         library->resolve("nppGetPluginAbiVersion"));
+    if (!getAbiVersion) {
+        library->unload();
+        delete library;
+        return false;
+    }
     const auto getName = reinterpret_cast<NppGetNameFn>(
         library->resolve("nppGetName"));
     const auto setInfo = reinterpret_cast<NppSetInfoFn>(
@@ -64,7 +69,7 @@ bool PluginManager::loadPlugin(const QString& filePath,
         library->resolve("nppBeNotified"));
     const auto messageProc = reinterpret_cast<NppMessageProcFn>(
         library->resolve("nppMessageProc"));
-    if (!getAbiVersion || !getName || !setInfo || !getFuncsArray
+    if (!getName || !setInfo || !getFuncsArray
         || !beNotified || !messageProc) {
         if (errorMessage) {
             *errorMessage = loadError(
@@ -126,6 +131,28 @@ bool PluginManager::loadPlugin(const QString& filePath,
     plugin->hostInfo.get_current_file_path = &PluginManager::copyCurrentFilePath;
     plugin->hostInfo.open_file = &PluginManager::openFile;
     plugin->hostInfo.log = &PluginManager::log;
+    plugin->hostInfo.get_current_buffer_id = &PluginManager::currentBufferId;
+    plugin->hostInfo.get_current_view = &PluginManager::currentView;
+    plugin->hostInfo.get_current_document = &PluginManager::copyCurrentDocument;
+    plugin->hostInfo.replace_current_document = &PluginManager::replaceCurrentDocument;
+    plugin->hostInfo.get_current_selection = &PluginManager::copyCurrentSelection;
+    plugin->hostInfo.replace_current_selection = &PluginManager::replaceCurrentSelection;
+    plugin->hostInfo.set_current_selection = &PluginManager::setCurrentSelection;
+    plugin->hostInfo.create_document = &PluginManager::createDocument;
+    plugin->hostInfo.get_clipboard_text = &PluginManager::copyClipboardText;
+    plugin->hostInfo.set_clipboard_text = &PluginManager::setClipboardText;
+    plugin->hostInfo.set_status_text = &PluginManager::setStatusText;
+    plugin->hostInfo.get_view_document = &PluginManager::copyViewDocument;
+    plugin->hostInfo.show_buffer_in_view = &PluginManager::showBufferInView;
+    plugin->hostInfo.clear_compare_marks = &PluginManager::clearCompareMarks;
+    plugin->hostInfo.add_compare_mark = &PluginManager::addCompareMark;
+    plugin->hostInfo.get_first_visible_line = &PluginManager::firstVisibleLine;
+    plugin->hostInfo.set_first_visible_line = &PluginManager::setFirstVisibleLine;
+    plugin->hostInfo.goto_line = &PluginManager::gotoLine;
+    plugin->hostInfo.send_scintilla = &PluginManager::sendScintilla;
+    plugin->hostInfo.get_buffer_file_path = &PluginManager::copyBufferFilePath;
+    plugin->hostInfo.save_current_file = &PluginManager::saveCurrentFile;
+    plugin->hostInfo.execute_menu_command = &PluginManager::executeMenuCommand;
 
     if (!setInfo(&plugin->hostInfo)) {
         if (errorMessage)
@@ -164,8 +191,12 @@ bool PluginManager::loadPlugin(const QString& filePath,
     plugin->messageProc = messageProc;
     _plugins.push_back(plugin);
     _loadedPaths.insert(canonicalPath);
-    if (_readySent)
-        notify(*_plugins.constLast(), NPP_PLUGIN_NOTIFICATION_READY);
+    if (_readySent) {
+        NppPluginNotification notification{};
+        notification.struct_size = sizeof(notification);
+        notification.code = NPP_PLUGIN_NOTIFICATION_READY;
+        notify(*_plugins.constLast(), notification);
+    }
     return true;
 }
 
@@ -195,15 +226,17 @@ void PluginManager::notifyReady()
     if (_readySent)
         return;
     _readySent = true;
-    for (const LoadedPlugin* plugin : _plugins)
-        notify(*plugin, NPP_PLUGIN_NOTIFICATION_READY);
+    notifyPlugins(NPP_PLUGIN_NOTIFICATION_READY);
 }
 
 void PluginManager::unloadAll()
 {
     for (int index = _plugins.size() - 1; index >= 0; --index) {
         LoadedPlugin* plugin = _plugins[index];
-        notify(*plugin, NPP_PLUGIN_NOTIFICATION_SHUTDOWN);
+        NppPluginNotification notification{};
+        notification.struct_size = sizeof(notification);
+        notification.code = NPP_PLUGIN_NOTIFICATION_SHUTDOWN;
+        notify(*plugin, notification);
         plugin->library->unload();
         delete plugin->library;
         plugin->library = nullptr;
@@ -346,14 +379,229 @@ void NPP_PLUGIN_CALL PluginManager::log(
         qInfo().noquote() << text;
 }
 
-void PluginManager::notify(const LoadedPlugin& plugin, uint32_t code) const
+uint64_t NPP_PLUGIN_CALL PluginManager::currentBufferId(void* context)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    return services ? static_cast<uint64_t>(services->currentBufferId()) : 0;
+}
+
+int32_t NPP_PLUGIN_CALL PluginManager::currentView(void* context)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    return services ? services->currentViewIndex() : -1;
+}
+
+size_t NPP_PLUGIN_CALL PluginManager::copyCurrentDocument(
+    void* context, uint8_t* output, size_t capacity)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    const QByteArray data = services ? services->currentDocumentBytes() : QByteArray();
+    const size_t required = static_cast<size_t>(data.size());
+    if (output && capacity)
+        std::memcpy(output, data.constData(), qMin(required, capacity));
+    return required;
+}
+
+int NPP_PLUGIN_CALL PluginManager::replaceCurrentDocument(
+    void* context, const uint8_t* data, size_t size)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    return services && (data || size == 0)
+        && services->replaceCurrentDocument(QByteArray(
+            reinterpret_cast<const char*>(data), static_cast<int>(size)));
+}
+
+size_t NPP_PLUGIN_CALL PluginManager::copyCurrentSelection(
+    void* context, uint8_t* output, size_t capacity,
+    int64_t* start, int64_t* end)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    qint64 qtStart = 0;
+    qint64 qtEnd = 0;
+    const QByteArray data = services
+        ? services->currentSelectionBytes(&qtStart, &qtEnd) : QByteArray();
+    if (start)
+        *start = qtStart;
+    if (end)
+        *end = qtEnd;
+    const size_t required = static_cast<size_t>(data.size());
+    if (output && capacity)
+        std::memcpy(output, data.constData(), qMin(required, capacity));
+    return required;
+}
+
+int NPP_PLUGIN_CALL PluginManager::replaceCurrentSelection(
+    void* context, const uint8_t* data, size_t size)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    return services && (data || size == 0)
+        && services->replaceCurrentSelection(QByteArray(
+            reinterpret_cast<const char*>(data), static_cast<int>(size)));
+}
+
+int NPP_PLUGIN_CALL PluginManager::setCurrentSelection(
+    void* context, int64_t start, int64_t end)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    return services && services->setCurrentSelection(start, end);
+}
+
+int NPP_PLUGIN_CALL PluginManager::createDocument(
+    void* context, const uint8_t* data, size_t size)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    return services && (data || size == 0)
+        && services->createDocument(QByteArray(
+            reinterpret_cast<const char*>(data), static_cast<int>(size)));
+}
+
+size_t NPP_PLUGIN_CALL PluginManager::copyClipboardText(
+    void* context, char* output, size_t capacity)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    const QByteArray data = services ? services->clipboardText().toUtf8() : QByteArray();
+    const size_t required = static_cast<size_t>(data.size());
+    if (output && capacity) {
+        const size_t copied = qMin(required, capacity - 1);
+        std::memcpy(output, data.constData(), copied);
+        output[copied] = '\0';
+    }
+    return required;
+}
+
+int NPP_PLUGIN_CALL PluginManager::setClipboardText(
+    void* context, const char* text)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    return services && text && services->setClipboardText(QString::fromUtf8(text));
+}
+
+void NPP_PLUGIN_CALL PluginManager::setStatusText(
+    void* context, const char* text)
+{
+    PluginHostServices* services = static_cast<PluginHostServices*>(context);
+    if (services)
+        services->setStatusBarText(0, QString::fromUtf8(text ? text : ""));
+}
+
+size_t NPP_PLUGIN_CALL PluginManager::copyViewDocument(
+    void* context, int32_t view, uint8_t* output, size_t capacity)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    const QByteArray data = services ? services->viewDocumentBytes(view) : QByteArray();
+    const size_t required = static_cast<size_t>(data.size());
+    if (output && capacity)
+        std::memcpy(output, data.constData(), qMin(required, capacity));
+    return required;
+}
+
+int NPP_PLUGIN_CALL PluginManager::showBufferInView(
+    void* context, uint64_t bufferId, int32_t view)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && services->showBufferInView(
+        static_cast<quintptr>(bufferId), view);
+}
+
+void NPP_PLUGIN_CALL PluginManager::clearCompareMarks(void* context, int32_t view)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    if (services) services->clearCompareMarks(view);
+}
+
+int NPP_PLUGIN_CALL PluginManager::addCompareMark(
+    void* context, int32_t view, int64_t line, uint32_t kind)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && services->addCompareMark(view, line, kind);
+}
+
+int64_t NPP_PLUGIN_CALL PluginManager::firstVisibleLine(void* context, int32_t view)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services ? services->firstVisibleLine(view) : -1;
+}
+
+int NPP_PLUGIN_CALL PluginManager::setFirstVisibleLine(
+    void* context, int32_t view, int64_t line)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && services->setFirstVisibleLine(view, line);
+}
+
+int NPP_PLUGIN_CALL PluginManager::gotoLine(
+    void* context, int32_t view, int64_t line)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && services->gotoLine(view, line);
+}
+
+intptr_t NPP_PLUGIN_CALL PluginManager::sendScintilla(
+    void* context, int32_t view, uint32_t message,
+    uintptr_t wParam, intptr_t lParam)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services ? services->sendScintilla(
+        view, message, static_cast<quintptr>(wParam),
+        static_cast<qintptr>(lParam)) : 0;
+}
+
+size_t NPP_PLUGIN_CALL PluginManager::copyBufferFilePath(
+    void* context, uint64_t bufferId, char* output, size_t capacity)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    const QByteArray path = services
+        ? services->pathForBuffer(static_cast<quintptr>(bufferId)).toUtf8()
+        : QByteArray();
+    const size_t required = static_cast<size_t>(path.size());
+    if (output && capacity) {
+        const size_t copied = qMin(required, capacity - 1);
+        std::memcpy(output, path.constData(), copied);
+        output[copied] = '\0';
+    }
+    return required;
+}
+
+int NPP_PLUGIN_CALL PluginManager::saveCurrentFile(void* context)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && services->saveCurrentFile();
+}
+
+int NPP_PLUGIN_CALL PluginManager::executeMenuCommand(
+    void* context, int32_t commandId)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && services->executeMenuCommand(commandId);
+}
+
+void PluginManager::notifyPlugins(
+    uint32_t code, quintptr bufferId, int sourceView,
+    qint64 position, qint64 length, quint32 modificationType,
+    quint32 updated, const QByteArray& text)
 {
     NppPluginNotification notification{};
     notification.struct_size = sizeof(notification);
     notification.code = code;
+    notification.buffer_id = static_cast<uint64_t>(bufferId);
+    notification.source_view = sourceView;
+    notification.position = position;
+    notification.length = length;
+    notification.modification_type = modificationType;
+    notification.updated = updated;
+    notification.text_utf8 = text.isEmpty() ? nullptr : text.constData();
+    for (const LoadedPlugin* plugin : _plugins)
+        notify(*plugin, notification);
+}
+
+void PluginManager::notify(
+    const LoadedPlugin& plugin,
+    const NppPluginNotification& notification) const
+{
     try {
         plugin.beNotified(&notification);
     } catch (...) {
-        qWarning() << "Plugin notification failed:" << plugin.name << code;
+        qWarning() << "Plugin notification failed:"
+                   << plugin.name << notification.code;
     }
 }

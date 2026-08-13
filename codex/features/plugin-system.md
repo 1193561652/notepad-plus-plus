@@ -7,11 +7,24 @@
 - 六导出形态参考原版接口，但所有数据均为 C ABI、固定宽度整数和 UTF-8；不跨动态库
   传递 Qt、STL、C++ 对象、异常或 HWND。
 - `NppPluginHostInfo` 包含系统、架构、系统版本、软件版本、插件路径，以及当前文件、
-  打开文件、日志三项基础服务。
+  打开文件、日志、二进制文档/选择区、新建文档、剪贴板和状态栏服务。
 - `PluginHostServices` 是 Win32 原版 ABI 与跨平台 ABI 共用的薄业务入口；兼容层不得在
   此处复制文档、Buffer、编辑器、会话或 Dock 逻辑。
-- ABI v1 二进制位于 `plugins/<id>/cross-platform/<platform>/`，避免 Windows 探测时
-  触发原版 DLL；两类插件共用启用 XML，同目录优先跨平台 ABI。
+- 加载器先在标准插件路径按符号探测新 ABI：新旧导出同时存在时调用新 ABI，只存在
+  旧导出时在 Windows 交给原版加载器。`cross-platform/<platform>` 保留为早期布局
+  回退；两类插件共用启用 XML。
+
+## ComparePlus-qt 与 HEX-Editor-qt
+
+- 源码分别位于工作区兄弟仓库 `../comparePlus/` 和 `../NPP_HexEditor/` 的 `qt-port`
+  分支，均从 v8.4.6 对应插件 tag 建立。
+- `ComparePlus-qt` 保留原版 29 项命令结构、第一/第二文档工作流和原版
+  Myers/Hirschberg `DiffCalc`，Qt 层提供差异表、统计、导航、筛选和设置。
+- `HEX-Editor-qt` 使用显式长度 ABI 读写原始字节，以虚拟 `QAbstractTableModel` 提供
+  地址、十六进制和 ASCII 编辑，并提供查找、定位、模式替换、比较和列设置。
+- 两个 DLL 都导出新 ABI 的实际实现和原版 ABI 的空实现；原版 Notepad++ 可安全检查
+  插件但不会得到命令，Qt 移植版按新 ABI 加载。
+- 插件仓库各自包含核心算法/模型测试和成品 DLL 动态符号加载烟雾测试。
 
 ## 2026-08-09 高、中优先级真实插件批次
 
@@ -134,6 +147,15 @@
   后续继续补齐真实语料需要的 Host Services 和插件专属通知语义，不承诺任意旧插件通用兼容。
 - 跨平台 ABI v1 的复杂编辑器、Dock、任务和主题服务，按真实移植插件需求增量扩展。
 - Linux/macOS 原生插件生态清单、签名、公证和发布策略。
+
+## 2026-08-13 跨平台复杂编辑器服务
+
+- ABI v1 保持版本号不变，通过 `NppPluginHostInfo::struct_size` 在尾部追加双视图、
+  Scintilla 行标记、滚动和导航服务；旧 ABI v1 二进制不会读取新增字段。
+- ComparePlus-qt 和 HEX-Editor-qt 的复杂行为继续由各自插件仓库拥有，宿主仅提供薄的
+  平台无关能力，不把差异算法、Hex 数据模型或插件 UI 并入主程序。
+- 深层功能和剩余人工检查记录见
+  `codex/changes/2026-08-13-compareplus-hexeditor-qt-abi.md`。
 
 ## 2026-08-11 可配置插件启用清单
 
