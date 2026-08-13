@@ -1,41 +1,75 @@
-// PluginManager.h - 插件管理器
-// 移植自: v8.4.6:PowerEditor/src/PluginsManager/
+#pragma once
 
-#ifndef PLUGINMANAGER_H
-#define PLUGINMANAGER_H
-
+#include <QByteArray>
+#include <QKeySequence>
 #include <QObject>
-#include <QList>
 #include <QSet>
 #include <QStringList>
-#include "IPlugin.h"
+#include <QVector>
 
+#include "CrossPlatformPluginSystem/PluginInterface.h"
+
+class PluginHostServices;
 class QLibrary;
 
-class PluginManager : public QObject
+class PluginManager final : public QObject
 {
-    Q_OBJECT
-
 public:
-    explicit PluginManager(QObject* parent = nullptr);
-    ~PluginManager();
+    explicit PluginManager(PluginHostServices* hostServices,
+                           QObject* parent = nullptr);
+    ~PluginManager() override;
 
-    // 扫描目录并加载所有插件 DLL
-    void loadPlugins(const QString& pluginDir, IPluginHost* host,
-                     const QStringList& enabledFolders);
+    bool loadPlugin(const QString& filePath,
+                    const QString& folderName = QString(),
+                    QString* errorMessage = nullptr);
+    int loadPlugins(const QString& pluginDir,
+                    const QStringList& enabledFolders,
+                    QStringList* errors = nullptr);
+    void notifyReady();
+    void unloadAll();
 
-    // 卸载所有已加载的插件
-    void unloadAll(IPluginHost* host);
-
-    const QList<IPlugin*>& plugins() const { return _plugins; }
+    int loadedPluginCount() const { return _plugins.size(); }
+    QStringList loadedPluginNames() const;
+    QStringList loadedPluginFolders() const;
+    int loadedPluginFunctionCount(int pluginIndex) const;
+    QString loadedPluginFunctionName(int pluginIndex, int functionIndex) const;
+    bool isLoadedPluginFunctionInitiallyChecked(
+        int pluginIndex, int functionIndex) const;
+    QKeySequence loadedPluginFunctionShortcut(
+        int pluginIndex, int functionIndex) const;
+    bool executePluginCommand(int pluginIndex, int functionIndex,
+                              QString* errorMessage = nullptr);
+    qintptr sendPluginMessage(int pluginIndex, quint32 message,
+                              quintptr wParam = 0, qintptr lParam = 0) const;
 
 private:
-    void tryLoad(const QString& filePath, IPluginHost* host);
+    struct LoadedPlugin {
+        QLibrary* library = nullptr;
+        QString filePath;
+        QString folderName;
+        QString name;
+        NppBeNotifiedFn beNotified = nullptr;
+        NppMessageProcFn messageProc = nullptr;
+        const NppPluginFuncItem* functions = nullptr;
+        int functionCount = 0;
+        QByteArray systemName;
+        QByteArray systemVersion;
+        QByteArray applicationName;
+        QByteArray applicationVersion;
+        QByteArray pluginHomePath;
+        QByteArray pluginConfigPath;
+        NppPluginHostInfo hostInfo{};
+    };
 
-    QList<IPlugin*>  _plugins;
-    QList<QLibrary*> _libs;
-    QList<DestroyPluginFn> _destroyFns;
+    static size_t NPP_PLUGIN_CALL copyCurrentFilePath(
+        void* context, char* output, size_t capacity);
+    static int NPP_PLUGIN_CALL openFile(void* context, const char* path);
+    static void NPP_PLUGIN_CALL log(void* context, uint32_t level,
+                                    const char* message);
+    void notify(const LoadedPlugin& plugin, uint32_t code) const;
+
+    PluginHostServices* _hostServices = nullptr;
+    QVector<LoadedPlugin*> _plugins;
     QSet<QString> _loadedPaths;
+    bool _readySent = false;
 };
-
-#endif // PLUGINMANAGER_H

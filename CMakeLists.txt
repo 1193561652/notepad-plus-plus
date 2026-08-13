@@ -10,8 +10,8 @@ set(CMAKE_AUTOMOC_COMPILER_PREDEFINES OFF)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# 插件系统选项（默认关闭）
-option(ENABLE_PLUGIN_SYSTEM "Enable plugin system support" OFF)
+# 跨平台插件 ABI 默认启用；原版 Windows ABI 由 WIN32 单独控制。
+option(ENABLE_PLUGIN_SYSTEM "Enable cross-platform plugin ABI support" ON)
 
 find_package(Qt5 REQUIRED COMPONENTS Core Gui Widgets Network PrintSupport Xml)
 
@@ -170,6 +170,7 @@ set(SOURCES
     src/WinControls/PluginsAdmin/PluginAdminDialog.cpp
     src/MISC/PluginsManager/PluginUpdatePlan.cpp
     src/MISC/PluginsManager/PluginLoadJournal.cpp
+    src/MISC/PluginsManager/PluginHostServices.cpp
     src/MISC/PluginsManager/PluginManager.cpp
 )
 
@@ -211,8 +212,9 @@ set(HEADERS
     src/WinControls/PluginsAdmin/PluginAdminDialog.h
     src/MISC/PluginsManager/PluginUpdatePlan.h
     src/MISC/PluginsManager/PluginLoadJournal.h
-    src/MISC/PluginsManager/IPlugin.h
+    src/MISC/PluginsManager/PluginHostServices.h
     src/MISC/PluginsManager/PluginManager.h
+    src/CrossPlatformPluginSystem/PluginInterface.h
 )
 
 if(WIN32)
@@ -428,6 +430,30 @@ if(BUILD_TESTING)
     target_link_libraries(plugin-load-journal-tests Qt5::Core)
     add_test(NAME plugin-load-journal-tests
         COMMAND plugin-load-journal-tests)
+
+    add_library(cross-platform-abi-test-plugin MODULE
+        tests/plugins/CrossPlatformAbiPlugin.cpp
+        src/CrossPlatformPluginSystem/PluginInterface.h)
+    target_compile_definitions(cross-platform-abi-test-plugin PRIVATE
+        NPP_PLUGIN_BUILD)
+    target_include_directories(cross-platform-abi-test-plugin PRIVATE
+        "${CMAKE_SOURCE_DIR}/src")
+    set_target_properties(cross-platform-abi-test-plugin PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME "CrossPlatformAbiTest")
+
+    add_executable(cross-platform-plugin-tests
+        tests/CrossPlatformPluginTests.cpp
+        src/MISC/PluginsManager/PluginArtifactResolver.cpp
+        src/MISC/PluginsManager/PluginManager.cpp)
+    target_compile_definitions(cross-platform-plugin-tests PRIVATE
+        NPP_CROSS_PLATFORM_TEST_PLUGIN="$<TARGET_FILE:cross-platform-abi-test-plugin>")
+    target_link_libraries(cross-platform-plugin-tests
+        Qt5::Core Qt5::Gui)
+    add_dependencies(cross-platform-plugin-tests
+        cross-platform-abi-test-plugin)
+    add_test(NAME cross-platform-plugin-tests
+        COMMAND cross-platform-plugin-tests)
 
     add_executable(plugin-investigation-tests
         tests/PluginInvestigationTests.cpp

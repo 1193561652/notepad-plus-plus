@@ -17,8 +17,8 @@
 - 文档管理系统，包括 Buffer、FileManager、DocTabView。
 - 文件保存、另存为、脏标记、关闭询问等基础文档行为。
 
-插件包管理已形成独立更新器闭环；Windows 原版插件 ABI 正按真实 DLL 有限兼容推进，
-跨平台稳定 ABI 尚未冻结。大文件方案 B 仍按当前决策作为可选优化。
+插件包管理已形成独立更新器闭环；Windows 原版插件 ABI 按真实 DLL 有限兼容，
+跨平台 C ABI v1 已形成最小稳定基线。大文件方案 B 仍按当前决策作为可选优化。
 
 ## 关键入口
 
@@ -32,14 +32,16 @@
 - `src/Parameters.h|cpp`：配置管理。
 - `src/WinControls/PluginsAdmin/PluginAdmin*`：插件管理 UI 和展示模型。
 - `src/MISC/PluginsManager/PluginCatalog*`、`PluginUpdate*`、`updater/`：插件清单、计划和退出后更新器。
-- `src/MISC/PluginsManager/IPlugin.h`、`PluginManager.h|cpp`：插件运行接口预留。
+- `src/MISC/PluginsManager/PluginHostServices.*`、`PluginManager.*`：公共宿主能力与
+  跨平台插件生命周期。
+- `src/CrossPlatformPluginSystem/PluginInterface.h`：跨平台 ABI v1 公共定义。
 
 ## 开发约束
 
 - 修改前必须核验原版 Notepad++ 的目标行为。
 - 优先保持用户行为一致，而不是保留 Win32 调用形态。
 - 配置文件必须完全读写兼容，不修改 XML 结构，不自动升级配置。
-- 插件不作为近期功能目标，但接口和平台隔离边界需要保留。
+- 插件接口保持平台隔离，新增能力必须由真实插件需求驱动。
 - 每次只处理有限且独立的功能范围。
 - 功能完成后至少进行一次验证。
 
@@ -49,4 +51,4 @@
 - `Buffer` 与 `ScintillaEditView` 的关系会影响文件保存、标签显示、脏状态和双视图。
 - 配置读写必须避免改变原版 XML 结构。
 - 插件相关代码应避免过早绑定某个平台的动态库细节。
-- `ENABLE_PLUGIN_SYSTEM` 默认关闭，仅控制实验性运行 ABI；Plugin Admin 与包更新器始终构建。
+- `ENABLE_PLUGIN_SYSTEM` 默认开启并控制跨平台 ABI v1；Plugin Admin 与包更新器始终构建。

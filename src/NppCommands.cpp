@@ -3795,22 +3795,9 @@ void MainWindow::createMenus()
     // ── Plugins ──────────────────────────────────────────────
     _pluginsMenu = menuBar()->addMenu(tr("&Plugins"));
     _pluginsMenu->setObjectName("pluginsMenu");
-    bool hasLoadedPlugins = false;
-#ifdef ENABLE_PLUGIN_SYSTEM
-    if (_pluginManager) {
-        for (IPlugin* plugin : _pluginManager->plugins()) {
-            QMenu* sub = _pluginsMenu->addMenu(plugin->getName());
-            for (QAction* act : plugin->getMenuActions())
-                sub->addAction(act);
-            hasLoadedPlugins = true;
-        }
-    }
-#endif
-    if (!hasLoadedPlugins) {
-        QAction* noPlugins = _pluginsMenu->addAction(tr("No plugins loaded"));
-        noPlugins->setObjectName("noPluginsLoadedAction");
-        noPlugins->setEnabled(false);
-    }
+    QAction* noPlugins = _pluginsMenu->addAction(tr("No plugins loaded"));
+    noPlugins->setObjectName("noPluginsLoadedAction");
+    noPlugins->setEnabled(false);
     _pluginsMenu->addSeparator();
     addCommand(_pluginsMenu, tr("Plugins Admin..."),
                "pluginsAdminAction",

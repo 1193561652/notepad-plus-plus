@@ -2,7 +2,7 @@
 
 #include <QDebug>
 
-#include "MainWindow.h"
+#include "MISC/PluginsManager/PluginHostServices.h"
 #include "Win32PluginSystem/Win32PluginDockAdapter.h"
 #include "Win32PluginSystem/Win32PluginInterface.h"
 
@@ -13,7 +13,6 @@
 #include <QPalette>
 #include <commctrl.h>
 
-#include "Parameters.h"
 #include "ScintillaComponent/ScintillaEditView.h"
 
 namespace {
@@ -98,14 +97,17 @@ QString languageName(int languageType)
 Win32MainWindowAdapter::Win32MainWindowAdapter(
     QMainWindow* window, ScintillaEditView* mainEditor,
     ScintillaEditView* subEditor, HWND handle,
-    Win32PluginDockAdapter* dockAdapter)
+    Win32PluginDockAdapter* dockAdapter,
+    PluginHostServices* hostServices)
     : _window(window), _mainEditor(mainEditor), _subEditor(subEditor),
-      _handle(handle), _dockAdapter(dockAdapter)
+      _handle(handle), _dockAdapter(dockAdapter),
+      _hostServices(hostServices)
 {
     Q_ASSERT(_window);
     Q_ASSERT(_mainEditor);
     Q_ASSERT(_subEditor);
     Q_ASSERT(_handle);
+    Q_ASSERT(_hostServices);
     _subclassInstalled = SetWindowSubclass(
         _handle, &Win32MainWindowAdapter::subclassProc,
         reinterpret_cast<UINT_PTR>(this),
@@ -128,8 +130,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
 {
     if (handled)
         *handled = false;
-    MainWindow* nppWindow = qobject_cast<MainWindow*>(_window);
-    if (!nppWindow)
+    if (!_hostServices)
         return 0;
 
     if (_dockAdapter) {
@@ -142,9 +143,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
     if (message == NppMessageGetPluginConfigDir) {
         if (handled)
             *handled = true;
-        const QString path = QDir(NppParameters::getInstance().getUserPath())
-            .filePath(QStringLiteral("plugins/Config"));
-        QDir().mkpath(path);
+        const QString path = _hostServices->pluginConfigPath();
         return copyPluginString(QDir::toNativeSeparators(path),
                                 wParam, lParam);
     }
@@ -152,7 +151,8 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         if (handled)
             *handled = true;
         return copyLegacyPathString(QDir::toNativeSeparators(
-            NppParameters::getInstance().getNppPath()), wParam, lParam);
+            QFileInfo(_hostServices->pluginHomePath()).absolutePath()),
+            wParam, lParam);
     }
     if (message == NppMessageGetEnableThemeTextureFunc) {
         if (handled)
@@ -167,7 +167,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         || message == NppMessageGetCurrentDirectory) {
         if (handled)
             *handled = true;
-        QString path = nppWindow->currentPathForPlugin();
+        QString path = _hostServices->currentFilePath();
         if (message == NppMessageGetFileName)
             path = QFileInfo(path).fileName();
         else if (message == NppMessageGetCurrentDirectory)
@@ -178,7 +178,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
     if (message == NppMessageMenuCommand) {
         if (handled)
             *handled = true;
-        return nppWindow->executePluginMenuCommand(
+        return _hostServices->executeMenuCommand(
             static_cast<int>(lParam)) ? TRUE : FALSE;
     }
     if (message == NppMessageSaveCurrentFile
@@ -187,12 +187,12 @@ LRESULT Win32MainWindowAdapter::handleMessage(
             *handled = true;
         const int commandId = message == NppMessageSaveCurrentFile
             ? 41006 : 41007;
-        return nppWindow->executePluginMenuCommand(commandId)
+        return _hostServices->executeMenuCommand(commandId)
             ? TRUE : FALSE;
     }
     if (message == WM_COMMAND && lParam == 0) {
         const int commandId = LOWORD(wParam);
-        if (nppWindow->executePluginMenuCommand(commandId)) {
+        if (_hostServices->executeMenuCommand(commandId)) {
             if (handled)
                 *handled = true;
             return TRUE;
@@ -205,7 +205,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
             return FALSE;
         const QString path = QString::fromWCharArray(
             reinterpret_cast<const wchar_t*>(lParam));
-        return nppWindow->openFileForPlugin(path) ? TRUE : FALSE;
+        return _hostServices->openFile(path) ? TRUE : FALSE;
     }
     if (message == NppMessageSaveCurrentFileAs) {
         if (handled)
@@ -214,7 +214,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
             return FALSE;
         const QString path = QString::fromWCharArray(
             reinterpret_cast<const wchar_t*>(lParam));
-        return nppWindow->saveCurrentFileAsForPlugin(
+        return _hostServices->saveCurrentFileAs(
             path, wParam == TRUE) ? TRUE : FALSE;
     }
     if (message == NppMessageSaveCurrentSession
@@ -226,60 +226,60 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         const QString path = QString::fromWCharArray(
             reinterpret_cast<const wchar_t*>(lParam));
         return (message == NppMessageSaveCurrentSession
-            ? nppWindow->saveCurrentSessionForPlugin(path)
-            : nppWindow->loadSessionForPlugin(path)) ? TRUE : FALSE;
+            ? _hostServices->saveCurrentSession(path)
+            : _hostServices->loadSession(path)) ? TRUE : FALSE;
     }
     if (message == NppMessageGetCurrentBufferId) {
         if (handled)
             *handled = true;
-        return static_cast<LRESULT>(nppWindow->currentBufferIdForPlugin());
+        return static_cast<LRESULT>(_hostServices->currentBufferId());
     }
     if (message == NppMessageGetFullPathFromBufferId) {
         if (handled)
             *handled = true;
         return copyLegacyPathString(
-            QDir::toNativeSeparators(nppWindow->pathForPluginBuffer(
+            QDir::toNativeSeparators(_hostServices->pathForBuffer(
                 static_cast<quintptr>(wParam))), MAX_PATH, lParam);
     }
     if (message == NppMessageGetPosFromBufferId) {
         if (handled)
             *handled = true;
-        return nppWindow->positionForPluginBuffer(
+        return _hostServices->positionForBuffer(
             static_cast<quintptr>(wParam), static_cast<int>(lParam));
     }
     if (message == NppMessageGetNbOpenFiles) {
         if (handled)
             *handled = true;
-        return nppWindow->openFileCountForPlugin(
+        return _hostServices->openFileCount(
             static_cast<int>(lParam));
     }
     if (message == NppMessageGetCurrentDocIndex) {
         if (handled)
             *handled = true;
-        return nppWindow->currentDocumentIndexForPlugin(
+        return _hostServices->currentDocumentIndex(
             static_cast<int>(lParam));
     }
     if (message == NppMessageActivateDoc) {
         if (handled)
             *handled = true;
-        return nppWindow->activateDocumentForPlugin(
+        return _hostServices->activateDocument(
             static_cast<int>(wParam), static_cast<int>(lParam));
     }
     if (message == NppMessageGetCurrentLine) {
         if (handled)
             *handled = true;
-        return nppWindow->currentLineForPlugin();
+        return _hostServices->currentLine();
     }
     if (message == NppMessageGetBufferEncoding) {
         if (handled)
             *handled = true;
-        return nppWindow->bufferEncodingForPlugin(
+        return _hostServices->bufferEncoding(
             static_cast<quintptr>(wParam));
     }
     if (message == NppMessageSetBufferEncoding) {
         if (handled)
             *handled = true;
-        return nppWindow->setBufferEncodingForPlugin(
+        return _hostServices->setBufferEncoding(
             static_cast<quintptr>(wParam), static_cast<int>(lParam));
     }
     if (message == NppMessageSetStatusBar) {
@@ -287,7 +287,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
             *handled = true;
         if (!lParam)
             return FALSE;
-        nppWindow->setPluginStatusBarText(
+        _hostServices->setStatusBarText(
             static_cast<int>(wParam), QString::fromWCharArray(
                 reinterpret_cast<const wchar_t*>(lParam)));
         return TRUE;
@@ -295,14 +295,13 @@ LRESULT Win32MainWindowAdapter::handleMessage(
     if (message == NppMessageAddToolbarIconForDarkMode) {
         if (handled)
             *handled = true;
-        return nppWindow->addPluginToolbarCommand(
+        return _hostServices->addToolbarCommand(
             static_cast<int>(wParam));
     }
     if (message == NppMessageGetPluginHomePath) {
         if (handled)
             *handled = true;
-        const QString path = QDir(NppParameters::getInstance().getNppPath())
-            .filePath(QStringLiteral("plugins"));
+        const QString path = _hostServices->pluginHomePath();
         return copyPluginString(QDir::toNativeSeparators(path), wParam, lParam);
     }
     if (message == NppMessageGetNppVersion) {
@@ -327,7 +326,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
     if (message == NppMessageIsDarkModeEnabled) {
         if (handled)
             *handled = true;
-        return NppParameters::getInstance().getNppGUI()._darkModeEnabled;
+        return _hostServices->isDarkModeEnabled();
     }
     if (message == NppMessageGetDarkModeColors) {
         if (handled)
@@ -379,7 +378,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
     if (message == NppMessageGetExtensionPart) {
         if (handled)
             *handled = true;
-        const QString suffix = QFileInfo(nppWindow->currentFilePath()).suffix();
+        const QString suffix = QFileInfo(_hostServices->currentFilePath()).suffix();
         return copyPluginString(suffix, wParam, lParam);
     }
     if (message == NppMessageGetCurrentLangType) {
@@ -388,7 +387,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
         int* language = reinterpret_cast<int*>(lParam);
         if (!language)
             return FALSE;
-        *language = currentLanguageType(nppWindow->currentView());
+        *language = currentLanguageType(_hostServices->currentView());
         return TRUE;
     }
     if (message == NppMessageGetLanguageName) {
@@ -406,7 +405,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
     if (message == NppMessageSetCurrentLangType) {
         if (handled)
             *handled = true;
-        return nppWindow->setCurrentLanguageTypeFromPlugin(
+        return _hostServices->setCurrentLanguageType(
             static_cast<int>(lParam)) ? TRUE : FALSE;
     }
     if (message != NppMessageGetCurrentScintilla) {
@@ -426,7 +425,7 @@ LRESULT Win32MainWindowAdapter::handleMessage(
     if (!currentView)
         return FALSE;
 
-    ScintillaEditView* activeEditor = nppWindow->currentView();
+    ScintillaEditView* activeEditor = _hostServices->currentView();
     if (activeEditor != _mainEditor && activeEditor != _subEditor)
         return FALSE;
 

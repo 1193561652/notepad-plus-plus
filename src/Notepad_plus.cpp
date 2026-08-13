@@ -22,6 +22,7 @@
 #include "WinControls/ProjectPanel/ProjectPanel.h"
 #include "WinControls/Grid/ShortcutMapper.h"
 #include "MISC/PluginsManager/PluginManager.h"
+#include "MISC/PluginsManager/PluginHostServices.h"
 #include "WinControls/PluginsAdmin/PluginAdminDialog.h"
 #include "WinControls/PluginsAdmin/PluginAdminModel.h"
 #include "MISC/PluginsManager/PluginCatalog.h"
@@ -105,6 +106,7 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
 
     setupTabViews();
     _dockingManager.init(this, _splitter);
+    _pluginHostServices = new MainWindowPluginHostServices(this);
 #ifdef Q_OS_WIN
     if (!startupOptions.noPlugin) {
         const QString pluginStateDirectory =
@@ -112,7 +114,8 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
                 .filePath(QStringLiteral("plugin-load"));
         _win32PluginManager = new Win32PluginManager(
             this, _mainDocTab->editor(), _subDocTab->editor(),
-            pluginStateDirectory, &_dockingManager);
+            pluginStateDirectory, &_dockingManager,
+            _pluginHostServices);
     }
 #endif
     createActions();
@@ -222,6 +225,8 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
     if (_win32PluginManager)
         _win32PluginManager->notifyReady();
 #endif
+    if (_pluginManager)
+        _pluginManager->notifyReady();
 }
 
 MainWindow::~MainWindow()
@@ -236,7 +241,9 @@ MainWindow::~MainWindow()
         _recordingMacro = nullptr;
     }
     if (_pluginManager)
-        _pluginManager->unloadAll(this);
+        _pluginManager->unloadAll();
+    delete _pluginHostServices;
+    _pluginHostServices = nullptr;
     for (Buffer* buffer : MainFileManager.buffers()) {
         if (buffer)
             buffer->releaseDocument();

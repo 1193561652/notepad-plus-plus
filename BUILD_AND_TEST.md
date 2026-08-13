@@ -23,8 +23,9 @@ compiler.
 | Other Linux | Qt 5 + GCC/Clang | Build path present; not currently verified |
 | macOS | Qt 5 + Apple Clang | Build path present; pending macOS verification |
 
-Plugin loading is disabled by default on every platform. The current status
-describes the application and automated tests, not plugin ABI compatibility.
+Plugin loading is enabled by default. Windows can load reviewed original
+Notepad++ DLLs through `src/Win32PluginSystem`; every platform can load the
+minimal C ABI v1 documented in `src/CrossPlatformPluginSystem/README.md`.
 
 ## Common Configure
 
@@ -169,6 +170,7 @@ ctest --test-dir build -R "localization|ui-" --output-on-failure
 ctest --test-dir build -R "config|session|shortcuts|langs|stylers|context|udl" --output-on-failure
 ctest --test-dir build -R "large-file|boost-regex|core-behavior" --output-on-failure
 ctest --test-dir build -R "plugin-(admin|updater)" --output-on-failure
+ctest --test-dir build -R "cross-platform-plugin" --output-on-failure
 ```
 
 The UI localization matrix runs simplified Chinese in light and dark themes at

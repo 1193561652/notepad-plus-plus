@@ -109,8 +109,16 @@ void PluginAdminModel::refresh()
     _items.clear();
 
     QSet<QString> installedFolders;
-    const QVector<PluginArtifact> artifacts =
+    QVector<PluginArtifact> artifacts =
         PluginArtifactResolver::discover(_pluginRoot);
+    QSet<QString> artifactFolders;
+    for (const PluginArtifact& artifact : artifacts)
+        artifactFolders.insert(artifact.folderName.toCaseFolded());
+    for (const PluginArtifact& artifact :
+         PluginArtifactResolver::discoverCrossPlatform(_pluginRoot)) {
+        if (!artifactFolders.contains(artifact.folderName.toCaseFolded()))
+            artifacts.append(artifact);
+    }
     for (const PluginArtifact& artifact : artifacts) {
         const QString folderName = artifact.folderName;
         const QString binaryPath = artifact.binaryPath;

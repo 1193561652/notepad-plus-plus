@@ -46,8 +46,9 @@ validation commands.
 Each platform builds the bundled `npp-scintilla-qt` static library with the
 Notepad++ Boost.Regex backend and the separate `npp-lexilla` static library.
 Both are built directly by CMake; qmake is not part of the current build.
-Plugin package management is available, while native Notepad++ plugin ABI
-compatibility remains a separate deferred scope.
+Plugin package management, the reviewed Windows Notepad++ ABI compatibility
+layer, and the minimal cross-platform C ABI v1 are available. The public ABI
+is documented in `src/CrossPlatformPluginSystem/README.md`.
 
 ## Repository Layout
 
@@ -58,6 +59,7 @@ compatibility remains a separate deferred scope.
 - `third_party/boostregex/`: Boost.Regex integration
 - `third_party/lexilla/`: separately built Lexilla, lexlib, built-in lexers,
   and the v8.4.6 LexUser lexer
+- `src/CrossPlatformPluginSystem/`: public cross-platform plugin ABI and guide
 - `codex/`: project knowledge base and implementation records
 
 ## Original Source
@@ -75,7 +77,7 @@ git show v8.4.6:PowerEditor/src/Notepad_plus.cpp
 - Preserve Notepad++ XML formats and unknown user data.
 - Keep platform-specific code behind explicit adaptation boundaries.
 - Keep changes local and verify every completed feature.
-- Plugin ABI work remains deferred; host interfaces stay isolated.
+- Keep original Windows plugin adaptation isolated from the cross-platform ABI.
 
 ## License
 

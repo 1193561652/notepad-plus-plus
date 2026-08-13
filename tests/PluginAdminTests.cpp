@@ -259,6 +259,38 @@ void testArtifactsAndModel()
           "an incompatible old plugin should offer a compatible update");
 }
 
+void testCrossPlatformArtifactDiscovery()
+{
+    QTemporaryDir temporary;
+    check(temporary.isValid(),
+          "cross-platform artifact root should exist");
+    const QString binaryPath =
+        PluginArtifactResolver::crossPlatformBinaryPath(
+            temporary.path(), QStringLiteral("PortableSample"));
+    QDir().mkpath(QFileInfo(binaryPath).absolutePath());
+    QFile binary(binaryPath);
+    check(binary.open(QFile::WriteOnly),
+          "cross-platform test binary should open");
+    binary.write("test");
+    binary.close();
+
+    const QVector<PluginArtifact> artifacts =
+        PluginArtifactResolver::discoverCrossPlatform(temporary.path());
+    check(artifacts.size() == 1
+              && artifacts.first().folderName
+                     == QStringLiteral("PortableSample")
+              && artifacts.first().binaryPath == binaryPath,
+          "ABI v1 platform directory should be discovered");
+
+    PluginAdminModel model(
+        temporary.path(), PluginCatalog(),
+        PluginVersion(QStringLiteral("8.4.6")));
+    check(model.installedItems().size() == 1
+              && model.installedItems().first().folderName
+                     == QStringLiteral("PortableSample"),
+          "Plugins Admin should list an ABI v1-only plugin");
+}
+
 void testUpdatePlan()
 {
     QTemporaryDir temporary;
@@ -300,6 +332,7 @@ int main(int argc, char** argv)
     testBundledWindowsCatalogs();
     testPluginEnablementConfig();
     testArtifactsAndModel();
+    testCrossPlatformArtifactDiscovery();
     testUpdatePlan();
     if (failures == 0)
         std::cout << "Plugin admin tests passed\n";

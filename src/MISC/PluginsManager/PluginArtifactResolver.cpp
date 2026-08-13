@@ -36,6 +36,21 @@ QString PluginArtifactResolver::binaryPath(const QString& pluginRoot,
         pluginDirectory.filePath(folderName + librarySuffix()));
 }
 
+QString PluginArtifactResolver::crossPlatformBinaryPath(
+    const QString& pluginRoot, const QString& folderName)
+{
+#if defined(Q_OS_WIN)
+    const QString platform = QStringLiteral("windows");
+#elif defined(Q_OS_MAC)
+    const QString platform = QStringLiteral("macos");
+#else
+    const QString platform = QStringLiteral("linux");
+#endif
+    return QDir::cleanPath(QDir(pluginRoot).filePath(
+        QStringLiteral("%1/cross-platform/%2/%1%3")
+            .arg(folderName, platform, librarySuffix())));
+}
+
 QVector<PluginArtifact> PluginArtifactResolver::discover(
     const QString& pluginRoot)
 {
@@ -60,6 +75,29 @@ QVector<PluginArtifact> PluginArtifactResolver::discover(
         artifact.folderName = folderName;
         artifact.binaryPath = path;
         artifacts.append(artifact);
+    }
+    return artifacts;
+}
+
+QVector<PluginArtifact> PluginArtifactResolver::discoverCrossPlatform(
+    const QString& pluginRoot)
+{
+    QVector<PluginArtifact> artifacts;
+    const QDir root(pluginRoot);
+    const QFileInfoList directories =
+        root.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot,
+                           QDir::Name | QDir::IgnoreCase);
+    for (const QFileInfo& directory : directories) {
+        if (directory.isSymLink()
+            || directory.fileName().compare(
+                QStringLiteral("Config"), Qt::CaseInsensitive) == 0) {
+            continue;
+        }
+        const QString path = crossPlatformBinaryPath(
+            pluginRoot, directory.fileName());
+        const QFileInfo binary(path);
+        if (binary.isFile() && !binary.isSymLink())
+            artifacts.push_back({directory.fileName(), path});
     }
     return artifacts;
 }

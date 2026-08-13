@@ -182,12 +182,13 @@ Win32PluginManager::Win32PluginManager(
     ScintillaEditView* mainEditor,
     ScintillaEditView* subEditor,
     const QString& pluginStateDirectory,
-    DockingManager* dockingManager)
+    DockingManager* dockingManager,
+    PluginHostServices* hostServices)
     : QObject(mainWindow),
       _dockAdapter(mainWindow, dockingManager, nativeHandle(mainWindow)),
       _mainWindowAdapter(
           mainWindow, mainEditor, subEditor, nativeHandle(mainWindow),
-          &_dockAdapter),
+          &_dockAdapter, hostServices),
       _mainEditorReceiver(createPluginReceiver(_mainWindowAdapter.handle())),
       _subEditorReceiver(createPluginReceiver(_mainWindowAdapter.handle())),
       _mainEditorAdapter(mainEditor, _mainEditorReceiver),

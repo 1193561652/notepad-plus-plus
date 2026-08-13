@@ -1,5 +1,18 @@
 # 本地缓存：最新分析
 
+## 2026-08-13 Plugin Host Services 与跨平台 ABI v1
+
+- 已按 v8.4.6 原版 PluginsManager 职责建立薄 `PluginHostServices`；文档和编辑器业务仍
+  留在主控制器，Win32 适配层只进行消息/类型转换。
+- 删除跨 DLL 暴露 Qt/C++ 类型的实验性 `IPlugin` 接口，新增单头文件、C ABI、UTF-8
+  的跨平台插件 ABI v1。
+- `nppSetInfo` 传递系统类型、CPU、系统名称/版本、软件名称/版本和插件路径；首版只
+  暴露当前文件、打开文件和日志服务。
+- ABI v1 使用 `cross-platform/<platform>` 独立目录，与原版 Windows DLL 共用
+  `pluginsEnabled.xml`，同插件目录优先加载 ABI v1。
+- Debug 全构建和完整 CTest `47/47` 通过。详见
+  `codex/changes/2026-08-13-plugin-host-services-and-abi-v1.md`。
+
 ## 2026-08-13 Win32 插件联合回归收口
 
 - 27 个已确认兼容的官方未修改 x64 DLL 已通过同进程联合加载、文档操作、正常关闭和

@@ -114,25 +114,18 @@ Dock 或内部窗口，也不能保证通过版本区间和导出检查的插件
 
 当前入口：
 
-- `src/MISC/PluginsManager/IPlugin.h`
+- `src/CrossPlatformPluginSystem/PluginInterface.h`
+- `src/MISC/PluginsManager/PluginHostServices.h`
 - `src/MISC/PluginsManager/PluginManager.h`
 - `src/MISC/PluginsManager/PluginManager.cpp`
 - `src/MainWindow.h`
 - `src/MainWindow.cpp`
 - `CMakeLists.txt`
 
-当前实现使用 `QLibrary` 加载 `.dll`、`.so` 或 `.dylib`，查找
-`createPlugin`/`destroyPlugin`，并直接跨动态库边界传递 `QString`、`QList`、
-`QAction`、`QMainWindow` 和 C++ 虚接口。它适合作为功能原型，但存在以下限制：
-
-- ABI 绑定编译器、标准库、Qt 主版本、Qt 构建选项和编译配置。
-- 没有 ABI 版本协商或能力协商。
-- 没有原版命令 ID、快捷键、通知、消息和 Dock 语义。
-- 插件异常可越过模块边界，加载失败也没有结构化诊断。
-- 插件目录固定为应用目录下的 `plugins/`，尚未统一到配置路径策略。
-- `ENABLE_PLUGIN_SYSTEM` 默认关闭，尚无完整插件测试。
-
-因此，不应把当前 `IPlugin` 直接冻结为公开的长期 ABI。
+当前实现使用 `QLibrary` 加载 ABI v1 平台动态库，解析参考原版形态的六个 C 导出。
+ABI 只传递固定宽度整数、UTF-8、显式大小结构和函数指针；Qt/C++ 类型不跨模块。
+首版已支持命令、快捷键、`READY`/`SHUTDOWN`，以及系统/软件版本、路径、当前文件、
+打开文件和日志。复杂通知、Dock 和编辑器服务继续按真实插件需求扩展。
 
 ## 3. 总体架构
 
@@ -397,9 +390,9 @@ Windows DLL 插件兼容实现隔离在 `Win32PluginSystem`。
 依赖 Windows SDK 和调用 Windows API；Linux/macOS 不配置、不编译其中源码，
 也不为该兼容层维护平台桩实现。新增源文件只登记在目录内的 `CMakeLists.txt`。
 
-首个重构步骤应把现有 `IPluginHost` 从 `MainWindow` 继承关系中移出，并用组合的
-`PluginHostServices` 适配器替代。旧 `IPlugin` 在迁移期可作为实验接口保留，
-但要明确标记为不稳定，最终通过新 ABI 的 Qt SDK 实现。
+现有 `IPluginHost` 已从 `MainWindow` 继承关系中移出，并由组合的
+`PluginHostServices` 适配器替代。旧 `IPlugin` 已删除；跨 DLL 接口统一使用
+`src/CrossPlatformPluginSystem/PluginInterface.h` 中的 C ABI v1。
 
 ## 7. 当前实施阶段
 
@@ -443,11 +436,12 @@ Plugin Admin、清单/兼容模型、退出后安装/更新/卸载、SHA-256、Z
 - 已完成永久主/副 Scintilla 视图、三个代理 HWND、命令/快捷键、同步 SCI 白名单和
   原生 DockingManager 接入。
 
-### 阶段 4：通知基线已完成，Host Services 进行中
+### 阶段 4：通知基线与 Host Services（已完成）
 
 - 常用 `NPPN_*` 与 `SCNotification` 已覆盖 Buffer、文件、语言、主题和关闭顺序；
   `READONLYCHANGED` 的特殊 HWND/状态位 ABI 及文件打开、保存、关闭顺序已有 DLL 回归。
-- 把可跨平台能力收敛到组合式 `PluginHostServices`，不继续让 MainWindow 实现 ABI。
+- 可跨平台能力已收敛到组合式 `PluginHostServices`；MainWindow 不再继承插件 ABI，
+  Win32 兼容层只把消息和类型转换为服务调用。
 - 双视图和 clone 的 Buffer 激活/关闭通知已接入；`SCN_*` 已保留主/副来源同步桥接，
   插件专属通知语义、线程和回调重入仍按真实插件语料逐项验证。
 
@@ -474,11 +468,13 @@ DoxyIt/ElasticTabstops 使用旧 `Sci_PositionCR=long` direct ABI，而 XMLTools
 `SendMessage`。XMLTools 的格式化、文本转换、语法注解、自动闭合、菜单状态和 Options
 窗口现均已验证。此修复不改变上述对“任意未知插件安全降级”的限制。
 
-### 阶段 6：跨平台 ABI v1
+### 阶段 6：跨平台 ABI v1（最小基线已完成）
 
-- 基于真实语料冻结版本化 C ABI 的错误、所有权、线程和服务发现规则。
-- Qt/C++ 只作为 SDK 包装，不跨 ABI 传递 Qt/STL 类型或异常。
-- Windows、Linux、macOS 使用同一源码测试插件重新编译验证。
+- 单一公共头文件定义版本化 C ABI、结构大小、所有权、UI 线程回调和六导出。
+- Qt/C++ 不跨 ABI；`nppSetInfo` 提供系统、CPU、系统版本、软件版本、插件路径和三项
+  最小宿主函数。
+- 同一源码测试插件已在 Windows 构建和运行；Linux/macOS 重编译验证随对应平台发布
+  阶段执行，不据 Windows 结果宣称已完成目标平台运行验证。
 
 ### 阶段 7：复杂插件源码移植
 
@@ -549,7 +545,7 @@ ctest --test-dir build-no-plugins --output-on-failure
 
 ## 9. 禁止事项
 
-- 不把当前 Qt/C++ `IPlugin` 当作已稳定公开 ABI。
+- 不重新引入跨动态库的 Qt/C++ 插件接口。
 - 不在业务层散布平台后缀、`QLibrary`、Win32 类型或消息编号。
 - 不以宏复制两套业务逻辑；平台差异放入适配器。
 - 不为 Linux/macOS 实现伪 `HWND` 来宣称 Windows DLL 兼容。

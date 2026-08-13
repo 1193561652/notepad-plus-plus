@@ -16,5 +16,9 @@ public:
     static QString librarySuffix();
     static QString binaryPath(const QString& pluginRoot,
                               const QString& folderName);
+    static QString crossPlatformBinaryPath(const QString& pluginRoot,
+                                           const QString& folderName);
     static QVector<PluginArtifact> discover(const QString& pluginRoot);
+    static QVector<PluginArtifact> discoverCrossPlatform(
+        const QString& pluginRoot);
 };

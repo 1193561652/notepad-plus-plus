@@ -14,6 +14,7 @@
 class QMainWindow;
 class ScintillaEditView;
 class Win32PluginDockAdapter;
+class PluginHostServices;
 
 class Win32MainWindowAdapter final
 {
@@ -22,7 +23,8 @@ public:
                            ScintillaEditView* mainEditor,
                            ScintillaEditView* subEditor,
                            HWND handle,
-                           Win32PluginDockAdapter* dockAdapter);
+                           Win32PluginDockAdapter* dockAdapter,
+                           PluginHostServices* hostServices);
     ~Win32MainWindowAdapter();
 
     QMainWindow* window() const { return _window; }
@@ -44,5 +46,6 @@ private:
     ScintillaEditView* _subEditor = nullptr;
     HWND _handle = nullptr;
     Win32PluginDockAdapter* _dockAdapter = nullptr;
+    PluginHostServices* _hostServices = nullptr;
     bool _subclassInstalled = false;
 };

@@ -26,6 +26,7 @@ class QMainWindow;
 class QWidget;
 class ScintillaEditView;
 class DockingManager;
+class PluginHostServices;
 namespace Scintilla { struct NotificationData; }
 
 class Win32PluginManager final : public QObject
@@ -35,7 +36,8 @@ public:
                        ScintillaEditView* mainEditor,
                        ScintillaEditView* subEditor,
                        const QString& pluginStateDirectory,
-                       DockingManager* dockingManager);
+                       DockingManager* dockingManager,
+                       PluginHostServices* hostServices);
     ~Win32PluginManager() override;
 
     QMainWindow* mainWindow() const { return _mainWindowAdapter.window(); }

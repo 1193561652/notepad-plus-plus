@@ -1,5 +1,18 @@
 # 插件系统功能索引
 
+## 跨平台 ABI v1
+
+- 公共 ABI 已冻结为首版最小集合，定义于
+  `src/CrossPlatformPluginSystem/PluginInterface.h`，说明见同目录 `README.md`。
+- 六导出形态参考原版接口，但所有数据均为 C ABI、固定宽度整数和 UTF-8；不跨动态库
+  传递 Qt、STL、C++ 对象、异常或 HWND。
+- `NppPluginHostInfo` 包含系统、架构、系统版本、软件版本、插件路径，以及当前文件、
+  打开文件、日志三项基础服务。
+- `PluginHostServices` 是 Win32 原版 ABI 与跨平台 ABI 共用的薄业务入口；兼容层不得在
+  此处复制文档、Buffer、编辑器、会话或 Dock 逻辑。
+- ABI v1 二进制位于 `plugins/<id>/cross-platform/<platform>/`，避免 Windows 探测时
+  触发原版 DLL；两类插件共用启用 XML，同目录优先跨平台 ABI。
+
 ## 2026-08-09 高、中优先级真实插件批次
 
 - 白名单新增 GotoLineCol 2.4.2.0、RandomValuesNppPlugin 0.2.1、Merge files in one 1.2.0.0、SelectToClipboard 1.0.3、urlPlugin 1.2.0.0；插件 DLL 未修改。
@@ -12,8 +25,8 @@
 插件系统分为两个独立范围：
 
 - 插件包管理：清单、已安装状态、安装、更新、卸载和退出后更新器，当前已实现。
-- 插件加载运行：规划和 v8.4.6 x86 静态调查已完成；原版 Windows ABI 与未来
-  跨平台 ABI 当前仍是隔离的预留接口。
+- 插件加载运行：原版 Windows ABI 兼容层与跨平台 ABI v1 均已实现，并通过共同的
+  `PluginHostServices` 使用既有业务行为；两种动态库格式继续隔离。
 
 完整 ABI 决策和插件分级见 `codex/guides/plugin-system-porting-guide.md`。
 
@@ -96,8 +109,9 @@
 ## 构建边界
 
 - Plugin Admin 和 `npp-plugin-updater` 始终构建，不依赖 `ENABLE_PLUGIN_SYSTEM`。
-- `ENABLE_PLUGIN_SYSTEM` 默认关闭，只控制实验性 Qt/C++ `IPlugin` 运行接口。
-- 当前 `IPlugin` 不是冻结 ABI，也不等同于 Notepad++ 原版插件兼容。
+- `ENABLE_PLUGIN_SYSTEM` 默认开启，只控制跨平台 C ABI v1；Windows 原版 ABI 仍由
+  `Q_OS_WIN` 平台边界和 `-noPlugin` 控制。
+- 已删除实验性 Qt/C++ `IPlugin`；公共接口只有单头文件 C ABI。
 
 ## 验证
 
@@ -118,7 +132,7 @@
 - 安全加载剩余项：PE 架构和依赖预检；本轮按决策暂不实现。
 - Windows v8.4.6 原版插件 ABI 已形成有限兼容层；常用 NPPN 和 `SCN_*` 转换基线已完成，
   后续继续补齐真实语料需要的 Host Services 和插件专属通知语义，不承诺任意旧插件通用兼容。
-- 跨平台稳定插件 ABI 及 SDK。
+- 跨平台 ABI v1 的复杂编辑器、Dock、任务和主题服务，按真实移植插件需求增量扩展。
 - Linux/macOS 原生插件生态清单、签名、公证和发布策略。
 
 ## 2026-08-11 可配置插件启用清单

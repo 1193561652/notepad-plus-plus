@@ -411,7 +411,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
     event->accept();
 }
 
-// ─── IPluginHost ─────────────────────────────────────────────────────────────
+// ─── Plugin host operations ─────────────────────────────────────────────────
 
 QString MainWindow::currentFilePath() const
 {
@@ -957,6 +957,33 @@ void MainWindow::setupPluginSystem()
                    << enablementError;
     }
     QStringList enabledPluginFolders = enablement.enabledPlugins();
+#ifdef ENABLE_PLUGIN_SYSTEM
+    _pluginManager = new PluginManager(_pluginHostServices, this);
+    QStringList crossPlatformErrors;
+    _pluginManager->loadPlugins(
+        pluginDir, enabledPluginFolders, &crossPlatformErrors);
+    for (const QString& error : crossPlatformErrors)
+        qInfo() << "Cross-platform plugin skipped:" << error;
+    populateCrossPlatformPluginMenu();
+
+    const QStringList loadedCrossPlatformFolders =
+        _pluginManager->loadedPluginFolders();
+    QSet<QString> crossPlatformFolders;
+    for (const QString& folder : loadedCrossPlatformFolders)
+        crossPlatformFolders.insert(folder);
+    for (int index = enabledPluginFolders.size() - 1; index >= 0; --index) {
+        bool loadedByCrossPlatformAbi = false;
+        for (const QString& folder : crossPlatformFolders) {
+            if (folder.compare(enabledPluginFolders[index],
+                               Qt::CaseInsensitive) == 0) {
+                loadedByCrossPlatformAbi = true;
+                break;
+            }
+        }
+        if (loadedByCrossPlatformAbi)
+            enabledPluginFolders.removeAt(index);
+    }
+#endif
 #ifdef Q_OS_WIN
     connect(_mainDocTab->editor(), &ScintillaEditBase::notify, this,
             [this](Scintilla::NotificationData* notification) {
@@ -1006,10 +1033,56 @@ void MainWindow::setupPluginSystem()
         });
     }
 #endif
-#ifdef ENABLE_PLUGIN_SYSTEM
-    _pluginManager = new PluginManager(this);
-    _pluginManager->loadPlugins(pluginDir, this, enabledPluginFolders);
-#endif
+}
+
+void MainWindow::populateCrossPlatformPluginMenu()
+{
+    if (!_pluginsMenu || !_pluginManager)
+        return;
+    QAction* placeholder = findChild<QAction*>(
+        QStringLiteral("noPluginsLoadedAction"));
+    if (placeholder) {
+        _pluginsMenu->removeAction(placeholder);
+        delete placeholder;
+    }
+
+    QAction* insertionPoint = findChild<QAction*>(
+        QStringLiteral("pluginsAdminAction"));
+    for (int pluginIndex = 0;
+         pluginIndex < _pluginManager->loadedPluginCount(); ++pluginIndex) {
+        QMenu* pluginMenu = new QMenu(
+            _pluginManager->loadedPluginNames().value(pluginIndex),
+            _pluginsMenu);
+        pluginMenu->setObjectName(
+            QStringLiteral("crossPlatformPluginMenu_%1").arg(pluginIndex));
+        for (int functionIndex = 0;
+             functionIndex < _pluginManager->loadedPluginFunctionCount(
+                 pluginIndex); ++functionIndex) {
+            QAction* action = pluginMenu->addAction(
+                _pluginManager->loadedPluginFunctionName(
+                    pluginIndex, functionIndex));
+            action->setCheckable(
+                _pluginManager->isLoadedPluginFunctionInitiallyChecked(
+                    pluginIndex, functionIndex));
+            action->setChecked(
+                _pluginManager->isLoadedPluginFunctionInitiallyChecked(
+                    pluginIndex, functionIndex));
+            action->setShortcut(
+                _pluginManager->loadedPluginFunctionShortcut(
+                    pluginIndex, functionIndex));
+            connect(action, &QAction::triggered, this,
+                    [this, pluginIndex, functionIndex]() {
+                QString error;
+                if (!_pluginManager->executePluginCommand(
+                        pluginIndex, functionIndex, &error)
+                    && !error.isEmpty()) {
+                    QMessageBox::warning(
+                        this, tr("Plugins"), error);
+                }
+            });
+        }
+        _pluginsMenu->insertMenu(insertionPoint, pluginMenu);
+    }
 }
 
 #ifdef Q_OS_WIN

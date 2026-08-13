@@ -24,18 +24,21 @@
 - `src/localization.*`：本地化和 `NativeLangSpeaker` 语言切换。
 - `src/TinyXml/`：XML 配置解析。
 - `src/MISC/PluginsManager/`：插件运行边界、清单、更新计划和独立更新器。
+- `src/CrossPlatformPluginSystem/`：平台无关插件 ABI 公共头文件与插件作者文档。
 - `src/WinControls/PluginsAdmin/`：插件管理 UI 与展示模型。
 - `src/Win32PluginSystem/`：原版 Windows DLL 插件 ABI、消息和窗口语义兼容层。
 
 ## 关键关系
 
-- `MainWindow` 继承 `QMainWindow`，同时实现 `IPluginHost`。
+- `MainWindow` 只继承 `QMainWindow`；`MainWindowPluginHostServices` 组合并委托其已有
+  文档和编辑器操作。
 - `MainWindow` 通过两个 `DocTabView` 管理主/副视图，每个视图永久持有一个
   `ScintillaEditView`。
 - `Buffer` 保存文件状态并拥有一个 addref 后的 Scintilla document pointer；标签只映射
   Buffer，永久编辑器在标签切换时通过 `SCI_SETDOCPOINTER` 切换文档。
 - `FileManager` 是单例，负责创建、加载、保存和关闭 `Buffer`。
-- `PluginAdminModel` 与独立更新器负责包管理；`PluginManager` 的 Qt 动态库接口仍是未冻结的运行 ABI 预留。
+- `PluginAdminModel` 与独立更新器负责包管理；`PluginManager` 加载单头文件 C ABI v1，
+  Win32 原版 DLL 仍由独立管理器加载。
 
 ## 待补充索引
 
@@ -43,7 +46,7 @@
 - `ScintillaEditView` 与官方 Scintilla Qt 平台层的消息边界。
 - `DocTabView` 标签生命周期和 Buffer 映射。
 - 文件保存、另存为、关闭询问、备份恢复的完整调用链。
-- 插件接口是否应默认参与构建，以及 `ENABLE_PLUGIN_SYSTEM` 默认值是否符合近期目标。
+- 跨平台 ABI 增量能力与复杂插件源码移植的对应关系。
 
 ## 已建立模块索引
 

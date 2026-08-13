@@ -12,7 +12,6 @@
 
 #include "ScintillaComponent/Buffer.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
-#include "MISC/PluginsManager/IPlugin.h"
 #include "MISC/PluginsManager/PluginUpdatePlan.h"
 #include "CommandLineOptions.h"
 #include "MISC/ClosedFileHistory.h"
@@ -25,6 +24,7 @@ class PreferenceDlg;
 class DocumentMapPanel;
 class FunctionListPanel;
 class PluginManager;
+class PluginHostServices;
 #ifdef Q_OS_WIN
 class Win32PluginManager;
 #endif
@@ -42,7 +42,7 @@ struct MacroDef;
 static const int MAIN_VIEW = 0;
 static const int SUB_VIEW  = 1;
 
-class MainWindow : public QMainWindow, public IPluginHost
+class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
@@ -52,11 +52,9 @@ public:
     ~MainWindow();
     void applyCommandLineInvocation(const CommandLineOptions& options);
 
-    // IPluginHost 接口
-    ScintillaEditView* currentView() override { return currentActiveView(); }
-    void openFile(const QString& path) override { doOpenFile(path, _activeDocTab); }
-    QString currentFilePath() const override;
-    QMainWindow* mainWindow() override { return this; }
+    ScintillaEditView* currentView() { return currentActiveView(); }
+    void openFile(const QString& path) { doOpenFile(path, _activeDocTab); }
+    QString currentFilePath() const;
     DockingManager& dockingManager() { return _dockingManager; }
     const DockingManager& dockingManager() const { return _dockingManager; }
     QString currentPathForPlugin() const;
@@ -129,6 +127,7 @@ private:
     void setupFindResultPanel();
     void setupAuxiliaryPanels();
     void setupPluginSystem();
+    void populateCrossPlatformPluginMenu();
 #ifdef Q_OS_WIN
     void populateWin32PluginMenu();
 #endif
@@ -323,6 +322,7 @@ private:
     QDockWidget*       _characterDock    = nullptr;
     QListWidget*       _characterList    = nullptr;
     PluginManager*     _pluginManager    = nullptr;
+    PluginHostServices* _pluginHostServices = nullptr;
 #ifdef Q_OS_WIN
     Win32PluginManager* _win32PluginManager = nullptr;
 #endif
