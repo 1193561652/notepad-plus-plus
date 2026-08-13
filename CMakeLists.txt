@@ -767,6 +767,14 @@ if(BUILD_TESTING)
                 COMMAND ui-parity-capture
                     "${CMAKE_BINARY_DIR}/win32-document-policy-plugins"
                     documentPolicyPlugins)
+            add_test(NAME win32-plugin-coexistence-first-start
+                COMMAND ui-parity-capture
+                    "${CMAKE_BINARY_DIR}/win32-plugin-coexistence"
+                    pluginCoexistence)
+            add_test(NAME win32-plugin-coexistence-restart
+                COMMAND ui-parity-capture
+                    "${CMAKE_BINARY_DIR}/win32-plugin-coexistence"
+                    pluginCoexistence)
         endif()
     endif()
     if(WIN32)
@@ -803,6 +811,8 @@ if(BUILD_TESTING)
                 win32-configuration-plugins
                 win32-session-manager
                 win32-document-policy-plugins
+                win32-plugin-coexistence-first-start
+                win32-plugin-coexistence-restart
                 PROPERTIES
                 ENVIRONMENT
                     "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM};NPP_QT_TEST_WIN32_PLUGIN_FILTER=BetterMultiSelection"
@@ -821,6 +831,19 @@ if(BUILD_TESTING)
             set_tests_properties(win32-document-policy-plugins PROPERTIES
                 ENVIRONMENT
                     "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM};NPP_QT_TEST_WIN32_PLUGIN_FILTER=nppAutoDetectIndent|AutoCodepage|AutoEolFormat")
+            set(NPP_COMPATIBLE_PLUGIN_FILTER
+                "mimeTools|qkNppReverseLines|Remove Duplicate Lines|SelectQuotedText|BracketsCheck|SecurePad|CodeAlignmentNpp|BetterMultiSelection|DoxyIt|ElasticTabstops|SurroundSelection|XMLTools|AutoSave|NppEditorConfig|SessionMgr|nppAutoDetectIndent|AutoCodepage|AutoEolFormat|NPPJSONViewer|JsonTools|nppConverter|NppPluginDemo|GotoLineCol|RandomValuesNppPlugin|Merge files in one|SelectToClipboard|urlPlugin")
+            set_tests_properties(win32-plugin-coexistence-first-start
+                PROPERTIES
+                ENVIRONMENT
+                    "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM};NPP_QT_TEST_WIN32_PLUGIN_FILTER=${NPP_COMPATIBLE_PLUGIN_FILTER};NPP_QT_TEST_PLUGIN_RESTART_PHASE=1"
+                FIXTURES_SETUP win32-plugin-coexistence-first-run)
+            set_tests_properties(win32-plugin-coexistence-restart
+                PROPERTIES
+                ENVIRONMENT
+                    "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM};NPP_QT_TEST_WIN32_PLUGIN_FILTER=${NPP_COMPATIBLE_PLUGIN_FILTER};NPP_QT_TEST_PLUGIN_RESTART_PHASE=2"
+                FIXTURES_REQUIRED
+                    "mimetools-managed-plugin;win32-plugin-coexistence-first-run")
         endif()
     endif()
     if(WIN32)

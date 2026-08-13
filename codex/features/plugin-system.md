@@ -203,3 +203,15 @@
 - 自动回归覆盖四个插件的核心命令、配置/选项窗口、菜单勾选、XML 注解和输入通知；
   四插件组合加载并正常退出。详细记录见
   `codex/changes/2026-08-11-p0-win32-plugin-compatibility.md`。
+
+## 2026-08-13 联合启动、关闭与重启
+
+- 新增 `win32-plugin-coexistence-first-start` 和
+  `win32-plugin-coexistence-restart`，共享隔离配置目录并按顺序运行。
+- 测试集合包含当前 27 个已确认兼容的官方未修改 Windows x64 DLL；覆盖完整主窗口、
+  READY、文档通知、编码重解释、配置策略、Session、关闭协商、SHUTDOWN 和 DLL 卸载。
+- `Win32PluginManager::notifyScintilla()` 保证 insert/delete 类型的
+  `SCN_MODIFIED::text` 在插件回调期间始终可读，避免 ElasticTabstops 按原版契约读取
+  通知文本时解引用空指针。
+- 第二次启动允许并核验第一次正常关闭保存的会话恢复，而不是错误要求空白 `new 1`
+  状态；加载日志必须包含两个完整 session 且没有加载中标记。

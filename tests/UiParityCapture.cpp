@@ -281,6 +281,9 @@ QSet<QWidget*> nativeQtWidgets(QWidget* root)
 
 int main(int argc, char* argv[])
 {
+#ifdef Q_OS_WIN
+    SetErrorMode(SetErrorMode(0) | SEM_NOGPFAULTERRORBOX);
+#endif
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Notepad++"));
     app.setApplicationVersion(QStringLiteral("8.4.6"));
@@ -291,7 +294,8 @@ int main(int argc, char* argv[])
     if (argc < 2 || argc > 4) {
         qCritical("Usage: ui-parity-capture <output-directory> "
                   "[light|dark|noPlugin|pluginRecovery|registrationRollback|"
-                  "betterMultiSelection|pluginEnablement|p0Plugins] "
+                  "betterMultiSelection|pluginEnablement|p0Plugins|"
+                  "pluginCoexistence] "
                   "[configurationPlugins] "
                   "[zh_CN]");
         return 2;
@@ -335,6 +339,13 @@ int main(int argc, char* argv[])
         && QString::fromLocal8Bit(argv[2]).compare(
                QStringLiteral("documentPolicyPlugins"),
                Qt::CaseInsensitive) == 0;
+    const bool pluginCoexistenceMode = argc >= 3
+        && QString::fromLocal8Bit(argv[2]).compare(
+               QStringLiteral("pluginCoexistence"),
+               Qt::CaseInsensitive) == 0;
+    const int pluginCoexistencePhase = pluginCoexistenceMode
+        ? qEnvironmentVariableIntValue("NPP_QT_TEST_PLUGIN_RESTART_PHASE")
+        : 0;
 
     const bool forceChinese =
         argc == 4
@@ -345,9 +356,11 @@ int main(int argc, char* argv[])
         || pluginRecoveryMode || betterMultiSelectionMode
         || pluginEnablementMode || p0PluginsMode
         || configurationPluginsMode || sessionManagerMode
-        || documentPolicyPluginsMode) {
+        || documentPolicyPluginsMode || pluginCoexistenceMode) {
         const QString settingsPath =
             output + QStringLiteral("/settings");
+        if (pluginCoexistenceMode && pluginCoexistencePhase == 1)
+            QDir(settingsPath).removeRecursively();
         if (!QDir().mkpath(settingsPath)
             || !parameters.setUserPathOverride(settingsPath)) {
             return 17;
@@ -388,7 +401,7 @@ int main(int argc, char* argv[])
         };
         for (const QString& folder : enabledPluginFolders)
             pluginEnablement.setEnabled(folder, true);
-        if (p0PluginsMode) {
+        if (p0PluginsMode || pluginCoexistenceMode) {
             const QStringList p0PluginFolders = {
                 QStringLiteral("DoxyIt"),
                 QStringLiteral("ElasticTabstops"),
@@ -398,14 +411,14 @@ int main(int argc, char* argv[])
             for (const QString& folder : p0PluginFolders)
                 pluginEnablement.setEnabled(folder, true);
         }
-        if (configurationPluginsMode) {
+        if (configurationPluginsMode || pluginCoexistenceMode) {
             pluginEnablement.setEnabled(QStringLiteral("AutoSave"), true);
             pluginEnablement.setEnabled(
                 QStringLiteral("NppEditorConfig"), true);
         }
-        if (sessionManagerMode)
+        if (sessionManagerMode || pluginCoexistenceMode)
             pluginEnablement.setEnabled(QStringLiteral("SessionMgr"), true);
-        if (documentPolicyPluginsMode) {
+        if (documentPolicyPluginsMode || pluginCoexistenceMode) {
             pluginEnablement.setEnabled(
                 QStringLiteral("nppAutoDetectIndent"), true);
             pluginEnablement.setEnabled(QStringLiteral("AutoCodepage"), true);
@@ -416,7 +429,7 @@ int main(int argc, char* argv[])
             return 92;
     }
 #endif
-    if (p0PluginsMode) {
+    if (p0PluginsMode || pluginCoexistenceMode) {
         const QString pluginConfigDir = QDir(parameters.getUserPath())
             .filePath(QStringLiteral("plugins/Config"));
         if (!QDir().mkpath(pluginConfigDir))
@@ -450,7 +463,7 @@ int main(int argc, char* argv[])
     QString autoCodepageSamplePath;
     QString autoEolSamplePath;
     QString autoIndentSamplePath;
-    if (configurationPluginsMode) {
+    if (configurationPluginsMode || pluginCoexistenceMode) {
         const QString pluginConfigDir = QDir(parameters.getUserPath())
             .filePath(QStringLiteral("plugins/Config"));
         if (!QDir().mkpath(pluginConfigDir))
@@ -507,7 +520,7 @@ int main(int argc, char* argv[])
             }
         }
     }
-    if (documentPolicyPluginsMode) {
+    if (documentPolicyPluginsMode || pluginCoexistenceMode) {
         const QString pluginConfigDir = QDir(parameters.getUserPath())
             .filePath(QStringLiteral("plugins/Config"));
         if (!QDir().mkpath(pluginConfigDir))
@@ -608,11 +621,15 @@ int main(int argc, char* argv[])
             QString(), Qt::FindDirectChildrenOnly).size() != 1) {
         return 32;
     }
-    if (mainWindow.windowTitle() != QStringLiteral("new 1 - Notepad++"))
+    const bool restoredCoexistenceSession = pluginCoexistenceMode
+        && pluginCoexistencePhase == 2;
+    if (!restoredCoexistenceSession
+        && mainWindow.windowTitle() != QStringLiteral("new 1 - Notepad++"))
         return 23;
-    if (mainTabs->tabBar()->count() != 1
+    if (!restoredCoexistenceSession
+        && (mainTabs->tabBar()->count() != 1
         || mainTabs->tabBar()->tabRect(0).width() >=
-            mainTabs->tabBar()->width() / 2) {
+            mainTabs->tabBar()->width() / 2)) {
         return 42;
     }
     if (noPluginMode) {
@@ -1033,6 +1050,182 @@ int main(int argc, char* argv[])
         || !isHiddenReceiver(
             win32Plugins->secondaryEditorHandle(), subTabs->editor())) {
         return 38;
+    }
+    if (pluginCoexistenceMode) {
+        const QStringList pluginNames = win32Plugins->loadedPluginNames();
+        const bool diagnosticSubset = qEnvironmentVariableIsSet(
+            "NPP_QT_TEST_PLUGIN_COEXISTENCE_SUBSET");
+        auto markCoexistenceStage = [&](const QString& stage) {
+            QFile progress(QDir(output).filePath(
+                QStringLiteral("plugin-coexistence-progress.txt")));
+            if (!progress.open(QIODevice::WriteOnly | QIODevice::Text))
+                return;
+            progress.write(QStringLiteral("phase=%1\nstage=%2\n")
+                .arg(pluginCoexistencePhase).arg(stage).toUtf8());
+            progress.write(pluginNames.join(QLatin1Char('\n')).toUtf8());
+            progress.write("\n");
+        };
+        markCoexistenceStage(QStringLiteral("loaded"));
+        const QStringList expectedPluginNames = {
+            QStringLiteral("MIME Tools"),
+            QStringLiteral("Reverse Lines"),
+            QStringLiteral("Remove Duplicate lines"),
+            QStringLiteral("SelectQuotedText"),
+            QStringLiteral("BracketsCheck"),
+            QStringLiteral("SecurePad"),
+            QStringLiteral("Code alignment"),
+            QStringLiteral("BetterMultiSelection"),
+            QStringLiteral("DoxyIt"),
+            QStringLiteral("Elastic Tabstops"),
+            QStringLiteral("S&urroundSelection"),
+            QStringLiteral("XML Tools"),
+            QStringLiteral("Auto Save"),
+            QStringLiteral("EditorConfig"),
+            QStringLiteral("Session Manager"),
+            QStringLiteral("Auto Detect Indention"),
+            QStringLiteral("AutoCodepage"),
+            QStringLiteral("AutoEolFormat"),
+            QStringLiteral("JSON Viewer"),
+            QStringLiteral("JsonTools"),
+            QStringLiteral("Converter"),
+            QStringLiteral("Notepad++ plugin demo"),
+            QStringLiteral("Goto Line, Column"),
+            QStringLiteral("Random values"),
+            QStringLiteral("Merge files in one"),
+            QStringLiteral("Selection to Clipboard"),
+            QStringLiteral("URL Plugin")
+        };
+        if (pluginCoexistencePhase < 1 || pluginCoexistencePhase > 2
+            || (!diagnosticSubset
+                && pluginNames.size() != expectedPluginNames.size())
+            || !mainWindow.property("win32PluginLoadErrors")
+                    .toStringList().isEmpty()) {
+            return 141;
+        }
+        if (!diagnosticSubset) {
+            for (const QString& name : expectedPluginNames) {
+                if (!pluginNames.contains(name))
+                    return 141;
+            }
+        }
+
+        if (pluginNames.contains(QStringLiteral("EditorConfig"))) {
+            markCoexistenceStage(QStringLiteral("before-editorconfig"));
+            if (!mainWindow.openFileForPlugin(editorConfigSamplePath))
+                return 142;
+            QApplication::processEvents();
+            win32Plugins->notifyBufferActivated(
+                mainWindow.currentBufferIdForPlugin());
+            QApplication::processEvents();
+            if (mainTabs->editor()->SendScintillaNpp(SCI_GETUSETABS) != 0
+                || mainTabs->editor()->SendScintillaNpp(SCI_GETINDENT) != 3
+                || mainTabs->editor()->SendScintillaNpp(SCI_GETTABWIDTH) != 6
+                || mainTabs->editor()->SendScintillaNpp(SCI_GETEOLMODE)
+                    != SC_EOL_LF) {
+                return 142;
+            }
+            markCoexistenceStage(QStringLiteral("editorconfig"));
+        }
+        if (pluginNames.contains(QStringLiteral("AutoEolFormat"))) {
+            if (!mainWindow.openFileForPlugin(autoEolSamplePath))
+                return 143;
+            QApplication::processEvents();
+            if (mainTabs->editor()->eolMode() != EolUnix
+                || mainTabs->editor()->text().contains(QLatin1Char('\r'))) {
+                return 143;
+            }
+            markCoexistenceStage(QStringLiteral("eol"));
+        }
+        if (pluginNames.contains(QStringLiteral("AutoCodepage"))) {
+            if (!mainWindow.openFileForPlugin(autoCodepageSamplePath))
+                return 144;
+            QApplication::processEvents();
+            Buffer* codepageBuffer = mainTabs->currentBuffer();
+            if (!codepageBuffer
+                || codepageBuffer->getEncoding().compare(
+                    QStringLiteral("windows-1251"),
+                    Qt::CaseInsensitive) != 0) {
+                return 144;
+            }
+            markCoexistenceStage(QStringLiteral("codepage"));
+        }
+        if (pluginNames.contains(QStringLiteral("Auto Detect Indention"))) {
+            if (!mainWindow.openFileForPlugin(autoIndentSamplePath))
+                return 145;
+            QApplication::processEvents();
+            if (!mainTabs->editor()->SendScintillaNpp(SCI_GETUSETABS))
+                return 145;
+            markCoexistenceStage(QStringLiteral("indent"));
+        }
+
+        if (pluginNames.contains(QStringLiteral("Session Manager"))) {
+            const QString sessionPath = QDir(output).filePath(
+                QStringLiteral("coexistence-session.xml"));
+            const std::wstring nativeSessionPath = QDir::toNativeSeparators(
+                sessionPath).toStdWString();
+            if (!SendMessageW(win32Plugins->mainWindowHandle(),
+                              NppMessageSaveCurrentSession, 0,
+                              reinterpret_cast<LPARAM>(
+                                  nativeSessionPath.c_str()))
+                || !QFileInfo::exists(sessionPath)) {
+                return 146;
+            }
+            markCoexistenceStage(QStringLiteral("session"));
+        }
+
+        QFile journal(QDir(parameters.getUserPath()).filePath(
+            QStringLiteral("plugin-load/plugin-load.jsonl")));
+        if (!journal.open(QIODevice::ReadOnly | QIODevice::Text))
+            return 147;
+        QSet<QString> startedSessions;
+        QSet<QString> completedSessions;
+        while (!journal.atEnd()) {
+            const QJsonObject event = QJsonDocument::fromJson(
+                journal.readLine()).object();
+            const QString session = event.value(
+                QStringLiteral("session")).toString();
+            if (event.value(QStringLiteral("event")).toString()
+                    == QStringLiteral("session-start")) {
+                startedSessions.insert(session);
+            } else if (event.value(QStringLiteral("event")).toString()
+                       == QStringLiteral("session-complete")) {
+                completedSessions.insert(session);
+            }
+        }
+        if (startedSessions.size() < pluginCoexistencePhase
+            || completedSessions.size() < pluginCoexistencePhase
+            || QFileInfo(QDir(parameters.getUserPath()).filePath(
+                    QStringLiteral(
+                        "plugin-load/plugin-load-in-progress.json")))
+                    .exists()) {
+            return 147;
+        }
+        markCoexistenceStage(QStringLiteral("journal"));
+
+        QFile report(QDir(output).filePath(QStringLiteral(
+            "plugin-coexistence-phase-%1.txt")
+                .arg(pluginCoexistencePhase)));
+        if (!report.open(QIODevice::WriteOnly | QIODevice::Text))
+            return 148;
+        report.write(QStringLiteral(
+            "phase=%1\nloaded=%2\nsessions-started=%3\n"
+            "sessions-completed=%4\n")
+            .arg(pluginCoexistencePhase)
+            .arg(pluginNames.size())
+            .arg(startedSessions.size())
+            .arg(completedSessions.size()).toUtf8());
+        report.write(pluginNames.join(QLatin1Char('\n')).toUtf8());
+        report.write("\n");
+        report.close();
+
+        markCoexistenceStage(QStringLiteral("before-close"));
+        if (!mainWindow.close())
+            return 149;
+        QApplication::processEvents();
+        if (mainWindow.isVisible())
+            return 149;
+        markCoexistenceStage(QStringLiteral("closed"));
+        return 0;
     }
     if (betterMultiSelectionMode) {
         const QStringList pluginNames = win32Plugins->loadedPluginNames();

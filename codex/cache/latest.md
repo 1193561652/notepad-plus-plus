@@ -1,5 +1,17 @@
 # 本地缓存：最新分析
 
+## 2026-08-13 Win32 插件联合回归收口
+
+- 27 个已确认兼容的官方未修改 x64 DLL 已通过同进程联合加载、文档操作、正常关闭和
+  第二次启动验证；两轮加载错误均为 0。
+- 联合测试发现 `AutoCodepage + ElasticTabstops` 在编码重解释期间因空
+  `SCN_MODIFIED::text` 发生访问冲突。宿主适配层现为 insert/delete 修改通知提供
+  长度匹配的稳定文本缓冲区，插件 DLL 保持未修改。
+- 第二次启动复用同一配置目录并恢复首轮 session，加载日志包含两个完整 session，
+  没有加载中标记残留。
+- 插件专项 `16/16`、完整 Debug CTest `46/46` 通过。详见
+  `codex/changes/2026-08-13-win32-plugin-coexistence-closure.md`。
+
 ## 2026-08-12 Session 与文档策略插件
 
 - SessionMgr 1.4.4、AutoCodepage 1.2.4、AutoEolFormat 1.0.2 和

@@ -403,6 +403,14 @@ void Win32PluginManager::notifyFileBeforeClose(quintptr bufferId)
 void Win32PluginManager::notifyScintilla(
     const Scintilla::NotificationData& source, bool fromMainEditor)
 {
+    const int modificationType = static_cast<int>(source.modificationType);
+    QByteArray missingModificationText;
+    // Legacy plugins expect modification notifications to carry readable text.
+    if ((modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0
+        && !source.text) {
+        missingModificationText.fill(
+            '\0', static_cast<qsizetype>(qMax<sptr_t>(0, source.length)) + 1);
+    }
     SCNotification notification{};
     notification.nmhdr.hwndFrom = fromMainEditor
         ? mainEditorHandle() : secondaryEditorHandle();
@@ -411,8 +419,10 @@ void Win32PluginManager::notifyScintilla(
     notification.position = source.position;
     notification.ch = source.ch;
     notification.modifiers = static_cast<int>(source.modifiers);
-    notification.modificationType = static_cast<int>(source.modificationType);
+    notification.modificationType = modificationType;
     notification.text = source.text;
+    if (!notification.text && !missingModificationText.isEmpty())
+        notification.text = missingModificationText.constData();
     notification.length = source.length;
     notification.linesAdded = source.linesAdded;
     notification.message = static_cast<int>(source.message);
