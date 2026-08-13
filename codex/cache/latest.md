@@ -825,3 +825,9 @@
 - 宿主完整 CTest `47/47`、八插件独立 CTest `13/13` 通过。
 - 外部运行时和原版专属功能边界见
   `codex/changes/2026-08-13-high-priority-plugin-deep-parity.md`。
+# 2026-08-13 插件缺口补齐
+
+最新批次在不新增技术决策的范围内，完成 Explorer 收藏无损保存、DSpellCheck
+增量重检、ComparePlus/HexEditor 生命周期与冲突保护、NppExec 常用控制流、NppFTP
+常规远程操作及 TextFX 平台无关算法。详情见
+`codex/changes/2026-08-13-non-decision-plugin-gap-closure.md`。
