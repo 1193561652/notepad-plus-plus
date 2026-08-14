@@ -169,9 +169,39 @@ void MainWindow::showEditorContextMenu(ScintillaEditView* view,
 {
     if (!view)
         return;
+    QMenu menu(view);
+    bool hasPluginItems = false;
+    if (_pluginManager) {
+        const qint64 bytePosition = view->execute(
+            SCI_POSITIONFROMPOINTCLOSE,
+            static_cast<uptr_t>(position.x()),
+            static_cast<sptr_t>(position.y()));
+        const int viewIndex = view == pluginView(SUB_VIEW)
+            ? SUB_VIEW : MAIN_VIEW;
+        const auto items = _pluginManager->editorContextMenu(
+            viewIndex, bytePosition);
+        for (const PluginEditorContextMenuItem& item : items) {
+            if (item.separator) {
+                if (!menu.isEmpty() && !menu.actions().constLast()->isSeparator())
+                    menu.addSeparator();
+                continue;
+            }
+            QAction* action = menu.addAction(item.text);
+            connect(action, &QAction::triggered, this,
+                    [this, item]() {
+                _pluginManager->executeEditorContextMenuCommand(
+                    item.pluginIndex, item.commandId);
+            });
+            hasPluginItems = true;
+        }
+    }
+
     QFile file(NppParameters::getInstance().getUserPath() + "/contextMenu.xml");
-    if (!file.open(QFile::ReadOnly | QFile::Text))
+    if (!file.open(QFile::ReadOnly | QFile::Text)) {
+        if (!menu.isEmpty())
+            menu.exec(view->mapToGlobal(position));
         return;
+    }
 
     auto normalized = [](QString text) {
         text.remove('&');
@@ -196,10 +226,10 @@ void MainWindow::showEditorContextMenu(ScintillaEditView* view,
         {"search on internet", "searchOnInternetAction"}
     };
 
-    QMenu menu(view);
     QMap<QString, QMenu*> folders;
     QXmlStreamReader xml(&file);
     bool inContextMenu = false;
+    bool builtInSectionStarted = false;
     while (!xml.atEnd()) {
         xml.readNext();
         if (xml.isStartElement() &&
@@ -231,7 +261,8 @@ void MainWindow::showEditorContextMenu(ScintillaEditView* view,
             }
         }
         if (id == "0") {
-            target->addSeparator();
+            if (builtInSectionStarted)
+                target->addSeparator();
             continue;
         }
 
@@ -243,6 +274,11 @@ void MainWindow::showEditorContextMenu(ScintillaEditView* view,
             source = findChild<QAction*>(aliases.value(normalized(itemName)));
         if (!source)
             continue;
+        if (!builtInSectionStarted) {
+            if (hasPluginItems && !menu.actions().constLast()->isSeparator())
+                menu.addSeparator();
+            builtInSectionStarted = true;
+        }
         QAction* entry = target->addAction(
             attrs.value("ItemNameAs").isEmpty()
                 ? source->text()

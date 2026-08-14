@@ -30,6 +30,19 @@ item strings until shutdown.
 - `nppMessageProc`: optional plugin-specific synchronous messages; return zero
   for unsupported messages.
 
+## Optional editor context menu exports
+
+Plugins that provide position-dependent editor actions may export both
+`nppGetEditorContextMenu` and `nppExecuteEditorContextMenuCommand`. The host
+passes the stable view identifier and clicked Scintilla byte position, copies
+the returned UTF-8 labels immediately, and invokes the selected command ID
+synchronously. A plugin must provide both symbols or the host ignores the
+extension.
+
+The returned array and labels must remain valid until the next context-menu
+query or command callback. Items are flat commands or separators in ABI v1;
+Qt menu objects and native handles never cross the plugin boundary.
+
 ## Host and platform information
 
 `NppPluginHostInfo` is passed through `nppSetInfo` before command discovery. It

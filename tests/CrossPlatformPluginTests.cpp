@@ -158,6 +158,16 @@ int main(int argc, char** argv)
             "current file callback failed");
     require(manager.sendPluginMessage(0, 5) != NPP_PLUGIN_SYSTEM_UNKNOWN,
             "system type was not transmitted");
+    const auto contextItems = manager.editorContextMenu(1, 7);
+    require(contextItems.size() == 2
+            && contextItems[0].text == QStringLiteral("ABI context command")
+            && contextItems[0].commandId == 41
+            && contextItems[1].separator,
+            "editor context menu extension was not loaded");
+    manager.executeEditorContextMenuCommand(
+        contextItems[0].pluginIndex, contextItems[0].commandId);
+    require(manager.sendPluginMessage(0, 9) == 41,
+            "editor context menu command did not reach plugin");
 
     manager.notifyReady();
     manager.notifyReady();

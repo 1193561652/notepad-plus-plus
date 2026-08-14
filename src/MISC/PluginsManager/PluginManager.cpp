@@ -189,6 +189,12 @@ bool PluginManager::loadPlugin(const QString& filePath,
     plugin->functionCount = static_cast<int>(count);
     plugin->beNotified = beNotified;
     plugin->messageProc = messageProc;
+    plugin->getEditorContextMenu =
+        reinterpret_cast<NppGetEditorContextMenuFn>(
+            library->resolve("nppGetEditorContextMenu"));
+    plugin->executeEditorContextMenu =
+        reinterpret_cast<NppExecuteEditorContextMenuCommandFn>(
+            library->resolve("nppExecuteEditorContextMenuCommand"));
     _plugins.push_back(plugin);
     _loadedPaths.insert(canonicalPath);
     if (_readySent) {
@@ -342,6 +348,54 @@ qintptr PluginManager::sendPluginMessage(
     return _plugins[pluginIndex]->messageProc(
         message, static_cast<uintptr_t>(wParam),
         static_cast<intptr_t>(lParam));
+}
+
+QVector<PluginEditorContextMenuItem> PluginManager::editorContextMenu(
+    int view, qint64 bytePosition) const
+{
+    constexpr uint32_t MaximumContextItems = 256;
+    QVector<PluginEditorContextMenuItem> result;
+    NppPluginEditorContext context{};
+    context.struct_size = sizeof(context);
+    context.view = view;
+    context.byte_position = bytePosition;
+    for (int pluginIndex = 0; pluginIndex < _plugins.size(); ++pluginIndex) {
+        const LoadedPlugin* plugin = _plugins[pluginIndex];
+        if (!plugin->getEditorContextMenu || !plugin->executeEditorContextMenu)
+            continue;
+        uint32_t count = 0;
+        const NppPluginContextMenuItem* items =
+            plugin->getEditorContextMenu(&context, &count);
+        if (!items || count > MaximumContextItems)
+            continue;
+        for (uint32_t index = 0; index < count; ++index) {
+            const NppPluginContextMenuItem& item = items[index];
+            if (item.struct_size != sizeof(item))
+                continue;
+            const bool separator =
+                (item.flags & NPP_PLUGIN_CONTEXT_MENU_ITEM_SEPARATOR) != 0;
+            if (!separator && (!item.item_name_utf8 || !item.item_name_utf8[0]))
+                continue;
+            PluginEditorContextMenuItem entry;
+            entry.pluginIndex = pluginIndex;
+            entry.commandId = item.command_id;
+            entry.separator = separator;
+            if (!separator)
+                entry.text = QString::fromUtf8(item.item_name_utf8);
+            result.append(entry);
+        }
+    }
+    return result;
+}
+
+void PluginManager::executeEditorContextMenuCommand(
+    int pluginIndex, quint32 commandId) const
+{
+    if (pluginIndex < 0 || pluginIndex >= _plugins.size())
+        return;
+    const LoadedPlugin* plugin = _plugins[pluginIndex];
+    if (plugin->executeEditorContextMenu)
+        plugin->executeEditorContextMenu(commandId);
 }
 
 size_t NPP_PLUGIN_CALL PluginManager::copyCurrentFilePath(

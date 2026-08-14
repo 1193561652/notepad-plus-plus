@@ -191,6 +191,25 @@ typedef struct NppPluginNotification {
     const char* text_utf8;
 } NppPluginNotification;
 
+typedef enum NppPluginContextMenuItemFlags {
+    NPP_PLUGIN_CONTEXT_MENU_ITEM_NONE = 0,
+    NPP_PLUGIN_CONTEXT_MENU_ITEM_SEPARATOR = 1
+} NppPluginContextMenuItemFlags;
+
+typedef struct NppPluginEditorContext {
+    uint32_t struct_size;
+    int32_t view;
+    int64_t byte_position;
+} NppPluginEditorContext;
+
+typedef struct NppPluginContextMenuItem {
+    uint32_t struct_size;
+    uint32_t command_id;
+    uint32_t flags;
+    uint32_t reserved;
+    const char* item_name_utf8;
+} NppPluginContextMenuItem;
+
 typedef uint32_t (NPP_PLUGIN_CALL *NppGetPluginAbiVersionFn)(void);
 typedef const char* (NPP_PLUGIN_CALL *NppGetNameFn)(void);
 typedef int (NPP_PLUGIN_CALL *NppSetInfoFn)(const NppPluginHostInfo* host_info);
@@ -200,6 +219,11 @@ typedef void (NPP_PLUGIN_CALL *NppBeNotifiedFn)(
     const NppPluginNotification* notification);
 typedef intptr_t (NPP_PLUGIN_CALL *NppMessageProcFn)(
     uint32_t message, uintptr_t w_param, intptr_t l_param);
+typedef const NppPluginContextMenuItem* (NPP_PLUGIN_CALL
+    *NppGetEditorContextMenuFn)(const NppPluginEditorContext* context,
+                               uint32_t* count);
+typedef void (NPP_PLUGIN_CALL *NppExecuteEditorContextMenuCommandFn)(
+    uint32_t command_id);
 
 NPP_PLUGIN_EXPORT uint32_t NPP_PLUGIN_CALL nppGetPluginAbiVersion(void);
 NPP_PLUGIN_EXPORT const char* NPP_PLUGIN_CALL nppGetName(void);
@@ -211,6 +235,13 @@ NPP_PLUGIN_EXPORT void NPP_PLUGIN_CALL nppBeNotified(
     const NppPluginNotification* notification);
 NPP_PLUGIN_EXPORT intptr_t NPP_PLUGIN_CALL nppMessageProc(
     uint32_t message, uintptr_t w_param, intptr_t l_param);
+
+/* Optional ABI v1 exports. Hosts must resolve these by symbol name. */
+NPP_PLUGIN_EXPORT const NppPluginContextMenuItem* NPP_PLUGIN_CALL
+nppGetEditorContextMenu(const NppPluginEditorContext* context,
+                        uint32_t* count);
+NPP_PLUGIN_EXPORT void NPP_PLUGIN_CALL
+nppExecuteEditorContextMenuCommand(uint32_t command_id);
 
 #ifdef __cplusplus
 }

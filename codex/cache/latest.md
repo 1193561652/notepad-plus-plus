@@ -1,5 +1,15 @@
 # 本地缓存：最新分析
 
+## 2026-08-14 DSpellCheck-qt 功能收口
+
+- Qt 目标直接复用原版 `ScintillaUtils` 完整 Lexer/style 分类表，设置适配保持注释、
+  字符串、标识符和默认 UDL 样式的原版 INI 键。
+- 跨平台 ABI v1 增加可选编辑器上下文菜单双导出；DSpellCheck 根据点击字节位置提供
+  Hunspell 建议、忽略和加入词典操作，宿主仅负责菜单渲染与命令回调。
+- 无可用词典时不再把所有单词标记为错误。
+- DSpellCheck `2/2`、宿主 `47/47` 回归通过。详细记录见
+  `codex/changes/2026-08-14-dspellcheck-qt-completion.md`。
+
 ## 2026-08-13 ComparePlus 与 HEX-Editor Qt 插件
 
 - 两个插件已在各自 `qt-port` 分支建立新 ABI 实现，显示名和产物名带 `-qt`。

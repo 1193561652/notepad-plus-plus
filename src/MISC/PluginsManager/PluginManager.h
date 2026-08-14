@@ -12,6 +12,14 @@
 class PluginHostServices;
 class QLibrary;
 
+struct PluginEditorContextMenuItem
+{
+    int pluginIndex = -1;
+    quint32 commandId = 0;
+    QString text;
+    bool separator = false;
+};
+
 class PluginManager final : public QObject
 {
 public:
@@ -45,6 +53,10 @@ public:
                               QString* errorMessage = nullptr);
     qintptr sendPluginMessage(int pluginIndex, quint32 message,
                               quintptr wParam = 0, qintptr lParam = 0) const;
+    QVector<PluginEditorContextMenuItem> editorContextMenu(
+        int view, qint64 bytePosition) const;
+    void executeEditorContextMenuCommand(int pluginIndex,
+                                         quint32 commandId) const;
 
 private:
     struct LoadedPlugin {
@@ -54,6 +66,8 @@ private:
         QString name;
         NppBeNotifiedFn beNotified = nullptr;
         NppMessageProcFn messageProc = nullptr;
+        NppGetEditorContextMenuFn getEditorContextMenu = nullptr;
+        NppExecuteEditorContextMenuCommandFn executeEditorContextMenu = nullptr;
         const NppPluginFuncItem* functions = nullptr;
         int functionCount = 0;
         QByteArray systemName;

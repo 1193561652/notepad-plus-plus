@@ -12,6 +12,7 @@ int readyCount = 0;
 int commandCount = 0;
 bool extendedCallbacksValid = false;
 bool notificationPayloadValid = false;
+uint32_t contextCommand = 0;
 
 void NPP_PLUGIN_CALL runCommand(void*)
 {
@@ -163,8 +164,31 @@ NPP_PLUGIN_EXPORT intptr_t NPP_PLUGIN_CALL nppMessageProc(
         case 6: return host ? host->cpu_architecture : 0;
         case 7: return extendedCallbacksValid ? 1 : 0;
         case 8: return notificationPayloadValid ? 1 : 0;
+        case 9: return contextCommand;
         default: return 0;
     }
+}
+
+NPP_PLUGIN_EXPORT const NppPluginContextMenuItem* NPP_PLUGIN_CALL
+nppGetEditorContextMenu(const NppPluginEditorContext* context,
+                        uint32_t* count)
+{
+    static const NppPluginContextMenuItem items[] = {
+        {sizeof(NppPluginContextMenuItem), 41,
+         NPP_PLUGIN_CONTEXT_MENU_ITEM_NONE, 0, "ABI context command"},
+        {sizeof(NppPluginContextMenuItem), 0,
+         NPP_PLUGIN_CONTEXT_MENU_ITEM_SEPARATOR, 0, nullptr}
+    };
+    if (count)
+        *count = context && context->view == 1 && context->byte_position == 7
+            ? 2u : 0u;
+    return count && *count ? items : nullptr;
+}
+
+NPP_PLUGIN_EXPORT void NPP_PLUGIN_CALL
+nppExecuteEditorContextMenuCommand(uint32_t commandId)
+{
+    contextCommand = commandId;
 }
 
 struct LegacyNppData { void* npp; void* mainEditor; void* subEditor; };

@@ -12,7 +12,7 @@
 
 | 插件 | 新增行为 | 保留边界 |
 | --- | --- | --- |
-| DSpellCheck-qt | 完整脏行增量重检、URL/邮箱排除、调试日志 | 全 Lexer 分类和右键建议 |
+| DSpellCheck-qt | 原版完整 Lexer/style 分类、脏行增量重检、URL/邮箱排除、右键建议和调试日志 | 无已知基础行为缺口；Aspell/在线词典属于独立依赖与产品范围 |
 | NppExec-qt | LABEL/GOTO、嵌套块 IF、NPE_QUEUE、PROC_INPUT/SIGNAL | 脚本仓库、指针消息 |
 | NppFTP-qt | 删除、重命名、建目录、重试、取消和队列状态 | 安全凭据与主密码迁移 |
 | NPPTextFX2-qt | 引号、对齐、重排、缩进和小端字节转换 | Viz、键盘钩子、Tidy |
