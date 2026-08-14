@@ -16,7 +16,7 @@
 | DSpellCheck | `DSpellCheck-qt` | Hunspell 字典、检查、前后跳转、建议替换、忽略和用户词典 | 2/2 |
 | MarkdownViewerPlusPlus | `MarkdownViewerPlusPlus-qt` | Markdown dock 预览、扩展名过滤、CSS、HTML/PDF 导出 | 2/2 |
 | Explorer | `Explorer-qt` | 文件树 dock、过滤、导航、打开文件、收藏夹、隐藏文件 | 1/1 |
-| NppExec | `NppExec-qt` | 脚本解析、变量、常用内部命令、外部进程、控制台 dock | 2/2 |
+| NppExec | `NppExec-qt` | 脚本解析、变量、命名脚本仓库、常用内部命令、外部进程、控制台 dock、SCI 指针消息 | 2/2 |
 | NppFTP | `NppFTP-qt` | XML profile、远程列表、下载打开、上传当前文档、FTP/SFTP curl 后端 | 2/2 |
 | NppMarkdownPanel | `NppMarkdownPanel-qt` | 预览 dock、CSS、缩放、工具栏、自动 HTML | 1/1 |
 | NPPTextFX2 | `NPPTextFX2-qt` | 31 个常用文本转换、排序、编码、统计命令 | 2/2 |
@@ -28,7 +28,7 @@
 - 两个 Markdown 插件：当前解析器未覆盖原版全部 CommonMark/Markdig 扩展，编辑器
   与预览滚动同步仍需宿主事件接口。
 - Explorer：收藏配置尚未复刻 `Favorites.dat`，缺少 Shell 上下文菜单和部分组操作。
-- NppExec：原版完整 NPE/NPP/SCI 命令集、错误定位、进程输入与信号尚未覆盖。
+- NppExec：已补齐原版 `npes_saved.txt` 命名脚本仓库、`NPP_EXEC` 和 SCI 指针参数；任意 NPP Win32 窗口消息不进入跨平台 ABI。
 - NppFTP：缺少保存触发上传、密钥认证、完整传输队列/缓存和主密码加密。
 - NPPTextFX2：覆盖常用命令，但不是原版约百项命令及自动编辑钩子的完整集合。
 - PythonScript：目前是外部解释器桥，不是原版嵌入式 Python 与完整 Scintilla/Notepad API。

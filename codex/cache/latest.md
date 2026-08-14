@@ -841,3 +841,10 @@
 增量重检、ComparePlus/HexEditor 生命周期与冲突保护、NppExec 常用控制流、NppFTP
 常规远程操作及 TextFX 平台无关算法。详情见
 `codex/changes/2026-08-13-non-decision-plugin-gap-closure.md`。
+## 2026-08-14 NppExec-qt
+
+- 以原版 v082 的职责边界补齐 `npes_saved.txt` 命名脚本仓库和 `NPP_EXEC`。
+- `SCI_SENDMSG` 支持原版整数、字符串、十六进制与 `@` 指针回写参数，并维护
+  `MSG_RESULT`、`MSG_WPARAM`、`MSG_LPARAM`。
+- 插件测试 2/2、宿主测试 47/47 通过；隔离配置启动稳定。
+- 任意 `NPP_SENDMSG` Win32 消息不加入跨平台 ABI，等价操作继续使用类型化宿主服务。

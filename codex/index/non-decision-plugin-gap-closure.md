@@ -13,7 +13,7 @@
 | 插件 | 新增行为 | 保留边界 |
 | --- | --- | --- |
 | DSpellCheck-qt | 原版完整 Lexer/style 分类、脏行增量重检、URL/邮箱排除、右键建议和调试日志 | 无已知基础行为缺口；Aspell/在线词典属于独立依赖与产品范围 |
-| NppExec-qt | LABEL/GOTO、嵌套块 IF、NPE_QUEUE、PROC_INPUT/SIGNAL | 脚本仓库、指针消息 |
+| NppExec-qt | LABEL/GOTO、嵌套块 IF、NPE_QUEUE、PROC_INPUT/SIGNAL、`npes_saved.txt` 脚本仓库、NPP_EXEC、SCI 指针消息 | 无已知的无决策基础行为缺口；任意 NPP 原生窗口消息不进入跨平台 ABI |
 | NppFTP-qt | 删除、重命名、建目录、重试、取消和队列状态 | 安全凭据与主密码迁移 |
 | NPPTextFX2-qt | 引号、对齐、重排、缩进和小端字节转换 | Viz、键盘钩子、Tidy |
 
