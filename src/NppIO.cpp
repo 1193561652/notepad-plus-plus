@@ -461,7 +461,7 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
     buf->setReadOnly(!QFileInfo(filePath).isWritable());
     view->setEolMode(toScintillaEol(buf->getEolMode(), fallbackEol));
     view->setReadOnly(buf->isReadOnly());
-    view->setLexerForFile(filePath);
+    view->setLexerForFile(filePath, buf->detectedLanguage());
     applyPreferencesToView(view);
 
     targetTab->addBuffer(buf);
@@ -564,7 +564,10 @@ bool MainWindow::doSave(Buffer* buf, const QString& filePath)
     setBufferReadOnly(buf, !QFileInfo(filePath).isWritable());
     activeBufferView->SendScintilla(SCI_SETSAVEPOINT);
     const QString previousLanguage = activeBufferView->lexerLanguage();
-    activeBufferView->setLexerForFile(filePath);
+    const QString detectedLanguage = Buffer::detectLanguageFromTextBeginning(
+        activeBufferView->text(0, 80).toUtf8());
+    buf->setDetectedLanguage(detectedLanguage);
+    activeBufferView->setLexerForFile(filePath, detectedLanguage);
     for (DocTabView* tab : {_mainDocTab, _subDocTab}) {
         if (tab->currentBuffer() == buf)
             tab->editor()->setReadOnly(buf->isReadOnly());
@@ -684,13 +687,28 @@ bool MainWindow::checkBufferSave(Buffer* buf)
     if (!buf->isDirty())
         return true;
 
-    QMessageBox::StandardButton reply = QMessageBox::question(this,
-        tr("Unsaved Changes"),
-        tr("File \"%1\" has been modified.\nDo you want to save it?")
-            .arg(buf->getFileName()),
-        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+    NativeLangSpeaker& speaker =
+        NppParameters::getInstance().getNativeLangSpeaker();
+    QString title = QStringLiteral("Save");
+    QString message = QStringLiteral("Save file \"$STR_REPLACE$\" ?");
+    speaker.getDoSaveOrNotStrings(title, message);
+    message.replace(QStringLiteral("$STR_REPLACE$"), buf->getFileName());
 
-    if (reply == QMessageBox::Save)
+    QMessageBox box(QMessageBox::Question, title, message,
+                    QMessageBox::Yes | QMessageBox::No |
+                        QMessageBox::Cancel,
+                    this);
+    const QString dialogName = QStringLiteral("DoSaveOrNot");
+    box.button(QMessageBox::Yes)->setText(
+        speaker.getDialogItemText(dialogName, 6, QStringLiteral("&Yes")));
+    box.button(QMessageBox::No)->setText(
+        speaker.getDialogItemText(dialogName, 7, QStringLiteral("&No")));
+    box.button(QMessageBox::Cancel)->setText(
+        speaker.getDialogItemText(dialogName, 2, QStringLiteral("&Cancel")));
+    const QMessageBox::StandardButton reply =
+        static_cast<QMessageBox::StandardButton>(box.exec());
+
+    if (reply == QMessageBox::Yes)
         return buf->isUntitled() ? doSaveAs(buf) : doSave(buf, buf->getFullPath());
     else if (reply == QMessageBox::Cancel)
         return false;

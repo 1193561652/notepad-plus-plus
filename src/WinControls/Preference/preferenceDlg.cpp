@@ -172,9 +172,14 @@ QWidget* PreferenceDlg::makePage_General()
     localization->addWidget(localizationLabel);
     _languageCombo = new QComboBox(w);
     _languageCombo->setObjectName("comboInterfaceLanguage");
-    _languageCombo->addItem(tr("English"), "en");
-    _languageCombo->addItem(tr("Chinese Simplified"), "zh_CN");
-    _languageCombo->setFixedWidth(145);
+    const auto languages =
+        NppParameters::getInstance().getAvailableNativeLanguages();
+    for (const auto& language : languages)
+        _languageCombo->addItem(language.first, language.second);
+    if (_languageCombo->count() == 0)
+        _languageCombo->addItem(QStringLiteral("English"),
+                                QStringLiteral("english.xml"));
+    _languageCombo->setMinimumWidth(180);
     localization->addWidget(_languageCombo);
     localization->addStretch();
     lay->addLayout(localization);

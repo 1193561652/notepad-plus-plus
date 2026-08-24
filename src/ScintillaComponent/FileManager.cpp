@@ -193,6 +193,8 @@ bool FileManager::loadBufferContent(
             *errorMessage = file.errorString();
         return false;
     }
+    buf->setDetectedLanguage(
+        Buffer::detectLanguageFromTextBeginning(sample));
 
     const bool hasUnicodeBom =
         sample.startsWith("\xEF\xBB\xBF") ||

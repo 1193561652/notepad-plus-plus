@@ -182,6 +182,7 @@ set(HEADERS
     src/CommandLineOptions.h
     src/NppCommandRegistry.h
     src/localization.h
+    src/localizationString.h
     src/MainWindow.h
     src/ScintillaComponent/ScintillaEditView.h
     src/ScintillaComponent/Buffer.h
@@ -349,6 +350,12 @@ add_custom_command(TARGET notepadpp-qt POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/resources/functionList"
         "$<TARGET_FILE_DIR:notepadpp-qt>/functionList"
+)
+add_custom_command(TARGET notepadpp-qt POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/resources/nativeLang"
+        "$<TARGET_FILE_DIR:notepadpp-qt>/localization"
+    COMMENT "Copying Notepad++ native language files to localization"
 )
 
 if(WIN32)
@@ -546,6 +553,7 @@ if(BUILD_TESTING)
     add_executable(parameters-style-udl-tests
         tests/ParametersStyleUdlTests.cpp
         src/Parameters.cpp
+        src/NppCommandRegistry.cpp
         src/MISC/ConfigPathResolver.cpp
         src/localization.cpp
         src/TinyXml/tinyxml.cpp
@@ -581,13 +589,35 @@ if(BUILD_TESTING)
         NPP_MAINWINDOW_SOURCE="${CMAKE_SOURCE_DIR}/src/MainWindow.cpp"
         NPP_NOTEPAD_SOURCE="${CMAKE_SOURCE_DIR}/src/Notepad_plus.cpp"
         NPP_COMMANDS_SOURCE="${CMAKE_SOURCE_DIR}/src/NppCommands.cpp"
+        NPP_LOCALIZATION_SOURCE="${CMAKE_SOURCE_DIR}/src/localization.cpp"
         NPP_FIND_DIALOG_SOURCE="${CMAKE_SOURCE_DIR}/src/ScintillaComponent/FindReplaceDlg.cpp"
         NPP_PREFERENCES_SOURCE="${CMAKE_SOURCE_DIR}/src/WinControls/Preference/preferenceDlg.cpp"
+        NPP_MAIN_SOURCE="${CMAKE_SOURCE_DIR}/src/main.cpp"
+        NPP_DESKTOP_SOURCE="${CMAKE_SOURCE_DIR}/installer_ubuntu/notepad-plus-plus.desktop"
+        NPP_ENGLISH_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/english.xml"
         NPP_FIND_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/chineseSimplified.xml"
+        NPP_JAPANESE_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/japanese.xml"
     )
     target_link_libraries(find-dialog-localization-tests Qt5::Core Qt5::Xml)
     add_test(NAME find-dialog-localization-tests
         COMMAND find-dialog-localization-tests)
+
+    add_executable(native-lang-save-prompt-tests
+        tests/NativeLangSavePromptTests.cpp
+        src/localization.cpp
+        src/NppCommandRegistry.cpp
+        src/TinyXml/tinyxml.cpp
+        src/TinyXml/tinyxmlerror.cpp
+        src/TinyXml/tinyxmlparser.cpp
+    )
+    target_compile_definitions(native-lang-save-prompt-tests PRIVATE
+        NPP_ENGLISH_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/english.xml"
+        NPP_CHINESE_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/chineseSimplified.xml"
+    )
+    target_link_libraries(native-lang-save-prompt-tests
+        Qt5::Core Qt5::Gui Qt5::Widgets)
+    add_test(NAME native-lang-save-prompt-tests
+        COMMAND native-lang-save-prompt-tests)
 
     add_executable(docking-manager-tests
         tests/DockingManagerTests.cpp
@@ -806,6 +836,10 @@ if(BUILD_TESTING)
         COMMAND ui-parity-capture
             "${CMAKE_BINARY_DIR}/ui-localization-dark-runtime-150"
             dark zh_CN)
+    add_test(NAME ui-localization-japanese-runtime-100
+        COMMAND ui-parity-capture
+            "${CMAKE_BINARY_DIR}/ui-localization-japanese-runtime-100"
+            light ja)
     add_test(NAME ui-no-plugin-runtime
         COMMAND ui-parity-capture
             "${CMAKE_BINARY_DIR}/ui-no-plugin-runtime"
@@ -871,6 +905,8 @@ if(BUILD_TESTING)
         ENVIRONMENT "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM}")
     set_tests_properties(ui-localization-dark-runtime-150 PROPERTIES
         ENVIRONMENT "QT_SCALE_FACTOR=1.5;${UI_TEST_PLATFORM}")
+    set_tests_properties(ui-localization-japanese-runtime-100 PROPERTIES
+        ENVIRONMENT "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM}")
     set_tests_properties(ui-no-plugin-runtime PROPERTIES
         ENVIRONMENT "QT_SCALE_FACTOR=1.0;${UI_TEST_PLATFORM}")
     if(NPP_MIMETOOLS_MANAGED_FIXTURE)
@@ -986,6 +1022,7 @@ if(BUILD_TESTING)
     add_executable(large-file-mode-tests
         tests/LargeFileModeTests.cpp
         src/Parameters.cpp
+        src/NppCommandRegistry.cpp
         src/MISC/ConfigPathResolver.cpp
         src/localization.cpp
         src/TinyXml/tinyxml.cpp
@@ -1042,6 +1079,7 @@ if(BUILD_TESTING)
     add_executable(config-corpus-tests
         tests/ConfigCorpusTests.cpp
         src/Parameters.cpp
+        src/NppCommandRegistry.cpp
         src/MISC/ConfigPathResolver.cpp
         src/localization.cpp
         src/TinyXml/tinyxml.cpp
@@ -1092,4 +1130,8 @@ if(BUILD_TESTING)
     add_config_corpus_test(shortcuts-current-user shortcuts
         "${NPP_REAL_USER_CONFIG}/shortcuts.xml")
 
+endif()
+
+if(UNIX AND NOT APPLE)
+    include("${CMAKE_SOURCE_DIR}/installer_ubuntu/CPackDebian.cmake")
 endif()

@@ -127,14 +127,27 @@
 
 - 旧版 Qt 实现曾把 `nativeLang.xml` 写成
   `<Native-Langue lang="zh_CN"/>` 短标记，原版会把该文件当完整语言包加载并报错。
-- `setNativeLang()` 现在与原版一致，复制完整官方本地化 XML；优先使用当前机器
-  已安装原版随附的 `localization/chineseSimplified.xml`，没有安装来源时才回退
-  到项目内置的 Notepad++ v8.4.6 版本。
+- `setNativeLang()` 现在与原版一致，从当前程序安装目录的
+  `localization/*.xml` 复制完整官方本地化 XML，不再从 qrc 或其他
+  Notepad++ 安装中寻找语言文件。
 - 启动时会识别并迁移旧短标记，不覆盖已经有效的原版语言包。
 - `EditorFont`、`EditorSettings`、`WindowState` 已从 `config.xml` 移至
   `qtState.ini`；旧节点仍可读取用于一次性迁移，写回时会清除。
 - `config.xml` 未知 GUIConfig、未知属性和嵌套子节点往返保持。
 - 2026-07-22 关于将 `darkMode` 写入 `EditorSettings` 的记录已被本次决策取代。
+
+## 2026-08-24 原版 NativeLangSpeaker 加载链路
+
+- 项目内仅保留 `resources/nativeLang/*.xml` 作为打包输入，不再保留重复的
+  `resources/localization/` 源码目录。构建时把它们复制到程序目录的
+  `localization/`，运行时只扫描该安装目录。
+- 94 份 XML 与 Notepad++ v8.4.6
+  `PowerEditor/installer/nativeLang/` 的完整集合逐字节一致。
+- 语言选择把完整官方 XML 复制为用户 `nativeLang.xml`；启动时
+  优先加载用户文件，再回退到程序目录文件，与原版顺序一致。
+- `NativeLangSpeaker` 使用原版菜单/对话框数字 ID；Qt 层只把这些
+  ID 映射到 `QAction`/`QWidget` objectName，不再向 XML 添加 Qt 字段。
+- `.ts/.qm` 以及 `QTranslator` 路径不属于该机制，已从项目资源移除。
 # 2026-07-23 更新
 
 - `config.xml` 已增加原版 `openSaveDir`、`Print`、`SmartHighLight`、`multiInst`、`DateTime`、`delimiterSelection`、`URL`、`searchEngine` 的读取和保守写回。

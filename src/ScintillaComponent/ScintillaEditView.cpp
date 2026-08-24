@@ -1104,7 +1104,8 @@ void ScintillaEditView::configureLexer(const QString& languageName)
     }
 }
 
-void ScintillaEditView::setLexerForFile(const QString& filePath)
+void ScintillaEditView::setLexerForFile(const QString& filePath,
+                                        const QString& detectedLanguage)
 {
     if (_largeFileMode) {
         clearLexer();
@@ -1118,6 +1119,8 @@ void ScintillaEditView::setLexerForFile(const QString& filePath)
         NppParameters::getInstance().getLangDescByExt(ext);
     QString nppName = extensionLanguage
         ? extensionLanguage->name : extToNppName(ext, fileName);
+    if (nppName.isEmpty())
+        nppName = detectedLanguage;
     _currentLexerName = nppName.toLower();
 
     if (nppName.isEmpty()) {

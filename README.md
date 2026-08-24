@@ -11,6 +11,9 @@ Notepad++ project is <https://github.com/notepad-plus-plus/notepad-plus-plus>.
 See [QT_PORT_NOTICE.md](QT_PORT_NOTICE.md) for complete attribution and license
 scope.
 
+Current platform, feature, packaging, and plugin-port progress is summarized in
+[PROJECT_STATUS.md](PROJECT_STATUS.md).
+
 ## Stack
 
 - C++17
@@ -74,6 +77,20 @@ ctest --test-dir build-ubuntu --output-on-failure
 ./build-ubuntu/notepadpp-qt
 ```
 
+Build the Ubuntu `.deb` package in Release mode:
+
+```bash
+cmake -S . -B build-ubuntu-package \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTING=ON
+cmake --build build-ubuntu-package -j "$(nproc)"
+ctest --test-dir build-ubuntu-package --output-on-failure
+cpack --config build-ubuntu-package/CPackConfig.cmake -G DEB
+```
+
+The package installs the self-contained application under
+`/opt/notepad-plus-plus` and provides `/usr/bin/notepad++` plus a desktop entry.
+
 ### macOS
 
 **Not tested yet; testing will have to wait until I can afford a Mac.**
@@ -115,6 +132,10 @@ is documented in `src/CrossPlatformPluginSystem/README.md`.
 
 - `src/`: application and Qt port implementation
 - `resources/`: compatible XML defaults, localization, icons, and parsers
+- `installer/`: reserved Windows installer tree, corresponding to the original
+  Notepad++ installer location
+- `installer_ubuntu/`: Debian package metadata and desktop integration
+- `installer_mac/`: reserved macOS installer tree
 - `tests/`: behavior, configuration, and UI runtime tests
 - `third_party/scintilla/`: bundled Scintilla 5.3.0 source and Qt platform code
 - `third_party/boostregex/`: Boost.Regex integration

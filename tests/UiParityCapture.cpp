@@ -297,7 +297,7 @@ int main(int argc, char* argv[])
                   "betterMultiSelection|pluginEnablement|p0Plugins|"
                   "pluginCoexistence] "
                   "[configurationPlugins] "
-                  "[zh_CN]");
+                  "[native-language]");
         return 2;
     }
 
@@ -347,12 +347,14 @@ int main(int argc, char* argv[])
         ? qEnvironmentVariableIntValue("NPP_QT_TEST_PLUGIN_RESTART_PHASE")
         : 0;
 
-    const bool forceChinese =
-        argc == 4
-        && QString::fromLocal8Bit(argv[3]).compare(
-               QStringLiteral("zh_CN"), Qt::CaseInsensitive) == 0;
+    const QString requestedNativeLanguage =
+        argc == 4 ? QString::fromLocal8Bit(argv[3]) : QString();
+    const bool forceChinese = requestedNativeLanguage.compare(
+        QStringLiteral("zh_CN"), Qt::CaseInsensitive) == 0;
+    const bool forceJapanese = requestedNativeLanguage.compare(
+        QStringLiteral("ja"), Qt::CaseInsensitive) == 0;
     NppParameters& parameters = NppParameters::getInstance();
-    if (forceChinese || noPluginMode || registrationRollbackMode
+    if (!requestedNativeLanguage.isEmpty() || noPluginMode || registrationRollbackMode
         || pluginRecoveryMode || betterMultiSelectionMode
         || pluginEnablementMode || p0PluginsMode
         || configurationPluginsMode || sessionManagerMode
@@ -373,8 +375,8 @@ int main(int argc, char* argv[])
             PluginEnablementConfig::filePathForConfigDirectory(
                 parameters.getUserPath()));
     }
-    if (forceChinese)
-        parameters.setNativeLang(QStringLiteral("zh_CN"));
+    if (!requestedNativeLanguage.isEmpty())
+        parameters.setNativeLang(requestedNativeLanguage);
 #ifdef NPP_WIN32_PLUGIN_CORPUS_MANAGED_TEST
     if (!pluginEnablementMode) {
         PluginEnablementConfig pluginEnablement(
@@ -3170,7 +3172,7 @@ int main(int argc, char* argv[])
     if (forceChinese) {
         const QStringList expectedTabs = {
             QStringLiteral("查找"), QStringLiteral("替换"),
-            QStringLiteral("文件查找"), QStringLiteral("项目查找"),
+            QStringLiteral("文件查找"), QStringLiteral("工程中查找"),
             QStringLiteral("标记")
         };
         for (int i = 0; i < expectedTabs.size(); ++i) {
@@ -3182,6 +3184,23 @@ int main(int argc, char* argv[])
                 QStringLiteral("btnMarkAll"));
         if (findDialog->windowTitle() != QStringLiteral("查找 / 替换")
             || !markAll || markAll->text() != QStringLiteral("全部标记")) {
+            return 21;
+        }
+    }
+    if (forceJapanese) {
+        const QStringList expectedTabs = {
+            QStringLiteral("検索"), QStringLiteral("置換"),
+            QStringLiteral("ファイル内検索"),
+            QStringLiteral("プロジェクト内検索"), QStringLiteral("マーク")
+        };
+        for (int i = 0; i < expectedTabs.size(); ++i) {
+            if (tabs->tabText(i) != expectedTabs.at(i))
+                return 20;
+        }
+        QAbstractButton* markAll = findDialog->findChild<QAbstractButton*>(
+            QStringLiteral("btnMarkAll"));
+        if (findDialog->windowTitle() != QStringLiteral("検索 / 置換")
+            || !markAll || markAll->text() != QStringLiteral("すべてマーク")) {
             return 21;
         }
     }
@@ -3218,8 +3237,8 @@ int main(int argc, char* argv[])
             return;
         }
         if (forceChinese
-            && (preferences->windowTitle() != QStringLiteral("偏好设置")
-                || pages->item(0)->text() != QStringLiteral("通用"))) {
+            && (preferences->windowTitle() != QStringLiteral("首选项")
+                || pages->item(0)->text() != QStringLiteral("常用"))) {
             preferences->reject();
             return;
         }
@@ -3236,7 +3255,7 @@ int main(int argc, char* argv[])
                 preferences->findChild<QGroupBox*>(
                     QStringLiteral("grpAutoInsert"));
             if (!autoInsert
-                || autoInsert->title() != QStringLiteral("自动插入")) {
+                || autoInsert->title() != QStringLiteral("自动输入")) {
                 preferences->reject();
                 return;
             }
@@ -3256,6 +3275,19 @@ int main(int argc, char* argv[])
                 return;
             }
 #endif
+        }
+        if (forceJapanese) {
+            QAbstractButton* closeButton = preferences->findChild<QAbstractButton*>(
+                QStringLiteral("btnPrefsClose"));
+            QGroupBox* autoInsert = preferences->findChild<QGroupBox*>(
+                QStringLiteral("grpAutoInsert"));
+            if (preferences->windowTitle() != QStringLiteral("環境設定")
+                || pages->item(0)->text() != QStringLiteral("全般設定")
+                || !closeButton || closeButton->text() != QStringLiteral("閉じる")
+                || !autoInsert || autoInsert->title() != QStringLiteral("自動挿入")) {
+                preferences->reject();
+                return;
+            }
         }
         preferencesCaptured = preferences->grab().save(
             output + QStringLiteral("/preferences-dialog.png"));

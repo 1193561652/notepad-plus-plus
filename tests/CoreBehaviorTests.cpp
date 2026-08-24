@@ -174,5 +174,17 @@ int main(int argc, char** argv)
                     std::numeric_limits<int>::max()),
                 "Huge-file confirmation boundary failed");
 
+    ok &= check(Buffer::detectLanguageFromTextBeginning(
+                    QByteArray("#!/usr/bin/env python3\nprint('ok')\n")) ==
+                    QStringLiteral("python"),
+                "Extensionless Python shebang detection failed");
+    ok &= check(Buffer::detectLanguageFromTextBeginning(
+                    QByteArray("  <?xml version=\"1.0\"?>\n<root/>")) ==
+                    QStringLiteral("xml"),
+                "Extensionless XML prolog detection failed");
+    ok &= check(Buffer::detectLanguageFromTextBeginning(
+                    QByteArray("const value = 1;\n")).isEmpty(),
+                "Ordinary text must not be guessed heuristically");
+
     return ok ? 0 : 1;
 }

@@ -1,11 +1,5 @@
 <RCC>
     <qresource prefix="/">
-        <!-- 语言文件（XML 格式，与原版一致，运行时热切换） -->
-        <file>nativeLang/chineseSimplified.xml</file>
-        <!-- 原版兼容语言包：选择语言时完整复制为 nativeLang.xml -->
-        <file>localization/chineseSimplified.xml</file>
-        <!-- 翻译文件（保留，用于回退兼容） -->
-        <file>translations/zh_CN.qm</file>
         <!-- 默认配色主题 -->
         <file>stylers.model.xml</file>
         <!-- 原版默认配置模型（用于用户目录/exe目录缺失时回退） -->

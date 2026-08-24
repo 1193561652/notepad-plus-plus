@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Notepad++
+GenericName=Text Editor
+Comment=Edit text and source code
+Exec=notepad++ %F
+Icon=/opt/notepad-plus-plus/npp.ico
+Terminal=false
+Categories=Utility;TextEditor;
+MimeType=text/plain;
+StartupNotify=true
+StartupWMClass=notepadpp-qt

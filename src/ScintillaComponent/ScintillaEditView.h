@@ -196,7 +196,8 @@ public:
     void init();
 
     // 语法高亮
-    void setLexerForFile(const QString& filePath);
+    void setLexerForFile(const QString& filePath,
+                         const QString& detectedLanguage = QString());
     void setBuiltinLanguage(const QString& languageName);
     void setLexerByExtension(const QString& ext);
     bool setLexerByName(const QString& name);

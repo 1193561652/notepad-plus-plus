@@ -5,6 +5,7 @@
 #define BUFFER_H
 
 #include <QString>
+#include <QByteArray>
 #include <QDateTime>
 #include <QList>
 #include <functional>
@@ -98,6 +99,13 @@ public:
             qint64(1) << 20, size / 6);
         return size + editingRoom > std::numeric_limits<int>::max();
     }
+    // 与原版 detectLanguageFromTextBegining() 的识别范围一致。
+    // 返回 langs.xml 使用的语言名；空字符串表示普通文本。
+    static QString detectLanguageFromTextBeginning(const QByteArray& data);
+    const QString& detectedLanguage() const { return _detectedLanguage; }
+    void setDetectedLanguage(const QString& language) {
+        _detectedLanguage = language;
+    }
     int individualTabColour() const { return _individualTabColour; }
     void setIndividualTabColour(int colour) { _individualTabColour = colour; }
     const BufferMapState& mapState() const { return _mapState; }
@@ -136,6 +144,7 @@ private:
     BufferMapState _mapState;
     QString _backupFilePath; // %APPDATA%\Notepad++\backup\filename@timestamp
     QDateTime _lastKnownModificationTime;
+    QString _detectedLanguage;
 };
 
 using BufferID = Buffer*;

@@ -1,5 +1,18 @@
 # 本地缓存：最新分析
 
+## 2026-08-24 Ubuntu 打包、本地化和运行时一致性
+
+- 新增 Debian 安装包、桌面启动器和 Ubuntu 收藏夹所需的稳定应用标识；安装包包含
+  94 份可选语言文件。
+- 语言加载已切换为原版 `localization/` + `nativeLang.xml` 模型，不再使用 Qt
+  `.ts/.qm`。
+- 无后缀/未知扩展名文件按 v8.4.6 原版范围识别 shebang 及 XML/PHP/HTML 首行标记。
+- 关闭文件保存提示改从原版 `Dialog/DoSaveOrNot` 节点加载。
+- Ubuntu Release 构建、35/35 测试、Debian 包检查和 offscreen 启动冒烟均通过。
+- 当前总览见 `PROJECT_STATUS.md`；详细记录见
+  `codex/changes/2026-08-24-ubuntu-packaging-and-runtime-parity.md` 和
+  `codex/changes/2026-08-24-original-native-language-loading.md`。
+
 ## 2026-08-14 DSpellCheck-qt 功能收口
 
 - Qt 目标直接复用原版 `ScintillaUtils` 完整 Lexer/style 分类表，设置适配保持注释、

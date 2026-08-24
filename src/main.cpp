@@ -30,6 +30,12 @@ int main(int argc, char *argv[])
     startupTimer.start();
     QApplication app(argc, argv);
 
+#if defined(Q_OS_LINUX)
+    // GNOME/Ubuntu Dock uses the desktop file ID to associate a running
+    // Wayland/X11 window with its launcher, which enables “Add to Favorites”.
+    QGuiApplication::setDesktopFileName(QStringLiteral("notepad-plus-plus"));
+#endif
+
     // These identifiers intentionally remain compatible with Notepad++ and
     // earlier Qt-port settings. They are configuration keys, not authorship or
     // project-ownership claims; see QT_PORT_NOTICE.md.

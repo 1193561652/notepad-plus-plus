@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /opt/notepad-plus-plus/notepadpp-qt "$@"

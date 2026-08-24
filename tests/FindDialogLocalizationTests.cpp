@@ -1,6 +1,6 @@
+#include <QCryptographicHash>
 #include <QDomDocument>
 #include <QFile>
-#include <QRegularExpression>
 #include <QSet>
 #include <QString>
 
@@ -17,125 +17,109 @@ void require(bool condition, const char* message)
     }
 }
 
-QString readFile(const QString& path)
+QByteArray readBytes(const QString& path)
 {
     QFile file(path);
     require(file.open(QIODevice::ReadOnly), "test source file is not readable");
-    return QString::fromUtf8(file.readAll());
+    return file.readAll();
+}
+
+QString readText(const QString& path)
+{
+    return QString::fromUtf8(readBytes(path));
+}
+
+void verifyOfficialLanguage(const QString& path, const QString& filename,
+                            const QByteArray& expectedSha256)
+{
+    const QByteArray data = readBytes(path);
+    require(QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex()
+                == expectedSha256,
+            "native language resource differs from Notepad++ v8.4.6");
+
+    QDomDocument document;
+    require(document.setContent(data), "native language XML is invalid");
+    const QDomElement nativeLanguage = document.documentElement()
+        .firstChildElement(QStringLiteral("Native-Langue"));
+    require(nativeLanguage.attribute(QStringLiteral("filename")) == filename,
+            "native language filename attribute changed");
+    require(nativeLanguage.attribute(QStringLiteral("version"))
+                == QStringLiteral("8.4.6"),
+            "native language version attribute changed");
+
+    const QDomNodeList allElements = document.elementsByTagName(QStringLiteral("*"));
+    for (int i = 0; i < allElements.count(); ++i) {
+        require(!allElements.at(i).toElement().hasAttribute(
+                    QStringLiteral("objectName")),
+                "Qt objectName must not be written into original language XML");
+    }
+
+    const QDomElement find = nativeLanguage.firstChildElement(QStringLiteral("Dialog"))
+        .firstChildElement(QStringLiteral("Find"));
+    require(!find.isNull(), "original Find dialog language section is missing");
+    QSet<int> ids;
+    for (QDomElement item = find.firstChildElement(QStringLiteral("Item"));
+         !item.isNull(); item = item.nextSiblingElement(QStringLiteral("Item"))) {
+        ids.insert(item.attribute(QStringLiteral("id")).toInt());
+    }
+    for (int id : {1, 2, 1603, 1615, 1620, 1624, 1633, 1656, 1703})
+        require(ids.contains(id), "original Find dialog control ID is missing");
 }
 
 } // namespace
 
 int main()
 {
-    const QString mainWindowSource =
-        readFile(QStringLiteral(NPP_MAINWINDOW_SOURCE))
-        + readFile(QStringLiteral(NPP_NOTEPAD_SOURCE))
-        + readFile(QStringLiteral(NPP_COMMANDS_SOURCE));
+    verifyOfficialLanguage(
+        QStringLiteral(NPP_ENGLISH_LANGUAGE_SOURCE), QStringLiteral("english.xml"),
+        QByteArrayLiteral("912f515c673bc57ee8f359dd31258e3552f7bb5f2cdffbcb258894806a4848c7"));
+    verifyOfficialLanguage(
+        QStringLiteral(NPP_FIND_LANGUAGE_SOURCE),
+        QStringLiteral("chineseSimplified.xml"),
+        QByteArrayLiteral("0bfbd9eb282ed4f7b23d4c136b939e186aaf78d8efbd94893744993e86544ad1"));
+    verifyOfficialLanguage(
+        QStringLiteral(NPP_JAPANESE_LANGUAGE_SOURCE), QStringLiteral("japanese.xml"),
+        QByteArrayLiteral("971ac1b027873286fb4dd321fb088e80fb47d16ffc98294d7eecef4841f545dd"));
+
+    const QString localizationSource =
+        readText(QStringLiteral(NPP_LOCALIZATION_SOURCE));
+    require(localizationSource.contains(QStringLiteral("nppCommandMappings()"))
+                && localizationSource.contains(
+                    QStringLiteral("findDialogObjectNames(int originalId)"))
+                && localizationSource.contains(
+                    QStringLiteral("txAttr(item, L\"id\")")),
+            "Qt platform layer must adapt original numeric localization IDs");
+    require(localizationSource.contains(
+                QStringLiteral("getDoSaveOrNotStrings"))
+                && localizationSource.contains(
+                    QStringLiteral("FirstChildElement(L\"DoSaveOrNot\")")),
+            "close-save prompt must use the original nativeLang dialog node");
+
     const QString findDialogSource =
-        readFile(QStringLiteral(NPP_FIND_DIALOG_SOURCE));
+        readText(QStringLiteral(NPP_FIND_DIALOG_SOURCE));
+    for (const QString& objectName : {
+             QStringLiteral("btnFindNext"), QStringLiteral("btnMarkAll"),
+             QStringLiteral("btnClearMarks"), QStringLiteral("lblFindWhat"),
+             QStringLiteral("grpSearchMode"), QStringLiteral("rbModeRegex")}) {
+        require(findDialogSource.contains(
+                    QStringLiteral("setObjectName(\"%1\")").arg(objectName)),
+                "mapped Qt Find control lacks a stable objectName");
+    }
+
     const QString preferencesSource =
-        readFile(QStringLiteral(NPP_PREFERENCES_SOURCE));
+        readText(QStringLiteral(NPP_PREFERENCES_SOURCE));
+    require(preferencesSource.contains(
+                QStringLiteral("getAvailableNativeLanguages()"))
+                && preferencesSource.contains(
+                    QStringLiteral("_languageCombo->addItem(language.first, language.second)")),
+            "Preferences must enumerate installed native language files");
 
-    require(mainWindowSource.count(QStringLiteral("new FindReplaceDlg(this)")) == 2,
-            "FindReplaceDlg must only be created at startup and by the shared helper");
-    require(mainWindowSource.count(QStringLiteral("ensureFindReplaceDialog()")) >= 8,
-            "all FindReplaceDlg entry points must use the shared localization helper");
-
-    QFile languageFile(QStringLiteral(NPP_FIND_LANGUAGE_SOURCE));
-    QDomDocument languageDocument;
-    require(languageFile.open(QIODevice::ReadOnly)
-                && languageDocument.setContent(&languageFile),
-            "Find dialog language XML is invalid");
-
-    QSet<QString> translatedNames;
-    QSet<QString> preferenceTranslatedNames;
-    const QDomNodeList dialogs = languageDocument.elementsByTagName("Dialog");
-    for (int i = 0; i < dialogs.count(); ++i) {
-        const QDomElement dialog = dialogs.at(i).toElement();
-        QSet<QString>* target = nullptr;
-        if (dialog.attribute("name") == QStringLiteral("FindReplace"))
-            target = &translatedNames;
-        else if (dialog.attribute("name") == QStringLiteral("Preferences"))
-            target = &preferenceTranslatedNames;
-        if (!target)
-            continue;
-        for (QDomElement item = dialog.firstChildElement("Item");
-             !item.isNull(); item = item.nextSiblingElement("Item")) {
-            target->insert(item.attribute("objectName"));
-        }
-    }
-
-    const QStringList requiredNames = {
-        "tabBar_0", "tabBar_1", "tabBar_2", "tabBar_3", "tabBar_4",
-        "lblFindWhat", "lblReplaceWith", "lblFilters", "lblDirectory",
-        "chkInSel", "browseDirBtn",
-        "chkBackwardDir", "chkWholeWord", "chkMatchCase", "chkWrapAround",
-        "chkMatchCase2", "chkWholeWord2", "chkWrapAround2", "chkInSel2",
-        "chkMatchCase3", "chkWholeWord3", "chkFollowDoc", "chkRecursive",
-        "chkInHiddenDir",
-        "chkProjectPanel1", "chkProjectPanel2", "chkProjectPanel3",
-        "chkBookmarkLine", "chkPurgeMarks", "chkMatchCase4", "chkWholeWord4",
-        "chkInSel4",
-        "btnFindNext", "btnCount", "btnFindAllOpened", "btnFindAllCur",
-        "btnClose", "btnFindNext2", "btnReplace", "btnReplaceAll",
-        "btnReplAllOpened", "btnClose2", "btnFindAllFif",
-        "btnReplaceInFiles", "btnClose3", "btnFindAllFip",
-        "btnReplaceInProjects", "btnClose4", "btnMarkAll", "btnClearMarks",
-        "btnCopyMarked", "btnClose5",
-        "grpSearchMode", "rbModeNormal", "rbModeExtended", "rbModeRegex",
-        "chkDotMatchNewline", "grpTransparency", "rbTransOnLostFocus",
-        "rbTransAlways"
-    };
-
-    for (const QString& name : requiredNames) {
-        require(translatedNames.contains(name),
-                qPrintable(QStringLiteral("missing FindReplace language item: %1")
-                               .arg(name)));
-        if (!name.startsWith(QStringLiteral("tabBar_"))) {
-            require(findDialogSource.contains(
-                        QStringLiteral("setObjectName(\"%1\")").arg(name)),
-                    qPrintable(QStringLiteral("missing FindReplace objectName: %1")
-                                   .arg(name)));
-        }
-    }
-
-    const QStringList requiredPreferenceNames = {
-        "grpAutoInsert", "chkPairParentheses", "chkPairBrackets",
-        "chkPairCurly", "chkPairQuotes", "chkPairDoubleQuotes",
-        "chkPairTags", "lblEdgeColumn", "chkBackupCustomDir",
-        "btnBackupDirBrowse", "lblSupportedExtensions",
-        "lblRegisteredExtensions", "lblFileAssociationAdmin",
-        "lblFileAssociationPlatform", "grpTagMatching", "chkTagMatch",
-        "chkTagAttributes"
-    };
-    for (const QString& name : requiredPreferenceNames) {
-        require(preferenceTranslatedNames.contains(name),
-                qPrintable(QStringLiteral("missing Preferences language item: %1")
-                               .arg(name)));
-        require(preferencesSource.contains(
-                    QStringLiteral("setObjectName(\"%1\")").arg(name)),
-                qPrintable(QStringLiteral("missing Preferences objectName: %1")
-                                   .arg(name)));
-    }
-
-    const QStringList preferenceLines = preferencesSource.split(QLatin1Char('\n'));
-    const QRegularExpression localizableConstructor(
-        QStringLiteral(
-            "new\\s+(QLabel|QGroupBox|QCheckBox|QRadioButton|"
-            "QPushButton|QToolButton)\\s*\\(\\s*tr\\("));
-    for (int i = 0; i < preferenceLines.size(); ++i) {
-        if (!localizableConstructor.match(preferenceLines.at(i)).hasMatch())
-            continue;
-        const int lastLine = qMin(i + 6, preferenceLines.size() - 1);
-        const QString nearby =
-            preferenceLines.mid(i, lastLine - i + 1).join(QLatin1Char('\n'));
-        require(nearby.contains(QStringLiteral("setObjectName("))
-                    || nearby.contains(QStringLiteral("placePreferenceControl(")),
-                qPrintable(QStringLiteral(
-                    "localizable Preferences control lacks objectName near line %1")
-                               .arg(i + 1)));
-    }
-
+    const QString mainSource = readText(QStringLiteral(NPP_MAIN_SOURCE));
+    const QString desktopEntry = readText(QStringLiteral(NPP_DESKTOP_SOURCE));
+    require(mainSource.contains(QStringLiteral(
+                "setDesktopFileName(QStringLiteral(\"notepad-plus-plus\"))"))
+                && desktopEntry.contains(
+                    QStringLiteral("StartupWMClass=notepadpp-qt")),
+            "Ubuntu launcher identity must support pinning to favorites");
     return 0;
 }

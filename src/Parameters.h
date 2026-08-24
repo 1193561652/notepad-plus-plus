@@ -12,6 +12,7 @@
 #include <QStringList>
 #include <QColor>
 #include <QVector>
+#include <QPair>
 #include <vector>
 #include <cstdint>
 #include "localization.h"
@@ -446,6 +447,7 @@ public:
     // 界面语言（与原版一致，通过 nativeLang.xml 文件标识）
     QString getNativeLang() const;
     void    setNativeLang(const QString& lang);
+    QVector<QPair<QString, QString>> getAvailableNativeLanguages() const;
 
     // NativeLangSpeaker（对应原版 Notepad_plus::_nativeLangSpeaker）
     NativeLangSpeaker&       getNativeLangSpeaker()       { return _nativeLangSpeaker; }

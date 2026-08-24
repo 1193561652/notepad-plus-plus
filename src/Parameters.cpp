@@ -2,6 +2,7 @@
 // 移植自: v8.4.6:PowerEditor/src/Parameters.cpp
 
 #include "Parameters.h"
+#include "localizationString.h"
 #include "MISC/QtCompat.h"
 #include <QApplication>
 #include <QDir>
@@ -264,102 +265,98 @@ QString NppParameters::userDefineLangFilePath() const { return _userPath + "/use
 
 // ── 界面语言（与原版一致，通过 nativeLang.xml 标识） ────────────────────────
 
-// 将原版 nativeLang.xml 的 filename 属性映射到 Qt locale 代码
-static QString filenameToLang(const QString& filename)
+static QString legacyLangToFilename(const QString& lang)
 {
-    // 原版 localization 文件名 → Qt locale
-    static const struct { const char* file; const char* lang; } map[] = {
-        { "chineseSimplified.xml",  "zh_CN" },
-        { "chineseTraditional.xml", "zh_TW" },
-        { "japanese.xml",           "ja"    },
-        { "korean.xml",             "ko"    },
-        { "french.xml",             "fr"    },
-        { "german.xml",             "de"    },
-        { "spanish.xml",            "es"    },
-        { "russian.xml",            "ru"    },
-        { "portuguese.xml",         "pt"    },
-        { "italian.xml",            "it"    },
-        { "dutch.xml",              "nl"    },
-        { "polish.xml",             "pl"    },
-        { "turkish.xml",            "tr"    },
-        { "arabic.xml",             "ar"    },
-    };
-    for (auto& e : map)
-        if (filename.compare(e.file, Qt::CaseInsensitive) == 0)
-            return e.lang;
+    if (lang == "en" || lang == "english")
+        return "english.xml";
+    if (lang == "zh_CN" || lang == "chineseSimplified")
+        return "chineseSimplified.xml";
+    if (lang == "ja" || lang == "ja_JP" || lang == "japanese")
+        return "japanese.xml";
     return QString();
 }
 
-static QString langToFilename(const QString& lang)
+static QString normalizedLanguageFilename(const QString& language)
 {
-    if (lang == "zh_CN" || lang == "chineseSimplified")
-        return "chineseSimplified.xml";
-    return QString();
+    QString filename = language.trimmed();
+    const QString legacyFilename = legacyLangToFilename(filename);
+    if (!legacyFilename.isEmpty())
+        filename = legacyFilename;
+    if (!filename.endsWith(QStringLiteral(".xml"), Qt::CaseInsensitive))
+        return QString();
+    if (QFileInfo(filename).fileName() != filename)
+        return QString();
+    return filename;
+}
+
+QVector<QPair<QString, QString>>
+NppParameters::getAvailableNativeLanguages() const
+{
+    QVector<QPair<QString, QString>> result;
+    const QDir localizationDir(_nppPath + QStringLiteral("/localization"));
+    std::size_t count = 0;
+    const NativeLanguageDefinition* definitions =
+        nativeLanguageDefinitions(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        const QString filename =
+            QString::fromLatin1(definitions[i].xmlFileName);
+        if (localizationDir.exists(filename)) {
+            result.append(qMakePair(
+                QString::fromUtf8(definitions[i].displayName), filename));
+        }
+    }
+    return result;
 }
 
 QString NppParameters::getNativeLang() const
 {
     QString path = nativeLangFilePath();
     if (!QFile::exists(path))
-        return "en";
+        return QStringLiteral("english.xml");
 
     TiXmlDocument doc;
     if (!loadTiXmlDoc(doc, path))
-        return "en";
+        return QStringLiteral("english.xml");
 
     TiXmlNode* root = doc.FirstChild(L"NotepadPlus");
-    if (!root) return "en";
+    if (!root) return QStringLiteral("english.xml");
 
     TiXmlElement* el = root->FirstChildElement(L"Native-Langue");
-    if (!el) return "en";
+    if (!el) return QStringLiteral("english.xml");
 
-    // 优先读我们自己写的 lang 属性
+    // 兼容早期 Qt 移植版写入的短 lang 属性。
     const wchar_t* langW = el->Attribute(L"lang");
     QString lang = langW ? QString::fromWCharArray(langW) : QString();
-    if (!lang.isEmpty())
-        return lang;
+    if (!lang.isEmpty()) {
+        const QString legacyFilename = legacyLangToFilename(lang);
+        return legacyFilename.isEmpty()
+            ? QStringLiteral("english.xml") : legacyFilename;
+    }
 
-    // 兼容原版格式：通过 filename 属性推断
+    // 原版格式直接以 filename 标识当前语言。
     const wchar_t* fnW = el->Attribute(L"filename");
     QString filename = fnW ? QString::fromWCharArray(fnW) : QString();
-    lang = filenameToLang(filename);
-    return lang.isEmpty() ? "en" : lang;
+    filename = normalizedLanguageFilename(filename);
+    return filename.isEmpty() ? QStringLiteral("english.xml") : filename;
 }
 
 void NppParameters::setNativeLang(const QString& lang)
 {
     ensureConfigDir();
-    if (lang.isEmpty() || lang == "en") {
+    const QString filename = normalizedLanguageFilename(lang);
+    if (filename.isEmpty())
+        return;
+    if (filename.compare(QStringLiteral("english.xml"),
+                         Qt::CaseInsensitive) == 0) {
         // 英文为默认，不需要文件
         QFile::remove(nativeLangFilePath());
         return;
     }
 
-    const QString filename = langToFilename(lang);
-    if (filename.isEmpty())
-        return;
-
-    QString sourcePath = ":/localization/" + filename;
-    const QString userLocalization =
-        _userPath + "/localization/" + filename;
-    const QString appLocalization =
+    const QString sourcePath =
         _nppPath + "/localization/" + filename;
-    QString installedLocalization;
-#ifdef Q_OS_WIN
-    const QString programFiles = qEnvironmentVariable("ProgramFiles");
-    if (!programFiles.isEmpty()) {
-        installedLocalization =
-            QDir(programFiles).filePath(
-                "Notepad++/localization/" + filename);
-    }
-#endif
-    if (QFile::exists(userLocalization))
-        sourcePath = userLocalization;
-    else if (QFile::exists(appLocalization))
-        sourcePath = appLocalization;
-    else if (!installedLocalization.isEmpty()
-             && QFile::exists(installedLocalization))
-        sourcePath = installedLocalization;
+    if (!QFile::exists(sourcePath))
+        return;
 
     QFile source(sourcePath);
     if (!source.open(QFile::ReadOnly))
@@ -383,35 +380,27 @@ void NppParameters::setNativeLang(const QString& lang)
 
 void NppParameters::reloadNativeLang()
 {
+    const QString englishXmlPath =
+        _nppPath + QStringLiteral("/localization/english.xml");
     if (!_startupLocalizationFile.isEmpty()) {
-        const QStringList candidates = {
-            _userPath + "/localization/" + _startupLocalizationFile,
-            _nppPath + "/localization/" + _startupLocalizationFile,
-            QStringLiteral(":/localization/") + _startupLocalizationFile
-        };
-        for (const QString& candidate : candidates) {
-            if (QFile::exists(candidate)) {
-                _nativeLangSpeaker.init(candidate);
-                return;
-            }
+        const QString candidate =
+            _nppPath + "/localization/" + _startupLocalizationFile;
+        if (QFile::exists(candidate)) {
+            _nativeLangSpeaker.init(candidate, englishXmlPath);
+            return;
         }
     }
 
-    const QString lang = getNativeLang();
-    QString xmlPath;
-
-    // 语言 → XML 文件名映射（与原版目录结构一致）
-    if (lang == "zh_CN" || lang == "chineseSimplified") {
-        xmlPath = ":/nativeLang/chineseSimplified.xml";
-    }
-    // 其他语言：优先查找用户配置目录，再查资源
-    if (xmlPath.isEmpty() && !lang.isEmpty() && lang != "en") {
-        QString userFile = _nppPath + "/nativeLang/" + lang + ".xml";
-        if (QFile::exists(userFile))
-            xmlPath = userFile;
+    // 与原版一致：优先加载用户的完整 nativeLang.xml，缺失时
+    // 回退到程序目录中的 nativeLang.xml。英文不需要语言文件。
+    QString xmlPath = nativeLangFilePath();
+    if (!QFile::exists(xmlPath)) {
+        xmlPath = _nppPath + QStringLiteral("/nativeLang.xml");
+        if (!QFile::exists(xmlPath))
+            xmlPath.clear();
     }
 
-    _nativeLangSpeaker.init(xmlPath); // 空路径 = 英文，使用内建 tr() 文本
+    _nativeLangSpeaker.init(xmlPath, englishXmlPath);
 }
 
 // ── 加载全部配置 ──────────────────────────────────────────────────────────────

@@ -86,7 +86,7 @@
 | contextMenu.xml | 缺失/待核验 | 未见完整入口 |
 | toolbarIcons.xml | 缺失/待核验 | Qt 版使用 qrc 图标 |
 | userDefineLang.xml | 缺失 | UDL 未完整实现 |
-| localization | 部分实现 | Qt 版 `NativeLangSpeaker` 和 Qt qm 并存 |
+| localization | 原版机制对齐 | `NativeLangSpeaker` 加载官方 XML，Qt 层仅适配原版 ID |
 
 ## 插件
 
@@ -98,4 +98,3 @@
 | `NPPM_*` 消息 | 缺失 | 原版插件核心能力 |
 | Plugin Admin | 缺失 | 原版有 JSON 管理和兼容列表 |
 | 插件 docking | 缺失 | 原版 docking 与插件窗口句柄绑定 |
-

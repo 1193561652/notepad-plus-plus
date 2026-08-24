@@ -108,5 +108,46 @@ int main(int argc, char** argv)
                     QStringLiteral("Codex Renamed")) != nullptr,
                 "imported UDL must load"))
         return 1;
+
+    parameters.setNativeLang(QStringLiteral("ja"));
+    const auto availableLanguages =
+        parameters.getAvailableNativeLanguages();
+    if (!expect(availableLanguages.size() == 94,
+                "all original v8.4.6 localization files must be available"))
+        return 1;
+    if (!expect(parameters.getNativeLang()
+                    == QStringLiteral("japanese.xml"),
+                "Japanese native language selection must round-trip"))
+        return 1;
+    QFile nativeLanguageFile(userPath + QStringLiteral("/nativeLang.xml"));
+    QDomDocument nativeLanguageDocument;
+    if (!expect(nativeLanguageFile.open(QIODevice::ReadOnly)
+                    && nativeLanguageDocument.setContent(&nativeLanguageFile),
+                "Japanese nativeLang.xml must be complete and valid"))
+        return 1;
+    const QDomElement nativeLanguage = nativeLanguageDocument.documentElement()
+        .firstChildElement(QStringLiteral("Native-Langue"));
+    if (!expect(nativeLanguage.attribute(QStringLiteral("filename"))
+                    == QStringLiteral("japanese.xml"),
+                "Japanese nativeLang.xml must retain the original filename"))
+        return 1;
+    parameters.reloadNativeLang();
+    if (!expect(parameters.getNativeLangSpeaker().isLoaded(),
+                "Japanese original native language resource must load"))
+        return 1;
+    if (!expect(parameters.getNativeLangSpeaker().getNativeLangMenuString(
+                    QStringLiteral("newAction"))
+                    == QStringLiteral("新規作成(&N)"),
+                "original command ID must localize the Qt action"))
+        return 1;
+
+    parameters.setStartupLocalizationFile(
+        QStringLiteral("chineseSimplified.xml"));
+    parameters.reloadNativeLang();
+    if (!expect(parameters.getNativeLangSpeaker().getLocalizedStrFromID(
+                    QStringLiteral("common-cancel"), QString())
+                    == QStringLiteral("取消"),
+                "-L localization must load the installed original language file"))
+        return 1;
     return 0;
 }
