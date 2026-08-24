@@ -34,7 +34,6 @@ int main(int argc, char *argv[])
     // earlier Qt-port settings. They are configuration keys, not authorship or
     // project-ownership claims; see QT_PORT_NOTICE.md.
     app.setApplicationName("Notepad++");
-    app.setApplicationDisplayName("Notepad++ for Qt");
     app.setApplicationVersion("8.4.6");
     app.setOrganizationName("Notepad++");
     app.setOrganizationDomain("notepad-plus-plus.org");
