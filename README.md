@@ -22,26 +22,79 @@ scope.
 
 ## Build
 
-Install Qt 5 with a matching C++ toolchain, then configure from the repository
-root:
+All platforms require CMake, Qt 5 with the Core, Gui, Widgets, Network,
+PrintSupport, and Xml modules, and a C++17 compiler. Initialize the pinned
+plugin catalog after cloning:
 
 ```bash
 git submodule update --init
-cmake -S . -B build -DBUILD_TESTING=ON
-cmake --build build -j 4
 ```
 
-The application is produced as `build/notepadpp-qt` or
-`build/notepadpp-qt.exe`.
+### Windows
 
-Run the complete automated suite with:
+Tested build environment: **Windows, Qt 5.12.12, MinGW 7.3, and CMake**. Use
+the compiler and `mingw32-make` supplied with the same Qt installation. From
+PowerShell:
+
+```powershell
+$qt = "F:\Qt\Qt5.12.12\5.12.12\mingw73_64"
+$mingw = "F:\Qt\Qt5.12.12\Tools\mingw730_64"
+$env:Path = "$mingw\bin;$qt\bin;$env:Path"
+
+cmake -S . -B build-windows -G "MinGW Makefiles" `
+  -DCMAKE_BUILD_TYPE=Debug `
+  -DBUILD_TESTING=ON `
+  -DCMAKE_PREFIX_PATH="$qt" `
+  -DCMAKE_CXX_COMPILER="$mingw\bin\g++.exe" `
+  -DCMAKE_MAKE_PROGRAM="$mingw\bin\mingw32-make.exe"
+cmake --build build-windows -j 4
+ctest --test-dir build-windows --output-on-failure
+```
+
+The executable and required runtime libraries are placed in `build-windows`.
+
+### Ubuntu
+
+Tested build environment: **Ubuntu 22.04.5 LTS x86_64, Linux 6.8, Qt 5.15.3,
+GCC 11.4.0, CMake 3.22.1, and GNU Make 4.3**. Install the required development
+packages:
 
 ```bash
-ctest --test-dir build --output-on-failure
+sudo apt update
+sudo apt install build-essential cmake qtbase5-dev qtbase5-dev-tools unzip
 ```
 
-See [BUILD_AND_TEST.md](BUILD_AND_TEST.md) for platform notes and targeted
-validation commands.
+Configure, build, test, and run from the repository root:
+
+```bash
+cmake -S . -B build-ubuntu \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBUILD_TESTING=ON
+cmake --build build-ubuntu -j "$(nproc)"
+ctest --test-dir build-ubuntu --output-on-failure
+./build-ubuntu/notepadpp-qt
+```
+
+### macOS
+
+**Not tested yet; testing will have to wait until I can afford a Mac.**
+
+The intended build path requires Qt 5, CMake, and the Xcode command-line tools:
+
+```bash
+cmake -S . -B build-macos \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBUILD_TESTING=ON \
+  -DCMAKE_PREFIX_PATH="$HOME/Qt/5.15.2/clang_64"
+cmake --build build-macos -j "$(sysctl -n hw.ncpu)"
+ctest --test-dir build-macos --output-on-failure
+./build-macos/notepadpp-qt
+```
+
+The current macOS path produces a plain executable; application bundling,
+signing, notarization, and deployment packaging are not implemented. See
+[BUILD_AND_TEST.md](BUILD_AND_TEST.md) for additional platform notes and
+targeted validation commands.
 
 ## Platform Support
 
@@ -49,7 +102,8 @@ validation commands.
 - Ubuntu 22.04 with Qt 5.15.3 and GCC 11.4 is built and tested.
 - Other Linux distributions and Clang remain supported build paths but are not
   yet part of the verified matrix.
-- macOS with Qt 5 and Apple Clang has a build path but has not yet been verified.
+- macOS with Qt 5 and Apple Clang has a build path, but it has not been tested
+  yet; testing will have to wait until I can afford a Mac.
 
 Each platform builds the bundled `npp-scintilla-qt` static library with the
 Notepad++ Boost.Regex backend and the separate `npp-lexilla` static library.
