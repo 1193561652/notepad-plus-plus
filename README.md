@@ -4,6 +4,13 @@ Notepad++ for Qt is a cross-platform port of Notepad++ v8.4.6. The project
 targets behavioral, configuration, and workflow compatibility while replacing
 Win32-specific implementation with Qt and standard C++.
 
+This is an independent Qt port, not an official Notepad++ release. The Qt port
+is authored and maintained by **Jiang Liwei** at
+<https://github.com/1193561652/notepad-plus-plus/tree/qt-port>. The original
+Notepad++ project is <https://github.com/notepad-plus-plus/notepad-plus-plus>.
+See [QT_PORT_NOTICE.md](QT_PORT_NOTICE.md) for complete attribution and license
+scope.
+
 ## Stack
 
 - C++17
@@ -83,6 +90,8 @@ git show v8.4.6:PowerEditor/src/Notepad_plus.cpp
 
 ## License
 
-The port builds on Notepad++, Scintilla, Boost, Lexilla, Qt, and
-other bundled components. Refer to the license files and source headers in the
-repository and its Git history for component-specific terms.
+This modified Qt port is distributed under the Notepad++ GNU GPL version 3
+terms, clarifications, and exceptions in [LICENSE](LICENSE). Original
+copyright notices are retained. Scintilla, Boost, Lexilla, Qt, plugins, and
+other third-party components retain their own licenses; see their license files
+and [QT_PORT_NOTICE.md](QT_PORT_NOTICE.md).

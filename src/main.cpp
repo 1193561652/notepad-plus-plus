@@ -1,5 +1,10 @@
-// Notepad++ Qt 移植版本
-// 基于 Notepad++ v8.4.6
+/*
+ * Notepad++ for Qt: an independent Qt port of Notepad++ v8.4.6.
+ * Qt port Copyright (C) 2026 Jiang Liwei.
+ * Port source: https://github.com/1193561652/notepad-plus-plus/tree/qt-port
+ * Original source: https://github.com/notepad-plus-plus/notepad-plus-plus
+ * License: see ../LICENSE and ../QT_PORT_NOTICE.md.
+ */
 
 #include <QApplication>
 #include <QCryptographicHash>
@@ -25,8 +30,11 @@ int main(int argc, char *argv[])
     startupTimer.start();
     QApplication app(argc, argv);
 
-    // 设置应用程序信息（与原版 Notepad++ 保持一致，复用配置目录）
+    // These identifiers intentionally remain compatible with Notepad++ and
+    // earlier Qt-port settings. They are configuration keys, not authorship or
+    // project-ownership claims; see QT_PORT_NOTICE.md.
     app.setApplicationName("Notepad++");
+    app.setApplicationDisplayName("Notepad++ for Qt");
     app.setApplicationVersion("8.4.6");
     app.setOrganizationName("Notepad++");
     app.setOrganizationDomain("notepad-plus-plus.org");

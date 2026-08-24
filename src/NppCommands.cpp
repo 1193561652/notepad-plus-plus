@@ -1,5 +1,5 @@
-// Qt port implementation split along the original Notepad++ controller boundaries.
-// 移植自: v8.4.6:PowerEditor/src/
+// Independent Notepad++ Qt port implementation by Jiang Liwei.
+// Derived from v8.4.6:PowerEditor/src/; see ../QT_PORT_NOTICE.md and ../LICENSE.
 
 #include "MainWindow.h"
 #include "NppCommandRegistry.h"
@@ -391,8 +391,11 @@ void MainWindow::about()
 {
     QMessageBox::about(this, tr("About Notepad++ Qt"),
         tr("Notepad++ Qt v8.4.6\n\n"
-           "A Qt port of Notepad++\n"
-           "Based on Notepad++ v8.4.6"));
+           "Independent Qt port of the original Notepad++ project.\n"
+           "Qt port author: Jiang Liwei\n"
+           "Port source: https://github.com/1193561652/notepad-plus-plus/tree/qt-port\n"
+           "Original source: https://github.com/notepad-plus-plus/notepad-plus-plus\n"
+           "License: Notepad++ GNU GPL v3 terms, clarifications and exceptions"));
 }
 
 void MainWindow::toggleSplitView()

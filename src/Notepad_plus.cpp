@@ -1,5 +1,5 @@
-// Qt port implementation split along the original Notepad++ controller boundaries.
-// 移植自: v8.4.6:PowerEditor/src/
+// Independent Notepad++ Qt port implementation by Jiang Liwei.
+// Derived from v8.4.6:PowerEditor/src/; see ../QT_PORT_NOTICE.md and ../LICENSE.
 
 #include "MainWindow.h"
 #include "NppCommandRegistry.h"

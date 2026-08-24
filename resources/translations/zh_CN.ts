@@ -130,11 +130,17 @@
     <message><source>About Notepad++ Qt</source><translation>关于 Notepad++ Qt</translation></message>
     <message><source>Notepad++ Qt v8.4.6
 
-A Qt port of Notepad++
-Based on Notepad++ v8.4.6</source><translation>Notepad++ Qt v8.4.6
+Independent Qt port of the original Notepad++ project.
+Qt port author: Jiang Liwei
+Port source: https://github.com/1193561652/notepad-plus-plus/tree/qt-port
+Original source: https://github.com/notepad-plus-plus/notepad-plus-plus
+License: Notepad++ GNU GPL v3 terms, clarifications and exceptions</source><translation>Notepad++ Qt v8.4.6
 
-Notepad++ 的 Qt 移植版本
-基于 Notepad++ v8.4.6</translation></message>
+原版 Notepad++ 项目的独立 Qt 移植版本。
+Qt 移植作者：Jiang Liwei
+移植版地址：https://github.com/1193561652/notepad-plus-plus/tree/qt-port
+原版地址：https://github.com/notepad-plus-plus/notepad-plus-plus
+协议：Notepad++ GNU GPL v3 条款、澄清及例外</translation></message>
 
     <message><source>Open File</source><translation>打开文件</translation></message>
     <message><source>All Files (*);;Text Files (*.txt)</source><translation>所有文件 (*);;文本文件 (*.txt)</translation></message>

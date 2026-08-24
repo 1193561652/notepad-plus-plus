@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
-project(NotepadPlusPlusQt VERSION 8.4.6 LANGUAGES CXX)
+project(NotepadPlusPlusQt VERSION 8.4.6
+    DESCRIPTION "Independent Qt port of Notepad++ by Jiang Liwei"
+    LANGUAGES CXX)
+set(PROJECT_HOMEPAGE_URL "https://github.com/1193561652/notepad-plus-plus/tree/qt-port")
 
 include(CTest)
 
