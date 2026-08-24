@@ -1263,6 +1263,13 @@ void MainWindow::populateWin32PluginMenu()
 
 void MainWindow::showPluginAdmin()
 {
+    if (_pluginAdminDlg) {
+        _pluginAdminDlg->show();
+        _pluginAdminDlg->raise();
+        _pluginAdminDlg->activateWindow();
+        return;
+    }
+
     const QString pluginRoot =
         QDir(NppParameters::getInstance().getNppPath())
             .filePath(QStringLiteral("plugins"));
@@ -1274,19 +1281,28 @@ void MainWindow::showPluginAdmin()
         return;
     }
 
-    PluginAdminModel model(
+    _pluginAdminModel = new PluginAdminModel(
         pluginRoot, catalog,
         PluginVersion(QCoreApplication::applicationVersion()),
         PluginEnablementConfig::filePathForConfigDirectory(
             NppParameters::getInstance().getUserPath()));
-    PluginAdminDialog dialog(&model, this);
-    dialog.applyLocalization(
+    _pluginAdminDlg = new PluginAdminDialog(_pluginAdminModel, this);
+    _pluginAdminDlg->setAttribute(Qt::WA_DeleteOnClose);
+    _pluginAdminDlg->setWindowModality(Qt::NonModal);
+    _pluginAdminDlg->setModal(false);
+    _pluginAdminDlg->applyLocalization(
         NppParameters::getInstance().getNativeLangSpeaker());
-    if (dialog.exec() != QDialog::Accepted)
-        return;
-    if (!schedulePluginOperations(dialog.selectedOperations()))
-        return;
-    QTimer::singleShot(0, this, &QWidget::close);
+    connect(_pluginAdminDlg, &QDialog::accepted, this, [this]() {
+        if (_pluginAdminDlg && schedulePluginOperations(
+                _pluginAdminDlg->selectedOperations()))
+            QTimer::singleShot(0, this, &QWidget::close);
+    });
+    connect(_pluginAdminDlg, &QObject::destroyed, this, [this]() {
+        _pluginAdminDlg = nullptr;
+        delete _pluginAdminModel;
+        _pluginAdminModel = nullptr;
+    });
+    _pluginAdminDlg->show();
 }
 
 bool MainWindow::schedulePluginOperations(

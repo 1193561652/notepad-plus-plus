@@ -231,6 +231,15 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
 
 MainWindow::~MainWindow()
 {
+    // PluginAdminModel is not a QObject and is normally released by the
+    // dialog's destroyed handler.  Close it explicitly while MainWindow is
+    // still fully alive so shutdown cannot leave the model behind.
+    delete _pluginAdminDlg;
+    _pluginAdminDlg = nullptr;
+    if (_pluginAdminModel) {
+        delete _pluginAdminModel;
+        _pluginAdminModel = nullptr;
+    }
 #ifdef Q_OS_WIN
     delete _win32PluginManager;
     _win32PluginManager = nullptr;

@@ -3217,6 +3217,22 @@ int main(int argc, char* argv[])
     const QSize findSize = findDialog->size();
     findDialog->close();
 
+    QAction* applicationAboutAction =
+        mainWindow.findChild<QAction*>(QStringLiteral("aboutAction"));
+    if (!applicationAboutAction)
+        return 22;
+    applicationAboutAction->trigger();
+    QApplication::processEvents();
+    QMessageBox* applicationAbout = mainWindow.findChild<QMessageBox*>(
+        QStringLiteral("aboutDialog"));
+    if (!applicationAbout
+        || applicationAbout->windowModality() != Qt::NonModal
+        || applicationAbout->isModal()) {
+        return 22;
+    }
+    applicationAbout->close();
+    QApplication::processEvents();
+
     QAction* preferencesAction =
         mainWindow.findChild<QAction*>(QStringLiteral("preferencesAction"));
     if (!preferencesAction)
@@ -3227,8 +3243,9 @@ int main(int argc, char* argv[])
     int preferencesPageCount = 0;
     QTimer::singleShot(0, [&]() {
         PreferenceDlg* preferences =
-            qobject_cast<PreferenceDlg*>(QApplication::activeModalWidget());
-        if (!preferences)
+            mainWindow.findChild<PreferenceDlg*>();
+        if (!preferences || preferences->windowModality() != Qt::NonModal
+            || preferences->isModal())
             return;
         QListWidget* pages =
             preferences->findChild<QListWidget*>(QStringLiteral("pageList"));
@@ -3313,6 +3330,7 @@ int main(int argc, char* argv[])
         preferences->reject();
     });
     preferencesAction->trigger();
+    QApplication::processEvents();
     if (!preferencesCaptured)
         return 16;
 

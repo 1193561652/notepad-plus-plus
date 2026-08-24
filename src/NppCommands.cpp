@@ -62,6 +62,7 @@
 #include <QProgressDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QEventLoop>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QComboBox>
@@ -114,6 +115,50 @@ static bool startDetachedCommand(const QString& command)
 #else
     return QProcess::startDetached(command);
 #endif
+}
+
+// The corresponding Notepad++ windows are modeless.  Some of the larger Qt
+// ports still build their controls on the stack, so keep those controls alive
+// with a local event loop while deliberately leaving the main window enabled.
+// This is different from QDialog::exec(), which marks the dialog modal and, on
+// GNOME, may attach it physically to the parent window.
+static int runModelessDialog(QDialog& dialog)
+{
+    dialog.setWindowModality(Qt::NonModal);
+    dialog.setModal(false);
+    QEventLoop loop;
+    QObject::connect(&dialog, &QDialog::finished,
+                     &loop, &QEventLoop::quit);
+    dialog.show();
+    dialog.raise();
+    dialog.activateWindow();
+    loop.exec();
+    return dialog.result();
+}
+
+static void showModelessMessage(QWidget* parent, const QString& objectName,
+                                QMessageBox::Icon icon,
+                                const QString& title, const QString& text)
+{
+    if (QMessageBox* existing =
+            parent->findChild<QMessageBox*>(objectName,
+                                            Qt::FindDirectChildrenOnly)) {
+        existing->setIcon(icon);
+        existing->setWindowTitle(title);
+        existing->setText(text);
+        existing->show();
+        existing->raise();
+        existing->activateWindow();
+        return;
+    }
+
+    QMessageBox* box = new QMessageBox(icon, title, text,
+                                       QMessageBox::Ok, parent);
+    box->setObjectName(objectName);
+    box->setAttribute(Qt::WA_DeleteOnClose);
+    box->setWindowModality(Qt::NonModal);
+    box->setModal(false);
+    box->show();
 }
 
 // Menu commands and command-state handling.
@@ -297,13 +342,34 @@ void MainWindow::goToLine()
 {
     ScintillaEditView* view = currentActiveView();
     if (!view) return;
-    bool ok;
-    int line = QInputDialog::getInt(this, tr("Go To Line"),
-        tr("Line number:"), 1, 1, view->lines(), 1, &ok);
-    if (ok) {
-        view->setCursorPosition(line - 1, 0);
-        view->ensureLineVisible(line - 1);
+    if (QInputDialog* existing =
+            findChild<QInputDialog*>(QStringLiteral("goToLineDialog"),
+                                     Qt::FindDirectChildrenOnly)) {
+        existing->setIntMaximum(view->lines());
+        existing->show();
+        existing->raise();
+        existing->activateWindow();
+        return;
     }
+    QInputDialog* dialog = new QInputDialog(this);
+    dialog->setObjectName(QStringLiteral("goToLineDialog"));
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowModality(Qt::NonModal);
+    dialog->setInputMode(QInputDialog::IntInput);
+    dialog->setWindowTitle(tr("Go To Line"));
+    dialog->setLabelText(tr("Line number:"));
+    dialog->setIntRange(1, view->lines());
+    dialog->setIntValue(1);
+    connect(dialog, &QInputDialog::accepted, this, [this, dialog]() {
+        ScintillaEditView* activeView = currentActiveView();
+        if (!activeView)
+            return;
+        const int line = qBound(1, dialog->intValue(), activeView->lines());
+        activeView->setCursorPosition(line - 1, 0);
+        activeView->ensureLineVisible(line - 1);
+        activeView->setFocus();
+    });
+    dialog->show();
 }
 
 void MainWindow::zoomIn()
@@ -389,7 +455,8 @@ void MainWindow::replace()
 
 void MainWindow::about()
 {
-    QMessageBox::about(this, tr("About Notepad++ Qt"),
+    showModelessMessage(this, QStringLiteral("aboutDialog"),
+        QMessageBox::Information, tr("About Notepad++ Qt"),
         tr("Notepad++ Qt v8.4.6\n\n"
            "Independent Qt port of the original Notepad++ project.\n"
            "Qt port author: Jiang Liwei\n"
@@ -858,7 +925,7 @@ void MainWindow::columnEditor()
     };
     connect(&mode, QOverload<int>::of(&QComboBox::currentIndexChanged), &dialog, updateMode);
     updateMode(0);
-    if (dialog.exec() != QDialog::Accepted) return;
+    if (runModelessDialog(dialog) != QDialog::Accepted) return;
 
     int cursorLine = 0, column = 0;
     view->getCursorPosition(&cursorLine, &column);
@@ -1447,7 +1514,9 @@ void MainWindow::onReplaceInFilesRequested(const QString& searchText,
         _subDocTab->setCurrentIndex(originalSubIndex);
     setActiveTab(originalActiveTab);
 
-    QMessageBox::information(this, tr("Replace in Files"),
+    showModelessMessage(
+        this, QStringLiteral("replaceInFilesResultDialog"),
+        QMessageBox::Information, tr("Replace in Files"),
         tr("%1 replacement(s) made in %2 file(s).\n"
            "Skipped dirty opened files: %3\n"
            "Skipped read-only files: %4\nErrors: %5")
@@ -1553,8 +1622,9 @@ void MainWindow::onReplaceInProjectsRequested(const QString& searchText,
     if (originalSubIndex >= 0 && originalSubIndex < _subDocTab->count())
         _subDocTab->setCurrentIndex(originalSubIndex);
     setActiveTab(originalActiveTab);
-    QMessageBox::information(
-        this, tr("Replace in Projects"),
+    showModelessMessage(
+        this, QStringLiteral("replaceInProjectsResultDialog"),
+        QMessageBox::Information, tr("Replace in Projects"),
         tr("%1 replacement(s) made in %2 file(s).\n"
            "Skipped dirty/read-only files: %3\nErrors: %4")
             .arg(replacements).arg(changedFiles).arg(skipped).arg(errors));
@@ -1575,9 +1645,11 @@ void MainWindow::showPreferences()
         speaker.changeDlgLang(_preferenceDlg, "Preferences");
 
     _preferenceDlg->loadSettings();
-    _preferenceDlg->exec();
-    delete _preferenceDlg;
-    _preferenceDlg = nullptr;
+    _preferenceDlg->setWindowModality(Qt::NonModal);
+    _preferenceDlg->setModal(false);
+    _preferenceDlg->show();
+    _preferenceDlg->raise();
+    _preferenceDlg->activateWindow();
 }
 
 static QIcon loadBmpIcon(const QString& path)
@@ -2398,7 +2470,9 @@ void MainWindow::createMenus()
     QAction* columnModeTip = _editMenu->addAction(tr("Column Mode..."));
     columnModeTip->setObjectName("columnModeTipAction");
     connect(columnModeTip, &QAction::triggered, this, [this]() {
-        QMessageBox::information(this, tr("Column Mode"),
+        showModelessMessage(
+            this, QStringLiteral("columnModeInfoDialog"),
+            QMessageBox::Information, tr("Column Mode"),
             tr("Use Alt+mouse selection or Alt+Shift+arrow keys for rectangular selection."));
     });
     QAction* columnEditorAction = _editMenu->addAction(tr("Colum&n Editor..."));
@@ -2774,8 +2848,9 @@ void MainWindow::createMenus()
         const int words = contents.split(
             QRegularExpression(QStringLiteral("\\s+")),
             NppQtCompat::SkipEmptyParts).size();
-        QMessageBox::information(
-            this, tr("Document Summary"),
+        showModelessMessage(
+            this, QStringLiteral("documentSummaryDialog"),
+            QMessageBox::Information, tr("Document Summary"),
             tr("Characters: %1\nWords: %2\nLines: %3")
                 .arg(contents.size()).arg(words).arg(view->lines()));
     });
@@ -3427,7 +3502,7 @@ void MainWindow::createMenus()
                     });
                 }
             });
-            if (dialog.exec() != QDialog::Accepted)
+            if (runModelessDialog(dialog) != QDialog::Accepted)
                 return;
 
             const int index = languageCombo.currentIndex();
@@ -3602,7 +3677,7 @@ void MainWindow::createMenus()
                 &dialog, &QDialog::accept);
         connect(&buttons, &QDialogButtonBox::rejected,
                 &dialog, &QDialog::reject);
-        if (dialog.exec() != QDialog::Accepted)
+        if (runModelessDialog(dialog) != QDialog::Accepted)
             return;
         saveTable();
         params.getLexerStylers() = lexers;
@@ -3695,14 +3770,33 @@ void MainWindow::createMenus()
     md5Menu->setObjectName("md5Menu");
     auto hashText = [this](QCryptographicHash::Algorithm algorithm,
                            const QString& title) {
-        bool ok = false;
-        const QString input = QInputDialog::getMultiLineText(
-            this, title, tr("Text:"), QString(), &ok);
-        if (!ok)
+        const QString objectName = QStringLiteral("hashTextInputDialog_%1")
+            .arg(static_cast<int>(algorithm));
+        if (QInputDialog* existing = findChild<QInputDialog*>(
+                objectName, Qt::FindDirectChildrenOnly)) {
+            existing->show();
+            existing->raise();
+            existing->activateWindow();
             return;
-        const QString digest = QString::fromLatin1(
-            QCryptographicHash::hash(input.toUtf8(), algorithm).toHex());
-        QMessageBox::information(this, title, digest);
+        }
+        QInputDialog* dialog = new QInputDialog(this);
+        dialog->setObjectName(objectName);
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->setWindowModality(Qt::NonModal);
+        dialog->setInputMode(QInputDialog::TextInput);
+        dialog->setOption(QInputDialog::UsePlainTextEditForTextInput);
+        dialog->setWindowTitle(title);
+        dialog->setLabelText(tr("Text:"));
+        connect(dialog, &QInputDialog::accepted, this,
+                [this, dialog, algorithm, title]() {
+            const QString digest = QString::fromLatin1(
+                QCryptographicHash::hash(
+                    dialog->textValue().toUtf8(), algorithm).toHex());
+            showModelessMessage(
+                this, QStringLiteral("hashTextResultDialog"),
+                QMessageBox::Information, title, digest);
+        });
+        dialog->show();
     };
     auto hashFiles = [this](QCryptographicHash::Algorithm algorithm,
                             const QString& title) {
@@ -3720,7 +3814,9 @@ void MainWindow::createMenus()
                 .arg(QString::fromLatin1(hash.result().toHex()),
                      QFileInfo(path).fileName());
         }
-        QMessageBox::information(this, title, output.join('\n'));
+        showModelessMessage(
+            this, QStringLiteral("hashFilesResultDialog"),
+            QMessageBox::Information, title, output.join('\n'));
     };
     auto hashToClipboard = [this](QCryptographicHash::Algorithm algorithm) {
         ScintillaEditView* view = currentActiveView();
@@ -3762,12 +3858,27 @@ void MainWindow::createMenus()
     QMenu* runMenu = menuBar()->addMenu(tr("&Run"));
     runMenu->setObjectName("runMenu");
     addCommand(runMenu, tr("Run..."), "runDialogAction", [this]() {
-        bool ok = false;
-        const QString command = QInputDialog::getText(
-            this, tr("Run"), tr("Command:"), QLineEdit::Normal,
-            QString(), &ok).trimmed();
-        if (ok && !command.isEmpty() && !startDetachedCommand(command))
-            QMessageBox::warning(this, tr("Run"), tr("Could not start command."));
+        if (QInputDialog* existing = findChild<QInputDialog*>(
+                QStringLiteral("runDialog"), Qt::FindDirectChildrenOnly)) {
+            existing->show();
+            existing->raise();
+            existing->activateWindow();
+            return;
+        }
+        QInputDialog* dialog = new QInputDialog(this);
+        dialog->setObjectName(QStringLiteral("runDialog"));
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->setWindowModality(Qt::NonModal);
+        dialog->setInputMode(QInputDialog::TextInput);
+        dialog->setWindowTitle(tr("Run"));
+        dialog->setLabelText(tr("Command:"));
+        connect(dialog, &QInputDialog::accepted, this, [this, dialog]() {
+            const QString command = dialog->textValue().trimmed();
+            if (!command.isEmpty() && !startDetachedCommand(command))
+                QMessageBox::warning(
+                    this, tr("Run"), tr("Could not start command."));
+        });
+        dialog->show();
     });
     const QVector<UserCommandDef>& userCommands =
         NppParameters::getInstance().getUserCommands();
@@ -3946,7 +4057,9 @@ void MainWindow::createMenus()
                  QCoreApplication::applicationFilePath(),
                  NppParameters::getInstance().getUserPath());
         QApplication::clipboard()->setText(info);
-        QMessageBox::information(this, tr("Debug Info"), info);
+        showModelessMessage(
+            this, QStringLiteral("debugInfoDialog"),
+            QMessageBox::Information, tr("Debug Info"), info);
     });
     _helpMenu->addSeparator();
     _helpMenu->addAction(_aboutAction);

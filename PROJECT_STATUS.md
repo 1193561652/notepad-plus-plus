@@ -32,6 +32,9 @@ Build commands and tested environments are documented in [README.md](README.md).
 - Ubuntu packaging installs the application under `/opt/notepad-plus-plus`,
   provides `/usr/bin/notepad++`, installs optional languages and supports
   desktop-launcher pinning.
+- Original modeless-dialog behavior is restored for the corresponding Qt
+  dialogs, and empty-line clicks reliably restore Scintilla caret focus. See
+  [dialog and caret record](codex/changes/2026-08-24-modeless-dialogs-and-empty-line-caret.md).
 
 ## Plugin ports
 

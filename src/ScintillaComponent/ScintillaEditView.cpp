@@ -554,7 +554,15 @@ void ScintillaEditView::setupDefaultStyles()
 
     // 设置插入符颜色
     setCaretForegroundColor(QColor(0, 0, 0));
+#if defined(Q_OS_LINUX)
+    // With the Qt/X11 surface, the first pixel of a one-pixel caret can be
+    // clipped where column zero meets Scintilla's internal left margin.  A
+    // two-pixel caret leaves one pixel inside the text area while preserving
+    // the original one-pixel Windows rendering below.
+    setCaretWidth(2);
+#else
     setCaretWidth(1);
+#endif
 }
 
 void ScintillaEditView::setupMargins()

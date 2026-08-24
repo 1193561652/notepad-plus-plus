@@ -29,6 +29,7 @@ class PluginHostServices;
 class Win32PluginManager;
 #endif
 class PluginAdminDialog;
+class PluginAdminModel;
 class EditorMacro;
 class QSplitter;
 class QDockWidget;
@@ -303,6 +304,8 @@ private:
 
     FindReplaceDlg*    _findReplaceDlg   = nullptr;
     PreferenceDlg*     _preferenceDlg    = nullptr;
+    PluginAdminDialog* _pluginAdminDlg   = nullptr;
+    PluginAdminModel*  _pluginAdminModel = nullptr;
 
     // Find All 结果面板
     QDockWidget*       _findResultDock   = nullptr;

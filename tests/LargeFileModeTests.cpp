@@ -10,6 +10,7 @@
 #include <QTextCodec>
 #include <QMetaObject>
 #include <QMouseEvent>
+#include <QImage>
 #include <Scintilla.h>
 #include <SciLexer.h>
 #include <Lexilla.h>
@@ -185,7 +186,82 @@ int main(int argc, char** argv)
                     "Bookmark margin accepts unrelated markers");
         marginView.resize(480, 240);
         marginView.show();
+        marginView.activateWindow();
+        marginView.setFocus(Qt::OtherFocusReason);
         QApplication::processEvents();
+        marginView.setText(QStringLiteral("first\n\nthird"));
+        marginView.setCursorPosition(1, 0);
+        marginView.SendScintilla(SCI_SETCARETPERIOD, 0);
+        marginView.viewport()->update();
+        QApplication::processEvents();
+        ok &= check(marginView.hasFocus() && marginView.SendScintilla(
+                        SCI_GETFOCUS) != 0,
+                    "Scintilla did not receive editor focus");
+        ok &= check(marginView.SendScintilla(SCI_GETCARETSTYLE)
+                        != CARETSTYLE_INVISIBLE &&
+                    marginView.SendScintilla(SCI_GETCARETWIDTH) > 0,
+                    "Scintilla caret style is invisible");
+#if defined(Q_OS_LINUX)
+        ok &= check(marginView.SendScintilla(SCI_GETCARETWIDTH) >= 2,
+                    "Linux caret does not cover the column-zero boundary");
+#endif
+        const int caretPosition = marginView.positionFromLineIndex(1, 0);
+        const int caretX = static_cast<int>(marginView.SendScintilla(
+            SCI_POINTXFROMPOSITION, 0, caretPosition));
+        const int caretY = static_cast<int>(marginView.SendScintilla(
+            SCI_POINTYFROMPOSITION, 0, caretPosition));
+        const QRgb caretRgb = QColor(0x80, 0x00, 0xff).rgb();
+        const QImage editorImage = marginView.viewport()->grab().toImage();
+        bool foundEmptyLineCaret = false;
+        for (int y = qMax(0, caretY); y < qMin(editorImage.height(), caretY + 24); ++y) {
+            for (int x = qMax(0, caretX - 2); x < qMin(editorImage.width(), caretX + 3); ++x) {
+                if (editorImage.pixel(x, y) == caretRgb)
+                    foundEmptyLineCaret = true;
+            }
+        }
+        ok &= check(foundEmptyLineCaret,
+                    "Focused caret was not painted on an empty line");
+        auto caretPaintedFor = [&](const QString& contents, int line) {
+            marginView.setText(contents);
+            marginView.setCursorPosition(line, 0);
+            marginView.viewport()->update();
+            QApplication::processEvents();
+            const int position = marginView.positionFromLineIndex(line, 0);
+            const int xPosition = static_cast<int>(marginView.SendScintilla(
+                SCI_POINTXFROMPOSITION, 0, position));
+            const int yPosition = static_cast<int>(marginView.SendScintilla(
+                SCI_POINTYFROMPOSITION, 0, position));
+            const QImage image = marginView.viewport()->grab().toImage();
+            for (int y = qMax(0, yPosition);
+                 y < qMin(image.height(), yPosition + 24); ++y) {
+                for (int x = qMax(0, xPosition - 2);
+                     x < qMin(image.width(), xPosition + 3); ++x) {
+                    if (image.pixel(x, y) == caretRgb)
+                        return true;
+                }
+            }
+            return false;
+        };
+        ok &= check(caretPaintedFor(QString(), 0),
+                    "Caret was not painted in an empty document");
+        ok &= check(caretPaintedFor(QStringLiteral("first\n"), 1),
+                    "Caret was not painted on the final empty line");
+        marginView.setText(QStringLiteral("first\n\nthird"));
+        marginView.setCursorPosition(1, 0);
+        marginView.clearFocus();
+        QApplication::processEvents();
+        QMouseEvent emptyLinePress(
+            QEvent::MouseButtonPress, QPointF(caretX, caretY + 4),
+            Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(marginView.viewport(), &emptyLinePress);
+        QMouseEvent emptyLineRelease(
+            QEvent::MouseButtonRelease, QPointF(caretX, caretY + 4),
+            Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(marginView.viewport(), &emptyLineRelease);
+        QApplication::processEvents();
+        ok &= check(marginView.hasFocus() && marginView.SendScintilla(
+                        SCI_GETFOCUS) != 0,
+                    "Clicking an empty line did not restore caret focus");
         const int bookmarkX = marginView.marginWidth(0)
             + marginView.marginWidth(1) / 2;
         const int lineY = static_cast<int>(marginView.SendScintilla(

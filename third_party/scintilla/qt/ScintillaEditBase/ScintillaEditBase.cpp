@@ -306,6 +306,14 @@ static int modifierTranslated(int sciModifier)
 
 void ScintillaEditBase::mousePressEvent(QMouseEvent *event)
 {
+	// QAbstractScrollArea delivers the click through its viewport.  Depending
+	// on the window manager and the previously active modeless dialog, that
+	// route does not always restore focus to the scroll-area widget.  Scintilla
+	// only paints its main caret while SetFocusState(true), so restore Qt focus
+	// before moving the selection, including when an empty line is clicked.
+	if (!hasFocus())
+		setFocus(Qt::MouseFocusReason);
+
 	Point pos = PointFromQPoint(event->pos());
 
 	emit buttonPressed(event);
