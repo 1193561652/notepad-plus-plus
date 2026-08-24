@@ -34,19 +34,18 @@ git submodule update --init
 
 Tested build environment: **Windows, Qt 5.12.12, MinGW 7.3, and CMake**. Use
 the compiler and `mingw32-make` supplied with the same Qt installation. From
-PowerShell:
+PowerShell, first set `QT_ROOT` to the selected Qt kit directory and
+`MINGW_ROOT` to its matching MinGW toolchain directory:
 
 ```powershell
-$qt = "F:\Qt\Qt5.12.12\5.12.12\mingw73_64"
-$mingw = "F:\Qt\Qt5.12.12\Tools\mingw730_64"
-$env:Path = "$mingw\bin;$qt\bin;$env:Path"
+$env:Path = "$env:MINGW_ROOT\bin;$env:QT_ROOT\bin;$env:Path"
 
 cmake -S . -B build-windows -G "MinGW Makefiles" `
   -DCMAKE_BUILD_TYPE=Debug `
   -DBUILD_TESTING=ON `
-  -DCMAKE_PREFIX_PATH="$qt" `
-  -DCMAKE_CXX_COMPILER="$mingw\bin\g++.exe" `
-  -DCMAKE_MAKE_PROGRAM="$mingw\bin\mingw32-make.exe"
+  -DCMAKE_PREFIX_PATH="$env:QT_ROOT" `
+  -DCMAKE_CXX_COMPILER="$env:MINGW_ROOT\bin\g++.exe" `
+  -DCMAKE_MAKE_PROGRAM="$env:MINGW_ROOT\bin\mingw32-make.exe"
 cmake --build build-windows -j 4
 ctest --test-dir build-windows --output-on-failure
 ```
