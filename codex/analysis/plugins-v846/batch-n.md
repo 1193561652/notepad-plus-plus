@@ -5,7 +5,7 @@
 
 ## 1. 范围、证据边界和等级规则
 
-本文件只调查 `resources/pluginList/windows/pl.x86.json`（列表版本 `1.5.4`，
+本文件只调查 `third_party/nppPluginList/catalog/windows/pl.x86.json`（列表版本 `1.5.4`，
 `arch=32`）中按 `folder-name` 忽略大小写排序后从 `NativeLang` 到
 `NWScript-Npp` 的 50 项。版本、功能描述、包地址和主页均以该 x86 JSON 为准，
 不引用 x64/ARM64 条目补全结论。

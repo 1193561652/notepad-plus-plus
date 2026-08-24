@@ -2,7 +2,7 @@
 
 ## 调查范围
 
-- 唯一数据源：`resources/pluginList/windows/pl.x86.json`。
+- 唯一数据源：`third_party/nppPluginList/catalog/windows/pl.x86.json`。
 - 清单版本：`1.5.4`；目标架构：Windows x86；插件数：169。
 - 本轮不调查 x64 或 ARM64，不合并其他架构的版本、包或结论。
 - 有对应版本源码时，以源码和官方材料为证据；无源码时明确标注，不反汇编。

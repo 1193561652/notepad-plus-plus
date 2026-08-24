@@ -19,6 +19,7 @@ Install Qt 5 with a matching C++ toolchain, then configure from the repository
 root:
 
 ```bash
+git submodule update --init
 cmake -S . -B build -DBUILD_TESTING=ON
 cmake --build build -j 4
 ```
@@ -59,6 +60,7 @@ is documented in `src/CrossPlatformPluginSystem/README.md`.
 - `third_party/boostregex/`: Boost.Regex integration
 - `third_party/lexilla/`: separately built Lexilla, lexlib, built-in lexers,
   and the v8.4.6 LexUser lexer
+- `third_party/nppPluginList/`: pinned JSON-only plugin catalog submodule
 - `src/CrossPlatformPluginSystem/`: public cross-platform plugin ABI and guide
 - `codex/`: project knowledge base and implementation records
 

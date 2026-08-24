@@ -15,10 +15,6 @@
         <file>contextMenu.xml</file>
         <file>toolbarIcons.xml</file>
         <file>userDefineLang.xml</file>
-        <!-- nppPluginList v1.5.4（Notepad++ v8.4.6 发布基线） -->
-        <file>pluginList/windows/pl.x86.json</file>
-        <file>pluginList/windows/pl.x64.json</file>
-        <file>pluginList/windows/pl.arm64.json</file>
         <!-- 程序图标 -->
         <file>icons/npp.ico</file>
         <!-- 标签页状态图标 -->

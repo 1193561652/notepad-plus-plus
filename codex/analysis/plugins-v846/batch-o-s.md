@@ -3,7 +3,7 @@
 ## 1. 范围和口径
 
 本文件是 **x86-only** 首轮调查，只使用
-`resources/pluginList/windows/pl.x86.json`，按 `folder-name` 不区分大小写
+`third_party/nppPluginList/catalog/windows/pl.x86.json`，按 `folder-name` 不区分大小写
 排序，范围从 `OpenSelection` 到 `SurroundSelection`，共 32 项。
 
 - JSON 版本、包 SHA-256、作者、主页和包地址以仓库内 x86 JSON 为准。

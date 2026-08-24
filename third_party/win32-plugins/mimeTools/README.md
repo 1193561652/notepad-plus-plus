@@ -4,7 +4,7 @@ This directory caches the real `mimeTools` 2.8 x64 plugin selected from the
 official Notepad++ plugin list. It is used only by the Windows plugin ABI
 compatibility test.
 
-- Catalog: `resources/pluginList/windows/pl.x64.json`
+- Catalog: `third_party/nppPluginList/catalog/windows/pl.x64.json`
 - Release: `https://github.com/npp-plugins/mimetools/releases/tag/v2.8`
 - Archive: `mimetools.v2.8.x64.zip`
 - Archive SHA-256: `ed5133f8a0552e974135ada78a0260581be979f916ddbcd45697d2a1a1b8f280`

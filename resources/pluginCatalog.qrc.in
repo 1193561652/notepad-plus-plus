@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/pluginList">
+        <file alias="catalog.json">@NPP_PLUGIN_CATALOG_FILE@</file>
+    </qresource>
+</RCC>

@@ -2,7 +2,7 @@
 
 ## 1. 范围、计数和方法
 
-本批次只使用 `resources/pluginList/windows/pl.x86.json`（版本 `1.5.4`，架构
+本批次只使用 `third_party/nppPluginList/catalog/windows/pl.x86.json`（版本 `1.5.4`，架构
 `32`）作为清单和版本基线。按 `inventory.md` 的排序，本文件覆盖第 148～169
 项中分配给 T–Z 批次的 17 项：
 

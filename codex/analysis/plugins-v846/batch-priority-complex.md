@@ -2,7 +2,7 @@
 
 ## 1. 范围和方法
 
-本批次只以 `resources/pluginList/windows/pl.x86.json` 为清单基线，不比较 x64 或
+本批次只以 `third_party/nppPluginList/catalog/windows/pl.x86.json` 为清单基线，不比较 x64 或
 ARM64。调查对象为 ComparePlus、DSpellCheck、HexEditor、JsonTools、
 NPPJSONViewer 和 XMLTools。
 
@@ -426,7 +426,7 @@ Windows 原 DLL 的宿主消息都能由有限同步代理表达，COM/MFC 依�
 
 | 编号 | 证据 | 支持范围 | 限制 |
 | --- | --- | --- | --- |
-| E-01 | `resources/pluginList/windows/pl.x86.json` | 版本、包、SHA、兼容区间 | 不证明运行兼容 |
+| E-01 | `third_party/nppPluginList/catalog/windows/pl.x86.json` | 版本、包、SHA、兼容区间 | 不证明运行兼容 |
 | E-02 | [ComparePlus `cp_1.0.0`](https://github.com/pnedev/comparePlus/tree/cp_1.0.0) | direct-call、双视图、Dock、subclass、线程 | 未运行 x86 包 |
 | E-03 | [DSpellCheck `v1.4.24`](https://github.com/Predelnik/DSpellCheck/tree/v1.4.24) | indicator、通知、subclass、网络和依赖 | 未运行 x86 包 |
 | E-04 | [NPP_HexEdit `0.9.12`](https://github.com/chcg/NPP_HexEdit/tree/0.9.12) | 额外 Scintilla、HEX view、原生 UI | 仓库自述为原源码镜像/延续 |

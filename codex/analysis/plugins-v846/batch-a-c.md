@@ -3,7 +3,7 @@
 ## 1. 范围和口径
 
 本文件是 **x86-only** 首轮调查，只使用
-`resources/pluginList/windows/pl.x86.json`，不比较、不推断 x64 或 ARM64。
+`third_party/nppPluginList/catalog/windows/pl.x86.json`，不比较、不推断 x64 或 ARM64。
 范围按 `folder-name` 不区分大小写排序，包括数字和下划线开头的条目，截止
 `CustomLineNumbers`，共 24 项。
 

@@ -102,32 +102,24 @@ void testVersionsAndCatalog()
           "a malformed plugin entry should be ignored like v8.4.6");
 }
 
-void testBundledWindowsCatalogs()
+void testSelectedBundledCatalog()
 {
-    struct CatalogExpectation
-    {
-        const char* resource;
-        int entries;
-    };
-    const CatalogExpectation expectations[] = {
-        {":/pluginList/windows/pl.x86.json", 169},
-        {":/pluginList/windows/pl.x64.json", 134},
-        {":/pluginList/windows/pl.arm64.json", 20}
-    };
-    for (const CatalogExpectation& expectation : expectations) {
-        QFile file(QString::fromLatin1(expectation.resource));
-        check(file.open(QFile::ReadOnly),
-              "bundled Windows catalog should be readable");
-        QString error;
-        const PluginCatalog catalog =
-            PluginCatalog::fromJson(file.readAll(), &error);
-        check(catalog.isValid() && error.isEmpty(),
-              "bundled Windows catalog should parse");
-        check(catalog.version() == QStringLiteral("1.5.4"),
-              "bundled catalog should retain its original version");
-        check(catalog.entries().size() == expectation.entries,
-              "bundled catalog should retain every original entry");
-    }
+    QFile file(QStringLiteral(":/pluginList/catalog.json"));
+    check(file.open(QFile::ReadOnly),
+          "selected bundled catalog should be readable");
+    const QByteArray bundledJson = file.readAll();
+
+    QFile selectedSource(QString::fromUtf8(NPP_TEST_PLUGIN_CATALOG));
+    check(selectedSource.open(QFile::ReadOnly),
+          "selected catalog source should be readable");
+    check(bundledJson == selectedSource.readAll(),
+          "bundled catalog should exactly match the CMake-selected JSON");
+
+    QString error;
+    const PluginCatalog catalog =
+        PluginCatalog::fromJson(bundledJson, &error);
+    check(catalog.isValid() && error.isEmpty(),
+          "selected bundled catalog should parse");
 }
 
 void writeReceipt(const QString& root, const QString& version)
@@ -343,7 +335,7 @@ int main(int argc, char** argv)
 {
     QCoreApplication application(argc, argv);
     testVersionsAndCatalog();
-    testBundledWindowsCatalogs();
+    testSelectedBundledCatalog();
     testPluginEnablementConfig();
     testArtifactsAndModel();
     testCrossPlatformArtifactDiscovery();

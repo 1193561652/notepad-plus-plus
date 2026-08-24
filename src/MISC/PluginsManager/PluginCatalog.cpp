@@ -10,15 +10,6 @@
 
 namespace {
 
-// Non-Windows packages must not offer Windows DLL downloads. Their catalogs
-// stay empty until native packages are published for the target platform.
-const char kEmptyPluginCatalog[] = R"json(
-{
-  "version": "1.5.4-no-native-packages",
-  "npp-plugins": []
-}
-)json";
-
 QByteArray resourceBytes(const QString& path)
 {
     QFile file(path);
@@ -240,24 +231,7 @@ PluginCatalog PluginCatalog::embedded()
 
 QByteArray PluginCatalog::embeddedJson()
 {
-#if defined(Q_OS_WIN)
-#if defined(Q_PROCESSOR_X86_64)
-    const QString resource =
-        QStringLiteral(":/pluginList/windows/pl.x64.json");
-#elif defined(Q_PROCESSOR_X86_32)
-    const QString resource =
-        QStringLiteral(":/pluginList/windows/pl.x86.json");
-#elif defined(Q_PROCESSOR_ARM_64)
-    const QString resource =
-        QStringLiteral(":/pluginList/windows/pl.arm64.json");
-#else
-    const QString resource;
-#endif
-    const QByteArray json = resourceBytes(resource);
-    if (!json.isEmpty())
-        return json;
-#endif
-    return QByteArray(kEmptyPluginCatalog);
+    return resourceBytes(QStringLiteral(":/pluginList/catalog.json"));
 }
 
 const PluginCatalogEntry* PluginCatalog::findByFolder(

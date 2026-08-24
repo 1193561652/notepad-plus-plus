@@ -116,9 +116,9 @@ Notepad++ v8.4.6 发布前 6 天创建，是当前从 nppPluginList 仓库取得
 
 仓库内原样归档位置：
 
-- `resources/pluginList/windows/pl.x86.json`
-- `resources/pluginList/windows/pl.x64.json`
-- `resources/pluginList/windows/pl.arm64.json`
+- `third_party/nppPluginList/catalog/windows/pl.x86.json`
+- `third_party/nppPluginList/catalog/windows/pl.x64.json`
+- `third_party/nppPluginList/catalog/windows/pl.arm64.json`
 
 三份根 `version` 均为 `1.5.4`，必需字段缺失数和单清单重复目录数均为 0。按
 `folder-name` 忽略大小写合并后共有 178 个插件：

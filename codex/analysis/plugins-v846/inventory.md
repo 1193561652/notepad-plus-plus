@@ -2,7 +2,7 @@
 
 ## 范围与状态约定
 
-- 数据源：`resources/pluginList/windows/pl.x86.json`（清单版本 `1.5.4`，架构字段 `32`）。
+- 数据源：`third_party/nppPluginList/catalog/windows/pl.x86.json`（清单版本 `1.5.4`，架构字段 `32`）。
 - 本索引仅覆盖 x86 清单中的 `169` 个插件；不合并、推断或代表 x64/ARM64 清单。
 - 一行对应一个原始 `folder-name`，顺序与 JSON 一致。版本、下载地址和主页均直接取自 x86 条目。
 - 调查状态、源码状态和兼容等级已由各字母批次的首轮静态调查回填。
@@ -204,7 +204,7 @@ import collections
 import json
 from pathlib import Path
 
-data = json.loads(Path('resources/pluginList/windows/pl.x86.json').read_text())
+data = json.loads(Path('third_party/nppPluginList/catalog/windows/pl.x86.json').read_text())
 names = [item['folder-name'] for item in data['npp-plugins']]
 duplicates = {name: count for name, count in collections.Counter(names).items() if count > 1}
 print({'entries': len(names), 'unique': len(set(names)), 'duplicates': duplicates})

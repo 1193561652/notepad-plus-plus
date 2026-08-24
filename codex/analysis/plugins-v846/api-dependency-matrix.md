@@ -5,7 +5,7 @@
 ## 1. 状态与边界
 
 本文件是插件移植阶段 1 的统一结论入口。身份和版本唯一来源为
-`resources/pluginList/windows/pl.x86.json` v1.5.4，不混入 x64、ARM64 或较新
+`third_party/nppPluginList/catalog/windows/pl.x86.json` v1.5.4，不混入 x64、ARM64 或较新
 插件版本。
 
 | 项目 | 结果 |

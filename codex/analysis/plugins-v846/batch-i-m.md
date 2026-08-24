@@ -2,7 +2,7 @@
 
 ## 1. 范围与方法
 
-本文件只覆盖 `resources/pluginList/windows/pl.x86.json` 按 `folder-name`
+本文件只覆盖 `third_party/nppPluginList/catalog/windows/pl.x86.json` 按 `folder-name`
 不区分大小写排序后从 `ImgTag` 到 `MZC8051` 的 23 项。版本、下载地址和
 SHA-256 只采用 x86 JSON，不合并 x64/ARM64 条目。
 

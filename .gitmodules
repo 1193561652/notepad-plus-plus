@@ -1,0 +1,4 @@
+[submodule "third_party/nppPluginList"]
+	path = third_party/nppPluginList
+	url = https://github.com/1193561652/nppPluginList.git
+	branch = qt-catalog

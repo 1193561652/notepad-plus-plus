@@ -99,8 +99,14 @@
 
 ## 当前行为
 
-- Windows 内置 `nppPluginList/v1.5.4` 的 x86、x64、ARM64 JSON，并按进程架构选择。
-- Linux/macOS 在没有本平台原生包清单前使用有效空清单，避免误装 Windows DLL。
+- 插件清单由 `third_party/nppPluginList` submodule 的 `qt-catalog` 分支管理；该分支
+  只有各平台/架构 JSON，不构建原版 `nppPluginList.dll`。
+- CMake 按目标平台和架构选择一份 JSON，并以统一资源路径
+  `:/pluginList/catalog.json` 打包；可用 `NPP_PLUGIN_CATALOG_FILE` 显式覆盖。
+- Windows 清单保持 `nppPluginList/v1.5.4` 的 x86、x64、ARM64 发布基线；Linux/macOS
+  在没有本平台原生包前选择对应架构的有效空清单，避免误装 Windows DLL。
+- 应用运行时不联网更新清单；submodule 固定 commit 和主程序发布流程共同确定清单版本，
+  因此不对 JSON 做独立签名。网络下载的插件包仍必须通过清单 SHA-256 校验。
 - 路径保持既定兼容规则：Windows `plugins/<name>/<name>.dll`，Linux
   `plugins/<name>/linux/<name>.so`，macOS `plugins/<name>/macos/<name>.dylib`。
 - 安装、更新和卸载都在主程序正常退出后执行，完成后重启，与 v8.4.6 工作流一致。
@@ -124,6 +130,8 @@
 
 ## 构建边界
 
+- 首次构建必须执行 `git submodule update --init`；清单 submodule 缺失时 CMake
+  配置阶段明确失败，不回退到未受版本控制的本地文件。
 - Plugin Admin 和 `npp-plugin-updater` 始终构建，不依赖 `ENABLE_PLUGIN_SYSTEM`。
 - `ENABLE_PLUGIN_SYSTEM` 默认开启，只控制跨平台 C ABI v1；Windows 原版 ABI 仍由
   `Q_OS_WIN` 平台边界和 `-noPlugin` 控制。

@@ -246,9 +246,51 @@ if(WIN32)
     endif()
 endif()
 
+# Select exactly one catalog from the pinned nppPluginList submodule. The
+# selected JSON is embedded in the executable; the application never fetches
+# or updates the catalog at runtime.
+set(NPP_PLUGIN_CATALOG_FILE "" CACHE FILEPATH
+    "Plugin catalog JSON to embed (defaults to the target platform/architecture catalog)")
+
+if(NOT NPP_PLUGIN_CATALOG_FILE)
+    if(WIN32)
+        set(NPP_PLUGIN_CATALOG_PLATFORM windows)
+    elseif(APPLE)
+        set(NPP_PLUGIN_CATALOG_PLATFORM macos)
+    else()
+        set(NPP_PLUGIN_CATALOG_PLATFORM linux)
+    endif()
+
+    string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" NPP_SYSTEM_PROCESSOR_LOWER)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+        set(NPP_PLUGIN_CATALOG_ARCH x86)
+    elseif(NPP_SYSTEM_PROCESSOR_LOWER MATCHES "^(aarch64|arm64)$")
+        set(NPP_PLUGIN_CATALOG_ARCH arm64)
+    else()
+        set(NPP_PLUGIN_CATALOG_ARCH x64)
+    endif()
+
+    set(NPP_PLUGIN_CATALOG_FILE
+        "${CMAKE_SOURCE_DIR}/third_party/nppPluginList/catalog/${NPP_PLUGIN_CATALOG_PLATFORM}/pl.${NPP_PLUGIN_CATALOG_ARCH}.json"
+        CACHE FILEPATH "Plugin catalog JSON to embed" FORCE)
+endif()
+
+get_filename_component(NPP_PLUGIN_CATALOG_FILE
+    "${NPP_PLUGIN_CATALOG_FILE}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+if(NOT EXISTS "${NPP_PLUGIN_CATALOG_FILE}")
+    message(FATAL_ERROR
+        "Plugin catalog not found: ${NPP_PLUGIN_CATALOG_FILE}\n"
+        "Initialize it with: git submodule update --init third_party/nppPluginList")
+endif()
+message(STATUS "Embedding plugin catalog: ${NPP_PLUGIN_CATALOG_FILE}")
+
+configure_file(resources/pluginCatalog.qrc.in
+    "${CMAKE_CURRENT_BINARY_DIR}/pluginCatalog.qrc" @ONLY)
+
 # 资源文件
 set(RESOURCES
     resources/resources.qrc
+    "${CMAKE_CURRENT_BINARY_DIR}/pluginCatalog.qrc"
 )
 
 add_executable(notepadpp-qt WIN32
@@ -404,6 +446,8 @@ if(BUILD_TESTING)
         src/MISC/PluginsManager/PluginUpdatePlan.cpp
         ${RESOURCES}
     )
+    target_compile_definitions(plugin-admin-tests PRIVATE
+        NPP_TEST_PLUGIN_CATALOG="${NPP_PLUGIN_CATALOG_FILE}")
     target_link_libraries(plugin-admin-tests Qt5::Core)
     if(WIN32)
         target_link_libraries(plugin-admin-tests version)
@@ -459,7 +503,7 @@ if(BUILD_TESTING)
         tests/PluginInvestigationTests.cpp
     )
     target_compile_definitions(plugin-investigation-tests PRIVATE
-        NPP_PLUGIN_CATALOG="${CMAKE_SOURCE_DIR}/resources/pluginList/windows/pl.x86.json"
+        NPP_PLUGIN_CATALOG="${CMAKE_SOURCE_DIR}/third_party/nppPluginList/catalog/windows/pl.x86.json"
         NPP_PLUGIN_INVENTORY="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/inventory.md"
         NPP_PLUGIN_IMPORTANCE="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/importance.md"
         NPP_PLUGIN_BATCH_A_C="${CMAKE_SOURCE_DIR}/codex/analysis/plugins-v846/batch-a-c.md"

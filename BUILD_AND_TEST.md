@@ -8,6 +8,12 @@
 
 Scintilla, Lexilla, Boost.Regex integration, and LexUser are
 bundled under `third_party/`; no sibling source directories are required.
+The plugin catalogs are pinned through `third_party/nppPluginList`; initialize
+that submodule before configuring a fresh checkout:
+
+```bash
+git submodule update --init
+```
 
 The Qt libraries, compiler, and build tool must belong to one compatible
 toolchain. In particular, do not mix a distribution Qt build with an unrelated
@@ -33,6 +39,14 @@ minimal C ABI v1 documented in `src/CrossPlatformPluginSystem/README.md`.
 cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Debug \
   -DBUILD_TESTING=ON
+```
+
+CMake embeds exactly one JSON catalog selected from the submodule for the
+target platform and architecture. To package a different catalog explicitly:
+
+```bash
+cmake -S . -B build \
+  -DNPP_PLUGIN_CATALOG_FILE=/absolute/path/to/catalog.json
 ```
 
 When Qt is not discoverable, provide its CMake package prefix:
