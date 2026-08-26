@@ -156,6 +156,7 @@ set(SOURCES
     src/ScintillaComponent/AutoCompletionParser.cpp
     src/WinControls/FunctionList/functionParser.cpp
     src/WinControls/ToolBar/ToolbarIconTheme.cpp
+    src/WinControls/UiResourceLoader.cpp
     src/ScintillaComponent/Printer.cpp
     src/ScintillaComponent/DocTabView.cpp
     src/WinControls/FileBrowser/fileBrowser.cpp
@@ -200,6 +201,7 @@ set(HEADERS
     src/ScintillaComponent/AutoCompletionParser.h
     src/WinControls/FunctionList/functionParser.h
     src/WinControls/ToolBar/ToolbarIconTheme.h
+    src/WinControls/UiResourceLoader.h
     src/ScintillaComponent/Printer.h
     src/ScintillaComponent/DocTabView.h
     src/WinControls/FileBrowser/fileBrowser.h
@@ -317,6 +319,12 @@ set(RESOURCES
 add_executable(notepadpp-qt WIN32
     ${SOURCES} ${HEADERS} ${RESOURCES} ${UCHARDET_SOURCES})
 
+if(WIN32)
+    # Preserve the original executable name for shortcuts, file associations,
+    # plugin process checks and the installed application layout.
+    set_target_properties(notepadpp-qt PROPERTIES OUTPUT_NAME "notepad++")
+endif()
+
 target_link_libraries(notepadpp-qt
     npp-scintilla-qt
     npp-lexilla
@@ -370,7 +378,7 @@ add_custom_command(TARGET notepadpp-qt POST_BUILD
 )
 add_custom_command(TARGET notepadpp-qt POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/resources/nativeLang"
+        "${CMAKE_SOURCE_DIR}/installer_common/nativeLang"
         "$<TARGET_FILE_DIR:notepadpp-qt>/localization"
     COMMENT "Copying Notepad++ native language files to localization"
 )
@@ -445,6 +453,21 @@ if(BUILD_TESTING)
             ENVIRONMENT "QT_QPA_PLATFORM=windows")
     elseif(UNIX AND NOT APPLE)
         set_tests_properties(toolbar-icon-theme-tests PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endif()
+
+    add_executable(ui-resource-loader-tests
+        tests/UiResourceLoaderTests.cpp
+        src/WinControls/UiResourceLoader.cpp
+        "${NPP_ORIGINAL_ICONS_QRC}"
+    )
+    target_link_libraries(ui-resource-loader-tests Qt5::Core Qt5::Gui)
+    add_test(NAME ui-resource-loader-tests COMMAND ui-resource-loader-tests)
+    if(WIN32)
+        set_tests_properties(ui-resource-loader-tests PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=windows")
+    elseif(UNIX AND NOT APPLE)
+        set_tests_properties(ui-resource-loader-tests PROPERTIES
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endif()
 
@@ -612,9 +635,9 @@ if(BUILD_TESTING)
         NPP_PREFERENCES_SOURCE="${CMAKE_SOURCE_DIR}/src/WinControls/Preference/preferenceDlg.cpp"
         NPP_MAIN_SOURCE="${CMAKE_SOURCE_DIR}/src/main.cpp"
         NPP_DESKTOP_SOURCE="${CMAKE_SOURCE_DIR}/installer_ubuntu/notepad-plus-plus.desktop"
-        NPP_ENGLISH_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/english.xml"
-        NPP_FIND_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/chineseSimplified.xml"
-        NPP_JAPANESE_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/japanese.xml"
+        NPP_ENGLISH_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/installer_common/nativeLang/english.xml"
+        NPP_FIND_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/installer_common/nativeLang/chineseSimplified.xml"
+        NPP_JAPANESE_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/installer_common/nativeLang/japanese.xml"
     )
     target_link_libraries(find-dialog-localization-tests Qt5::Core Qt5::Xml)
     add_test(NAME find-dialog-localization-tests
@@ -629,8 +652,8 @@ if(BUILD_TESTING)
         src/TinyXml/tinyxmlparser.cpp
     )
     target_compile_definitions(native-lang-save-prompt-tests PRIVATE
-        NPP_ENGLISH_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/english.xml"
-        NPP_CHINESE_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/resources/nativeLang/chineseSimplified.xml"
+        NPP_ENGLISH_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/installer_common/nativeLang/english.xml"
+        NPP_CHINESE_LANGUAGE_SOURCE="${CMAKE_SOURCE_DIR}/installer_common/nativeLang/chineseSimplified.xml"
     )
     target_link_libraries(native-lang-save-prompt-tests
         Qt5::Core Qt5::Gui Qt5::Widgets)
@@ -818,7 +841,7 @@ if(BUILD_TESTING)
             npp_prepare_plugin_archive(NPP_URL_PLUGIN_ARCHIVE
                 "third_party/win32-plugins/urlPlugin/1.2.0.0/x64/urlPlugin_x64.zip"
                 "3bab2b9494d6fbdaac17be5b410a18c074dec5e7dc440e2c1c5c61aaecb57588")
-            file(TO_CMAKE_PATH "${CMAKE_BINARY_DIR}/notepadpp-qt.exe"
+            file(TO_CMAKE_PATH "${CMAKE_BINARY_DIR}/notepad++.exe"
                  NPP_MIMETOOLS_TEST_APPLICATION)
             file(TO_CMAKE_PATH "${CMAKE_BINARY_DIR}/plugins"
                  NPP_MIMETOOLS_TEST_PLUGIN_ROOT)
@@ -1150,6 +1173,8 @@ if(BUILD_TESTING)
 
 endif()
 
-if(UNIX AND NOT APPLE)
+if(WIN32)
+    include("${CMAKE_SOURCE_DIR}/installer/CPackWindows.cmake")
+elseif(UNIX AND NOT APPLE)
     include("${CMAKE_SOURCE_DIR}/installer_ubuntu/CPackDebian.cmake")
 endif()

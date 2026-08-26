@@ -160,6 +160,7 @@ private:
 
     // 偏好设置
     void applyPreferencesToAllViews();
+    void applyPanelIcons();
     void applyPreferencesToView(ScintillaEditView* view);
     void applyDarkMode();
     void notifyCurrentLanguageChanged();

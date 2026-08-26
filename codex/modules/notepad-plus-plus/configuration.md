@@ -12,7 +12,7 @@
 - `resources/contextMenu.xml`
 - `resources/toolbarIcons.xml`
 - `resources/userDefineLang.xml`
-- `resources/nativeLang/chineseSimplified.xml`
+- `installer_common/nativeLang/chineseSimplified.xml`
 
 ## 主要类
 

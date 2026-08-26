@@ -8,13 +8,14 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
-#include <QStyle>
 #include <QTabWidget>
 #include <QTabBar>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
+#include <QSignalBlocker>
 #include <functional>
+#include "WinControls/UiResourceLoader.h"
 
 enum ItemRole {
     NodeTypeRole = Qt::UserRole,
@@ -46,19 +47,17 @@ ProjectPanel::ProjectPanel(int panelId, QWidget* parent)
     QWidget* editPage = new QWidget(pages);
     QVBoxLayout* tools = new QVBoxLayout(editPage);
     tools->setContentsMargins(6, 6, 6, 6);
-    auto addTool = [this, tools](QStyle::StandardPixmap icon,
-                                const QString& tip,
+    auto addTool = [this, tools](const QString& tip,
                                 const std::function<void()>& command) {
         QToolButton* button = new QToolButton(this);
-        button->setIcon(style()->standardIcon(icon));
         button->setText(tip);
         button->setToolTip(tip);
-        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        button->setToolButtonStyle(Qt::ToolButtonTextOnly);
         button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         connect(button, &QToolButton::clicked, this, command);
         tools->addWidget(button);
     };
-    addTool(QStyle::SP_DialogOpenButton, tr("Open Workspace"), [this]() {
+    addTool(tr("Open Workspace"), [this]() {
         const QString path = QFileDialog::getOpenFileName(
             this, tr("Open Workspace"), QString(), tr("Workspace Files (*)"));
         if (path.isEmpty())
@@ -67,7 +66,7 @@ ProjectPanel::ProjectPanel(int panelId, QWidget* parent)
         if (!loadWorkspace(path, &error))
             QMessageBox::warning(this, tr("Open Workspace"), error);
     });
-    addTool(QStyle::SP_DialogSaveButton, tr("Save Workspace"), [this]() {
+    addTool(tr("Save Workspace"), [this]() {
         QString path = _document.filePath();
         if (path.isEmpty())
             path = QFileDialog::getSaveFileName(
@@ -79,7 +78,7 @@ ProjectPanel::ProjectPanel(int panelId, QWidget* parent)
         if (!saveWorkspace(path, &error))
             QMessageBox::warning(this, tr("Save Workspace"), error);
     });
-    addTool(QStyle::SP_FileDialogNewFolder, tr("Add Project"), [this]() {
+    addTool(tr("Add Project"), [this]() {
         bool ok = false;
         const QString name = QInputDialog::getText(
             this, tr("Add Project"), tr("Name:"), QLineEdit::Normal,
@@ -90,7 +89,7 @@ ProjectPanel::ProjectPanel(int panelId, QWidget* parent)
         item->setData(0, NodeTypeRole, WorkspaceNode::Project);
         markDirty();
     });
-    addTool(QStyle::SP_DirIcon, tr("Add Folder"), [this]() {
+    addTool(tr("Add Folder"), [this]() {
         QTreeWidgetItem* parent = selectedContainer();
         if (!parent)
             return;
@@ -105,7 +104,7 @@ ProjectPanel::ProjectPanel(int panelId, QWidget* parent)
         parent->setExpanded(true);
         markDirty();
     });
-    addTool(QStyle::SP_FileIcon, tr("Add Files"), [this]() {
+    addTool(tr("Add Files"), [this]() {
         QTreeWidgetItem* parent = selectedContainer();
         if (!parent)
             return;
@@ -134,6 +133,10 @@ ProjectPanel::ProjectPanel(int panelId, QWidget* parent)
     });
     connect(_tree, &QTreeWidget::itemChanged,
             this, [this]() { markDirty(); });
+    connect(_tree, &QTreeWidget::itemExpanded,
+            this, [this](QTreeWidgetItem* item) { updateItemIcon(item); });
+    connect(_tree, &QTreeWidget::itemCollapsed,
+            this, [this](QTreeWidgetItem* item) { updateItemIcon(item); });
     connect(_tree, &QTreeWidget::customContextMenuRequested, this,
             [this](const QPoint& point) {
         QTreeWidgetItem* item = _tree->itemAt(point);
@@ -186,6 +189,7 @@ QTreeWidgetItem* ProjectPanel::addNodeItem(
     item->setData(0, NodeTypeRole, node.type);
     item->setData(0, FilePathRole, node.filePath);
     item->setFlags(item->flags() | Qt::ItemIsEditable);
+    updateItemIcon(item);
     for (const WorkspaceNode& child : node.children)
         addNodeItem(item, child);
     return item;
@@ -197,7 +201,7 @@ void ProjectPanel::rebuildTree()
     _tree->clear();
     QTreeWidgetItem* root = new QTreeWidgetItem(_tree, {tr("Workspace")});
     root->setData(0, SyntheticRootRole, true);
-    root->setIcon(0, style()->standardIcon(QStyle::SP_DirHomeIcon));
+    updateItemIcon(root);
     root->setFlags(root->flags() & ~Qt::ItemIsEditable);
     for (const WorkspaceNode& project : _document.projects())
         addNodeItem(root, project)->setExpanded(true);
@@ -242,4 +246,51 @@ void ProjectPanel::markDirty()
 {
     _dirty = true;
     rebuildDocument();
+    if (_tree->topLevelItemCount() > 0)
+        updateItemIcon(_tree->topLevelItem(0));
+}
+
+void ProjectPanel::refreshResources()
+{
+    const std::function<void(QTreeWidgetItem*)> refresh =
+        [this, &refresh](QTreeWidgetItem* item) {
+            if (!item)
+                return;
+            updateItemIcon(item);
+            for (int i = 0; i < item->childCount(); ++i)
+                refresh(item->child(i));
+        };
+    for (int i = 0; i < _tree->topLevelItemCount(); ++i)
+        refresh(_tree->topLevelItem(i));
+}
+
+void ProjectPanel::updateItemIcon(QTreeWidgetItem* item)
+{
+    if (!item)
+        return;
+    QString name;
+    if (item->data(0, SyntheticRootRole).toBool()) {
+        name = _dirty ? QStringLiteral("project_work_space_dirty.bmp")
+                      : QStringLiteral("project_work_space.bmp");
+    } else {
+        switch (static_cast<WorkspaceNode::Type>(
+                    item->data(0, NodeTypeRole).toInt())) {
+        case WorkspaceNode::Project:
+            name = QStringLiteral("project_root.bmp");
+            break;
+        case WorkspaceNode::Folder:
+            name = item->isExpanded() ? QStringLiteral("project_folder_open.bmp")
+                                      : QStringLiteral("project_folder_close.bmp");
+            break;
+        case WorkspaceNode::File:
+            name = QFileInfo::exists(item->data(0, FilePathRole).toString())
+                ? QStringLiteral("project_file.bmp")
+                : QStringLiteral("project_file_invalid.bmp");
+            break;
+        }
+    }
+    const QSignalBlocker blocker(_tree);
+    item->setIcon(0, NppUiResources::bitmapIcon(
+        QStringLiteral(":/icons/") + name,
+        NppUiResources::BitmapMode::MaskGray192));
 }

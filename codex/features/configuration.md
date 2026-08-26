@@ -16,7 +16,7 @@
 - `./resources/contextMenu.xml`
 - `./resources/toolbarIcons.xml`
 - `./resources/userDefineLang.xml`
-- `./resources/nativeLang/chineseSimplified.xml`
+- `./installer_common/nativeLang/chineseSimplified.xml`
 
 ## 当前涉及文件
 
@@ -138,7 +138,7 @@
 
 ## 2026-08-24 原版 NativeLangSpeaker 加载链路
 
-- 项目内仅保留 `resources/nativeLang/*.xml` 作为打包输入，不再保留重复的
+- 项目内仅保留 `installer_common/nativeLang/*.xml` 作为打包输入，不再保留重复的
   `resources/localization/` 源码目录。构建时把它们复制到程序目录的
   `localization/`，运行时只扫描该安装目录。
 - 94 份 XML 与 Notepad++ v8.4.6

@@ -6,7 +6,7 @@
 
 #include <QWidget>
 #include <QListWidget>
-#include <QPushButton>
+#include <QToolButton>
 #include <QLineEdit>
 #include "ScintillaComponent/ScintillaEditView.h"
 
@@ -22,6 +22,7 @@ public:
     void updateForView(ScintillaEditView* view);
     bool serialize(const QString& outputFilePath,
                    const QString& sourceName) const;
+    void refreshResources(bool darkMode);
 
 signals:
     void navigationRequested(int line);
@@ -39,7 +40,9 @@ private:
 
     QListWidget*       _list        = nullptr;
     QLineEdit*         _filterEdit  = nullptr;
-    QPushButton*       _refreshBtn  = nullptr;
+    QToolButton*       _refreshBtn  = nullptr;
+    QToolButton*       _sortBtn     = nullptr;
+    QToolButton*       _preferencesBtn = nullptr;
     ScintillaEditView* _currentView = nullptr;
 
     QList<FuncEntry>   _allEntries;

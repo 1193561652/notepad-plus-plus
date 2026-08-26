@@ -2,6 +2,7 @@
 // 移植自: v8.4.6:PowerEditor/src/
 
 #include "MainWindow.h"
+#include "WinControls/UiResourceLoader.h"
 #include "MISC/QtCompat.h"
 #include "NppCommandRegistry.h"
 #include "ScintillaComponent/ScintillaEditView.h"
@@ -195,6 +196,11 @@ void MainWindow::setupFileBrowser()
     DockingData data;
     data.hClient = _fileBrowserPanel;
     data.pszName = tr("Folder as Workspace");
+    data.uMask |= DWS_ICONTAB;
+    data.hIconTab = NppUiResources::panelIcon(
+        NppUiResources::PanelIcon::FileBrowser,
+        NppParameters::getInstance().getNppGUI()._darkModeEnabled,
+        NppParameters::getInstance().getNppGUI()._toolBarStatus != TB_STANDARD);
     data.objectName = QStringLiteral("FileBrowserDock");
     data.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea;
     _fileBrowserDock = _dockingManager.createDockableDlg(
@@ -205,6 +211,11 @@ void MainWindow::setupFileBrowser()
                 doOpenFile(path, _activeDocTab);
                 activateWindow();
             });
+    connect(_fileBrowserPanel, &FileBrowserPanel::locateCurrentFileRequested,
+            this, [this]() {
+        if (Buffer* buffer = _activeDocTab->currentBuffer())
+            _fileBrowserPanel->setSelectedPath(buffer->getFullPath());
+    });
 
     connect(_fileBrowserDock, &QDockWidget::visibilityChanged,
             this, [this](bool visible) {
@@ -687,6 +698,11 @@ void MainWindow::setupDocumentMap()
     DockingData data;
     data.hClient = _docMapPanel;
     data.pszName = tr("Document Map");
+    data.uMask |= DWS_ICONTAB;
+    data.hIconTab = NppUiResources::panelIcon(
+        NppUiResources::PanelIcon::DocumentMap,
+        NppParameters::getInstance().getNppGUI()._darkModeEnabled,
+        NppParameters::getInstance().getNppGUI()._toolBarStatus != TB_STANDARD);
     data.objectName = QStringLiteral("DocumentMapDock");
     data.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea;
     _docMapDock = _dockingManager.createDockableDlg(
@@ -725,6 +741,11 @@ void MainWindow::setupFunctionList()
     DockingData data;
     data.hClient = _funcListPanel;
     data.pszName = tr("Function List");
+    data.uMask |= DWS_ICONTAB;
+    data.hIconTab = NppUiResources::panelIcon(
+        NppUiResources::PanelIcon::FunctionList,
+        NppParameters::getInstance().getNppGUI()._darkModeEnabled,
+        NppParameters::getInstance().getNppGUI()._toolBarStatus != TB_STANDARD);
     data.objectName = QStringLiteral("FunctionListDock");
     data.allowedAreas = Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea;
     _funcListDock = _dockingManager.createDockableDlg(
@@ -754,6 +775,11 @@ void MainWindow::setupAuxiliaryPanels()
     DockingData documentListData;
     documentListData.hClient = _documentList;
     documentListData.pszName = tr("Document List");
+    documentListData.uMask |= DWS_ICONTAB;
+    documentListData.hIconTab = NppUiResources::panelIcon(
+        NppUiResources::PanelIcon::DocumentList,
+        NppParameters::getInstance().getNppGUI()._darkModeEnabled,
+        NppParameters::getInstance().getNppGUI()._toolBarStatus != TB_STANDARD);
     documentListData.objectName = QStringLiteral("DocumentListDock");
     _documentListDock = _dockingManager.createDockableDlg(
         documentListData, CONT_RIGHT, false);
@@ -769,6 +795,16 @@ void MainWindow::setupAuxiliaryPanels()
                 visited.insert(buffer);
                 QListWidgetItem* item =
                     new QListWidgetItem(buffer->getTabLabel(), _documentList);
+                const NppGUI& gui = NppParameters::getInstance().getNppGUI();
+                const auto state = buffer->isMonitoring()
+                    ? NppUiResources::DocumentState::Monitoring
+                    : buffer->isReadOnly()
+                        ? NppUiResources::DocumentState::ReadOnly
+                        : buffer->isDirty()
+                            ? NppUiResources::DocumentState::Modified
+                            : NppUiResources::DocumentState::Saved;
+                item->setIcon(NppUiResources::documentIcon(
+                    state, gui._darkModeEnabled, gui._tabIconSetNumber == 1));
                 item->setToolTip(buffer->getFullPath());
                 item->setData(Qt::UserRole, QVariant::fromValue<quintptr>(
                     reinterpret_cast<quintptr>(buffer)));
@@ -824,6 +860,11 @@ void MainWindow::setupAuxiliaryPanels()
         DockingData projectData;
         projectData.hClient = panel;
         projectData.pszName = tr("Project %1").arg(i + 1);
+        projectData.uMask |= DWS_ICONTAB;
+        projectData.hIconTab = NppUiResources::panelIcon(
+            NppUiResources::PanelIcon::Project,
+            NppParameters::getInstance().getNppGUI()._darkModeEnabled,
+            NppParameters::getInstance().getNppGUI()._toolBarStatus != TB_STANDARD);
         projectData.objectName = i == 0
             ? QStringLiteral("ProjectPanelsDock")
             : QStringLiteral("ProjectPanelsDock%1").arg(i + 1);
@@ -838,6 +879,11 @@ void MainWindow::setupAuxiliaryPanels()
     DockingData clipboardData;
     clipboardData.hClient = _clipboardHistory;
     clipboardData.pszName = tr("Clipboard History");
+    clipboardData.uMask |= DWS_ICONTAB;
+    clipboardData.hIconTab = NppUiResources::panelIcon(
+        NppUiResources::PanelIcon::Clipboard,
+        NppParameters::getInstance().getNppGUI()._darkModeEnabled,
+        NppParameters::getInstance().getNppGUI()._toolBarStatus != TB_STANDARD);
     clipboardData.objectName = QStringLiteral("ClipboardHistoryDock");
     _clipboardDock = _dockingManager.createDockableDlg(
         clipboardData, CONT_BOTTOM, false);
@@ -872,6 +918,11 @@ void MainWindow::setupAuxiliaryPanels()
     DockingData characterData;
     characterData.hClient = _characterList;
     characterData.pszName = tr("Character Panel");
+    characterData.uMask |= DWS_ICONTAB;
+    characterData.hIconTab = NppUiResources::panelIcon(
+        NppUiResources::PanelIcon::Character,
+        NppParameters::getInstance().getNppGUI()._darkModeEnabled,
+        NppParameters::getInstance().getNppGUI()._toolBarStatus != TB_STANDARD);
     characterData.objectName = QStringLiteral("CharacterPanelDock");
     _characterDock = _dockingManager.createDockableDlg(
         characterData, CONT_RIGHT, false);
@@ -896,6 +947,9 @@ void MainWindow::setupFindResultPanel()
     DockingData findResultData;
     findResultData.hClient = _findResultView;
     findResultData.pszName = tr("Find Result");
+    findResultData.uMask |= DWS_ICONTAB;
+    findResultData.hIconTab = NppUiResources::panelIcon(
+        NppUiResources::PanelIcon::FindResult, false, false);
     findResultData.objectName = QStringLiteral("FindResultDock");
     findResultData.allowedAreas =
         Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea;
@@ -1463,6 +1517,7 @@ void MainWindow::applyPreferencesToAllViews()
 {
     applyDarkMode();
     applyToolbarIcons();
+    applyPanelIcons();
 
     const ScintillaViewParams& svp =
         NppParameters::getInstance().getSVP();
@@ -1486,6 +1541,36 @@ void MainWindow::applyPreferencesToAllViews()
 
     // 对应原版：偏好设置变更后重新应用界面语言翻译（支持运行时热切换）
     applyNativeLang();
+}
+
+void MainWindow::applyPanelIcons()
+{
+    const NppGUI& gui = NppParameters::getInstance().getNppGUI();
+    const bool alternate = gui._toolBarStatus != TB_STANDARD;
+    const auto setIcon = [this, &gui, alternate](
+            QWidget* client, NppUiResources::PanelIcon panel) {
+        if (QDockWidget* dock = _dockingManager.dockForClient(client))
+            dock->setWindowIcon(NppUiResources::panelIcon(
+                panel, gui._darkModeEnabled, alternate));
+    };
+    setIcon(_docMapPanel, NppUiResources::PanelIcon::DocumentMap);
+    setIcon(_documentList, NppUiResources::PanelIcon::DocumentList);
+    setIcon(_funcListPanel, NppUiResources::PanelIcon::FunctionList);
+    setIcon(_fileBrowserPanel, NppUiResources::PanelIcon::FileBrowser);
+    for (ProjectPanel* panel : _projectPanels)
+        setIcon(panel, NppUiResources::PanelIcon::Project);
+    setIcon(_clipboardHistory, NppUiResources::PanelIcon::Clipboard);
+    setIcon(_characterList, NppUiResources::PanelIcon::Character);
+    setIcon(_findResultView, NppUiResources::PanelIcon::FindResult);
+
+    if (_fileBrowserPanel)
+        _fileBrowserPanel->refreshResources(gui._darkModeEnabled);
+    if (_funcListPanel)
+        _funcListPanel->refreshResources(gui._darkModeEnabled);
+    for (ProjectPanel* panel : _projectPanels) {
+        if (panel)
+            panel->refreshResources();
+    }
 }
 
 void MainWindow::applyDarkMode()

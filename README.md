@@ -55,6 +55,24 @@ ctest --test-dir build-windows --output-on-failure
 
 The executable and required runtime libraries are placed in `build-windows`.
 
+Build the Windows NSIS installer in Release mode after installing NSIS 3.03
+or newer and making `makensis.exe` available on `PATH`:
+
+```powershell
+cmake -S . -B build-windows-package -G "MinGW Makefiles" `
+  -DCMAKE_BUILD_TYPE=Release `
+  -DBUILD_TESTING=OFF `
+  -DCMAKE_PREFIX_PATH="$env:QT_ROOT" `
+  -DCMAKE_CXX_COMPILER="$env:MINGW_ROOT\bin\g++.exe" `
+  -DCMAKE_MAKE_PROGRAM="$env:MINGW_ROOT\bin\mingw32-make.exe"
+cmake --build build-windows-package -j 4
+cpack --config build-windows-package\CPackConfig.cmake -G NSIS
+```
+
+The installer includes the application and required runtime files, creates
+Start Menu and Desktop shortcuts, provides an uninstaller, and exposes the
+official non-English language files as optional `Localization` components.
+
 ### Ubuntu
 
 Tested build environment: **Ubuntu 22.04.5 LTS x86_64, Linux 6.8, Qt 5.15.3,
@@ -131,9 +149,10 @@ is documented in `src/CrossPlatformPluginSystem/README.md`.
 ## Repository Layout
 
 - `src/`: application and Qt port implementation
-- `resources/`: compatible XML defaults, localization, icons, and parsers
-- `installer/`: reserved Windows installer tree, corresponding to the original
-  Notepad++ installer location
+- `resources/`: compatible XML defaults, icons, and parsers
+- `installer_common/nativeLang/`: official v8.4.6 language XML shared by builds and installers
+- `installer_common/`: package metadata and localization rules shared by all installers
+- `installer/`: Windows NSIS package configuration
 - `installer_ubuntu/`: Debian package metadata and desktop integration
 - `installer_mac/`: reserved macOS installer tree
 - `tests/`: behavior, configuration, and UI runtime tests

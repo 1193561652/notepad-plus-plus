@@ -8,6 +8,7 @@
 #include <QTreeView>
 #include <QFileSystemModel>
 #include <QPushButton>
+#include <QToolButton>
 #include <QLineEdit>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -24,10 +25,12 @@ public:
     QString rootPath() const;
     QString selectedPath() const;
     void setSelectedPath(const QString& path);
+    void refreshResources(bool darkMode);
 
 signals:
     // 用户激活（双击/回车）某个文件时发出
     void fileActivated(const QString& filePath);
+    void locateCurrentFileRequested();
 
 private slots:
     void onItemActivated(const QModelIndex& index);
@@ -37,6 +40,9 @@ private:
     QTreeView*        _treeView   = nullptr;
     QFileSystemModel* _model      = nullptr;
     QPushButton*      _setRootBtn = nullptr;
+    QToolButton*      _locateBtn  = nullptr;
+    QToolButton*      _collapseBtn = nullptr;
+    QToolButton*      _expandBtn = nullptr;
     QLineEdit*        _rootEdit   = nullptr;
 };
 

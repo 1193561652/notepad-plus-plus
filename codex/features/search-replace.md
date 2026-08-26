@@ -126,7 +126,7 @@ Finder 已增加来源分组、匹配片段高亮、UTF-8 字节位置导航以�
 - `applyNativeLang()` 会销毁未显示的旧对话框，因此任何重新创建
   `FindReplaceDlg` 的代码都不能绕过上述入口，否则控件会回退为构造时英文。
 - Find in Projects 页的项目面板复选框和按钮已补齐稳定 `objectName`，并在
-  `resources/nativeLang/chineseSimplified.xml` 中补齐对应翻译。
+  `installer_common/nativeLang/chineseSimplified.xml` 中补齐对应翻译。
 - `tests/FindDialogLocalizationTests.cpp` 检查统一入口、控件标识和语言资源覆盖。
 - 2026-07-29 起，`ui-parity-capture` 还会从 `markDialogAction` 真实打开对话框，
   并在浅色/深色、100%/150% 缩放下校验中文标题、5 个标签和 Mark 按钮。

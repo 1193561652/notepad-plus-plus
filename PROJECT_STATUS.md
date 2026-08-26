@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-08-25
+Last updated: 2026-08-26
 
 This is an independent Qt port of Notepad++ v8.4.6 maintained by Jiang Liwei.
 The application name remains **Notepad++**. See [QT_PORT_NOTICE.md](QT_PORT_NOTICE.md)
@@ -10,8 +10,8 @@ for attribution and license scope.
 
 | Platform | Status | Latest verification |
 | --- | --- | --- |
-| Windows | Built and tested | Qt 5.12.12, MinGW 7.3; original Win32 plugin compatibility and Qt plugin ABI have automated coverage |
-| Ubuntu | Built, tested and packaged | Ubuntu 22.04, Qt 5.15.3, GCC 11.4; Release build and 35/35 tests passed; `.deb` smoke-tested |
+| Windows | Built and tested; installer pending test | Qt 5.12.12, MinGW 7.3; NSIS installer definition completed but not yet generated or installed on Windows |
+| Ubuntu | Built, tested and packaged | Ubuntu 22.04, Qt 5.15.3, GCC 11.4; Release build and 36/36 tests passed; `.deb` smoke-tested |
 | macOS | Build path only | Not tested yet; testing will have to wait until I can afford a Mac |
 
 Build commands and tested environments are documented in [README.md](README.md).
@@ -32,11 +32,15 @@ Build commands and tested environments are documented in [README.md](README.md).
 - Ubuntu packaging installs the application under `/opt/notepad-plus-plus`,
   provides `/usr/bin/notepad++`, installs optional languages and supports
   desktop-launcher pinning.
+- Windows packaging now provides a simplified original-style NSIS flow with
+  optional language components, shortcuts, Qt runtime deployment and an
+  uninstaller. It is awaiting the requested Windows-side test pass. See the
+  [Windows installer record](codex/changes/2026-08-26-windows-installer.md).
 - Original modeless-dialog behavior is restored for the corresponding Qt
   dialogs, and empty-line clicks reliably restore Scintilla caret focus. See
   [dialog and caret record](codex/changes/2026-08-24-modeless-dialogs-and-empty-line-caret.md).
-- The complete v8.4.6 icon tree is embedded, with original toolbar mode,
-  dark/disabled/custom override, and document-tab loading rules. See the
+- The complete v8.4.6 icon tree is embedded, with original toolbar, document
+  tab/close, dock panel, panel toolbar, tree, and About loading rules. See the
   [resource loading record](codex/changes/2026-08-25-original-resource-loading.md).
 
 ## Plugin ports
@@ -51,8 +55,9 @@ and [plugin port status](codex/index/high-priority-plugin-ports.md).
 
 - Test and package the macOS build; implement signing/notarization when a macOS
   environment is available.
-- Replace the placeholder Windows and macOS installer trees with production
-  installers.
+- Generate and install-test the NSIS package on Windows, then address any
+  toolchain-specific packaging differences found there.
+- Replace the placeholder macOS installer tree with a production installer.
 - Continue behavior-level parity work for advanced editor/UI details and the
   documented deep differences in individual plugins.
 - Run final interactive desktop checks on each release target in addition to

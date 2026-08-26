@@ -28,7 +28,7 @@ def upstream_filenames() -> list[str]:
 
 
 def main() -> int:
-    output_dir = ROOT / "resources/nativeLang"
+    output_dir = ROOT / "installer_common/nativeLang"
     output_dir.mkdir(parents=True, exist_ok=True)
     filenames = upstream_filenames()
     if len(filenames) != 94:

@@ -4,6 +4,7 @@
 #include "DocTabView.h"
 #include "ScintillaComponent/ScintillaEditView.h"
 #include "Parameters.h"
+#include "WinControls/UiResourceLoader.h"
 #include <QTabBar>
 #include <QVariant>
 #include <QIcon>
@@ -36,13 +37,136 @@ public:
     explicit NppTabBar(QWidget* parent = nullptr) : QTabBar(parent)
     {
         setExpanding(false);
+        setMouseTracking(true);
+        setTabsClosable(false); // Original close bitmaps are painted by the tab bar.
+        applyStyle();
+    }
+
+    void refreshAppearance()
+    {
+        const NppGUI& gui = NppParameters::getInstance().getNppGUI();
+        _showCloseButton = gui._tabCloseButton;
+        _darkMode = gui._darkModeEnabled;
+        setMovable(gui._tabDragAndDrop);
+        applyStyle();
+        update();
+    }
+
+signals:
+    void emptyAreaDoubleClicked();
+
+protected:
+    void mouseDoubleClickEvent(QMouseEvent* e) override
+    {
+        // 双击落在已有 tab 上时走默认行为（如 dbclkToClose）
+        if (tabAt(e->pos()) == -1)
+            emit emptyAreaDoubleClicked();
+        else
+            QTabBar::mouseDoubleClickEvent(e);
+    }
+
+    void mouseMoveEvent(QMouseEvent* e) override
+    {
+        const int hovered = closeTabAt(e->pos());
+        if (_hoverCloseTab != hovered) {
+            _hoverCloseTab = hovered;
+            update();
+        }
+        QTabBar::mouseMoveEvent(e);
+    }
+
+    void mousePressEvent(QMouseEvent* e) override
+    {
+        if (e->button() == Qt::LeftButton) {
+            const int tab = closeTabAt(e->pos());
+            if (tab >= 0) {
+                _pressedCloseTab = tab;
+                update(tabRect(tab));
+                e->accept();
+                return;
+            }
+        }
+        QTabBar::mousePressEvent(e);
+    }
+
+    void mouseReleaseEvent(QMouseEvent* e) override
+    {
+        if (_pressedCloseTab >= 0) {
+            const int pressed = _pressedCloseTab;
+            _pressedCloseTab = -1;
+            update(tabRect(pressed));
+            if (e->button() == Qt::LeftButton && closeTabAt(e->pos()) == pressed)
+                emit tabCloseRequested(pressed);
+            e->accept();
+            return;
+        }
+        QTabBar::mouseReleaseEvent(e);
+    }
+
+    void leaveEvent(QEvent* e) override
+    {
+        _hoverCloseTab = -1;
+        update();
+        QTabBar::leaveEvent(e);
+    }
+
+    void paintEvent(QPaintEvent* e) override
+    {
+        QTabBar::paintEvent(e);   // 先绘制默认标签
+
+        QPainter p(this);
+        const int cur = currentIndex();
+        if (cur >= 0) {
+            for (int i = 0; i < count(); ++i) {
+                const quintptr value = tabData(i).value<quintptr>();
+                const Buffer* buffer = reinterpret_cast<const Buffer*>(value);
+                const QColor colour = buffer
+                    ? individualTabColour(buffer->individualTabColour())
+                    : QColor();
+                if (colour.isValid()) {
+                    const QRect tab = tabRect(i);
+                    p.fillRect(tab.left() + 2, tab.bottom() - 2,
+                               qMax(0, tab.width() - 4), 3, colour);
+                }
+            }
+
+            const QRect currentRect = tabRect(cur);
+            const quintptr value = tabData(cur).value<quintptr>();
+            const Buffer* buffer = reinterpret_cast<const Buffer*>(value);
+            QColor topColour = buffer
+                ? individualTabColour(buffer->individualTabColour())
+                : QColor();
+            if (!topColour.isValid())
+                topColour = QColor(0xFA, 0xAA, 0x3C);
+            p.fillRect(currentRect.left() + 1, currentRect.top(),
+                       currentRect.width() - 2, 4, topColour);
+        }
+
+        if (_showCloseButton) {
+            for (int i = 0; i < count(); ++i) {
+                NppUiResources::TabCloseState state =
+                    i == currentIndex() ? NppUiResources::TabCloseState::Normal
+                                        : NppUiResources::TabCloseState::Inactive;
+                if (i == _hoverCloseTab)
+                    state = i == _pressedCloseTab
+                        ? NppUiResources::TabCloseState::Pressed
+                        : NppUiResources::TabCloseState::Hover;
+                p.drawPixmap(closeRect(i),
+                    NppUiResources::tabClosePixmap(state, _darkMode));
+            }
+        }
+    }
+
+private:
+    void applyStyle()
+    {
         // 为标签顶部预留 4px 空间，使图标/文字不被黄色横线遮挡
-        setStyleSheet(
+        setStyleSheet(QString(
             "QTabBar::tab {"
             "  padding-top: 5px;"
             "  padding-bottom: 3px;"
             "  padding-left: 6px;"
-            "  padding-right: 6px;"
+            "  padding-right: %1px;"
             "  margin-right: 1px;"
             /* 轻微突起边框：上/左用亮色，右/下用暗色，模拟 Windows 经典 3D raised */
             "  border-top: 1px solid #E0E0E0;"
@@ -60,54 +184,28 @@ public:
             "  background-color: white;"
             "  margin-top: 0;"
             "}"
-        );
+        ).arg(_showCloseButton ? 22 : 6));
     }
 
-signals:
-    void emptyAreaDoubleClicked();
-
-protected:
-    void mouseDoubleClickEvent(QMouseEvent* e) override
+    QRect closeRect(int tab) const
     {
-        // 双击落在已有 tab 上时走默认行为（如 dbclkToClose）
-        if (tabAt(e->pos()) == -1)
-            emit emptyAreaDoubleClicked();
-        else
-            QTabBar::mouseDoubleClickEvent(e);
+        const QRect rect = tabRect(tab);
+        return QRect(rect.right() - 15,
+                     rect.center().y() - 5, 11, 11);
     }
 
-    void paintEvent(QPaintEvent* e) override
+    int closeTabAt(const QPoint& point) const
     {
-        QTabBar::paintEvent(e);   // 先绘制默认标签
-
-        int cur = currentIndex();
-        if (cur < 0) return;
-
-        QPainter p(this);
-        for (int i = 0; i < count(); ++i) {
-            const quintptr value = tabData(i).value<quintptr>();
-            const Buffer* buffer = reinterpret_cast<const Buffer*>(value);
-            const QColor colour = buffer
-                ? individualTabColour(buffer->individualTabColour())
-                : QColor();
-            if (colour.isValid()) {
-                const QRect tab = tabRect(i);
-                p.fillRect(tab.left() + 2, tab.bottom() - 2,
-                           qMax(0, tab.width() - 4), 3, colour);
-            }
-        }
-
-        const QRect currentRect = tabRect(cur);
-        const quintptr value = tabData(cur).value<quintptr>();
-        const Buffer* buffer = reinterpret_cast<const Buffer*>(value);
-        QColor topColour = buffer
-            ? individualTabColour(buffer->individualTabColour())
-            : QColor();
-        if (!topColour.isValid())
-            topColour = QColor(0xFA, 0xAA, 0x3C);
-        p.fillRect(currentRect.left() + 1, currentRect.top(),
-                   currentRect.width() - 2, 4, topColour);
+        if (!_showCloseButton)
+            return -1;
+        const int tab = tabAt(point);
+        return tab >= 0 && closeRect(tab).contains(point) ? tab : -1;
     }
+
+    bool _showCloseButton = true;
+    bool _darkMode = false;
+    int _hoverCloseTab = -1;
+    int _pressedCloseTab = -1;
 };
 
 // ─── 图标辅助 ────────────────────────────────────────────────────────────────
@@ -116,26 +214,17 @@ static QIcon bufferIcon(const Buffer* buffer)
 {
     const NppGUI& gui = NppParameters::getInstance().getNppGUI();
     const bool alternate = gui._tabIconSetNumber == 1;
-    QString base = QStringLiteral(":/icons/");
-    if (!alternate && gui._darkModeEnabled)
-        base += QStringLiteral("darkMode/tabbar/");
-
-    QString name;
+    NppUiResources::DocumentState state;
     if (buffer && buffer->isMonitoring())
-        name = QStringLiteral("monitoring.ico");
+        state = NppUiResources::DocumentState::Monitoring;
     else if (buffer && buffer->isReadOnly())
-        name = alternate ? QStringLiteral("readonly_alt.ico")
-                         : QStringLiteral("readonly.ico");
+        state = NppUiResources::DocumentState::ReadOnly;
     else if (buffer && buffer->isDirty())
-        name = alternate ? QStringLiteral("unsaved_alt.ico")
-                         : QStringLiteral("unsaved.ico");
+        state = NppUiResources::DocumentState::Modified;
     else
-        name = alternate ? QStringLiteral("saved_alt.ico")
-                         : QStringLiteral("saved.ico");
-    // Upstream's alternate set reuses the normal monitoring image.
-    if (alternate && name == QStringLiteral("monitoring.ico"))
-        base = QStringLiteral(":/icons/");
-    return QIcon(base + name);
+        state = NppUiResources::DocumentState::Saved;
+    return NppUiResources::documentIcon(
+        state, gui._darkModeEnabled, alternate);
 }
 
 // ─── DocTabView ──────────────────────────────────────────────────────────────
@@ -144,8 +233,7 @@ DocTabView::DocTabView(QWidget* parent)
     : QWidget(parent)
 {
     _tabBar = new NppTabBar(this);
-    _tabBar->setTabsClosable(true);
-    _tabBar->setMovable(true);
+    static_cast<NppTabBar*>(_tabBar)->refreshAppearance();
     _tabBar->setDocumentMode(true);
     _editor = new ScintillaEditView(this);
 
@@ -282,6 +370,7 @@ void DocTabView::updateTabTitle(Buffer* buf)
 
 void DocTabView::refreshTabIcons()
 {
+    static_cast<NppTabBar*>(_tabBar)->refreshAppearance();
     for (int i = 0; i < _tabBar->count(); ++i)
         _tabBar->setTabIcon(i, bufferIcon(bufferAt(i)));
 }

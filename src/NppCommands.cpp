@@ -12,6 +12,7 @@
 #include "MISC/QtCompat.h"
 #include "MISC/TextFileCodec.h"
 #include "WinControls/ToolBar/ToolbarIconTheme.h"
+#include "WinControls/UiResourceLoader.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
 #include "ScintillaComponent/ScintillaTextSearch.h"
 #include "ScintillaComponent/EditorMacro.h"
@@ -269,12 +270,15 @@ struct StyleConfiguratorState
 
 static void showModelessMessage(QWidget* parent, const QString& objectName,
                                 QMessageBox::Icon icon,
-                                const QString& title, const QString& text)
+                                const QString& title, const QString& text,
+                                const QPixmap& iconPixmap = QPixmap())
 {
     if (QMessageBox* existing =
             parent->findChild<QMessageBox*>(objectName,
                                             Qt::FindDirectChildrenOnly)) {
         existing->setIcon(icon);
+        if (!iconPixmap.isNull())
+            existing->setIconPixmap(iconPixmap);
         existing->setWindowTitle(title);
         existing->setText(text);
         existing->show();
@@ -285,6 +289,8 @@ static void showModelessMessage(QWidget* parent, const QString& objectName,
 
     QMessageBox* box = new QMessageBox(icon, title, text,
                                        QMessageBox::Ok, parent);
+    if (!iconPixmap.isNull())
+        box->setIconPixmap(iconPixmap);
     box->setObjectName(objectName);
     box->setAttribute(Qt::WA_DeleteOnClose);
     box->setWindowModality(Qt::NonModal);
@@ -586,6 +592,7 @@ void MainWindow::replace()
 
 void MainWindow::about()
 {
+    const bool dark = NppParameters::getInstance().getNppGUI()._darkModeEnabled;
     showModelessMessage(this, QStringLiteral("aboutDialog"),
         QMessageBox::Information, tr("About Notepad++ Qt"),
         tr("Notepad++ Qt v8.4.6\n\n"
@@ -593,7 +600,8 @@ void MainWindow::about()
            "Qt port author: Jiang Liwei\n"
            "Port source: https://github.com/1193561652/notepad-plus-plus/tree/qt-port\n"
            "Original source: https://github.com/notepad-plus-plus/notepad-plus-plus\n"
-           "License: Notepad++ GNU GPL v3 terms, clarifications and exceptions"));
+           "License: Notepad++ GNU GPL v3 terms, clarifications and exceptions"),
+        NppUiResources::aboutIcon(dark).pixmap(QSize(80, 80)));
 }
 
 void MainWindow::toggleSplitView()
@@ -1809,21 +1817,8 @@ void MainWindow::showPreferences()
 
 static QIcon loadBmpIcon(const QString& path)
 {
-    QPixmap pm(path);
-    if (pm.isNull()) return QIcon();
-    QImage img = pm.toImage().convertToFormat(QImage::Format_ARGB32);
-    QColor bg(img.pixel(0, 0));
-    // 将背景色替换为透明
-    for (int y = 0; y < img.height(); ++y) {
-        for (int x = 0; x < img.width(); ++x) {
-            QColor c(img.pixel(x, y));
-            if (c.red()   == bg.red()   &&
-                c.green() == bg.green() &&
-                c.blue()  == bg.blue())
-                img.setPixel(x, y, qRgba(0, 0, 0, 0));
-        }
-    }
-    return QIcon(QPixmap::fromImage(img));
+    return NppUiResources::bitmapIcon(
+        path, NppUiResources::BitmapMode::TopLeftTransparent);
 }
 
 void MainWindow::applyToolbarIcons()

@@ -20,7 +20,7 @@
 
 ## 资源约束
 
-- `resources/nativeLang/` 中的 94 份 XML 必须与 v8.4.6 官方目录
+- `installer_common/nativeLang/` 中的 94 份 XML 必须与 v8.4.6 官方目录
   逐字节一致；它们是打包输入，构建后复制到程序目录 `localization/`。
 - 运行时扫描程序目录 `localization/`，不把语言文件嵌入 qrc。
 - 不保留项目内部 `resources/localization/` 副本。

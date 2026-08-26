@@ -11,6 +11,10 @@
 #include <QJsonObject>
 #include "functionParser.h"
 #include "Parameters.h"
+#include "WinControls/UiResourceLoader.h"
+#include <QToolButton>
+#include <QMenu>
+#include <algorithm>
 
 FunctionListPanel::FunctionListPanel(QWidget* parent)
     : QWidget(parent)
@@ -18,13 +22,30 @@ FunctionListPanel::FunctionListPanel(QWidget* parent)
     _filterEdit = new QLineEdit(this);
     _filterEdit->setPlaceholderText(tr("Filter..."));
 
-    _refreshBtn = new QPushButton(tr("Refresh"), this);
-    _refreshBtn->setFixedWidth(60);
+    _sortBtn = new QToolButton(this);
+    _sortBtn->setObjectName(QStringLiteral("functionListSortButton"));
+    _sortBtn->setCheckable(true);
+    _sortBtn->setToolTip(tr("Sort function list"));
+    _refreshBtn = new QToolButton(this);
+    _refreshBtn->setObjectName(QStringLiteral("functionListReloadButton"));
+    _refreshBtn->setToolTip(tr("Reload function list"));
+    _preferencesBtn = new QToolButton(this);
+    _preferencesBtn->setObjectName(QStringLiteral("functionListPreferencesButton"));
+    _preferencesBtn->setToolTip(tr("Function list preferences"));
+    QMenu* preferencesMenu = new QMenu(_preferencesBtn);
+    QAction* sortOnLoad = preferencesMenu->addAction(tr("Sort function list"));
+    sortOnLoad->setCheckable(true);
+    connect(sortOnLoad, &QAction::toggled, _sortBtn, &QToolButton::setChecked);
+    connect(_sortBtn, &QToolButton::toggled, sortOnLoad, &QAction::setChecked);
+    _preferencesBtn->setMenu(preferencesMenu);
+    _preferencesBtn->setPopupMode(QToolButton::InstantPopup);
 
     QHBoxLayout* topBar = new QHBoxLayout();
     topBar->setContentsMargins(2, 2, 2, 2);
     topBar->addWidget(_filterEdit);
+    topBar->addWidget(_sortBtn);
     topBar->addWidget(_refreshBtn);
+    topBar->addWidget(_preferencesBtn);
 
     _list = new QListWidget(this);
     _list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -35,11 +56,23 @@ FunctionListPanel::FunctionListPanel(QWidget* parent)
     mainLay->addLayout(topBar);
     mainLay->addWidget(_list);
 
-    connect(_refreshBtn, &QPushButton::clicked, this, &FunctionListPanel::refresh);
+    connect(_refreshBtn, &QToolButton::clicked, this, &FunctionListPanel::refresh);
+    connect(_sortBtn, &QToolButton::toggled, this, &FunctionListPanel::refresh);
     connect(_list, &QListWidget::itemActivated,
             this, &FunctionListPanel::onItemActivated);
     connect(_filterEdit, &QLineEdit::textChanged,
             this, &FunctionListPanel::onFilterChanged);
+    refreshResources(false);
+}
+
+void FunctionListPanel::refreshResources(bool darkMode)
+{
+    const QString base = darkMode
+        ? QStringLiteral(":/icons/darkMode/panels/")
+        : QStringLiteral(":/icons/");
+    _sortBtn->setIcon(NppUiResources::bitmapIcon(base + QStringLiteral("funclstSort.bmp")));
+    _refreshBtn->setIcon(NppUiResources::bitmapIcon(base + QStringLiteral("funclstReload.bmp")));
+    _preferencesBtn->setIcon(NppUiResources::bitmapIcon(base + QStringLiteral("funclstPreferences.bmp")));
 }
 
 void FunctionListPanel::updateForView(ScintillaEditView* view)
@@ -58,12 +91,21 @@ void FunctionListPanel::refresh()
     const QString lang = _currentView->lexerLanguage().toLower();
     QString text     = _currentView->text();
     _allEntries      = parseText(text, lang);
+    if (_sortBtn->isChecked()) {
+        std::sort(_allEntries.begin(), _allEntries.end(),
+                  [](const FuncEntry& left, const FuncEntry& right) {
+            return QString::localeAwareCompare(left.display, right.display) < 0;
+        });
+    }
 
     QString filter = _filterEdit->text().toLower();
     for (const FuncEntry& e : _allEntries) {
         if (!filter.isEmpty() && !e.display.toLower().contains(filter))
             continue;
         QListWidgetItem* item = new QListWidgetItem(e.display, _list);
+        item->setIcon(NppUiResources::bitmapIcon(
+            QStringLiteral(":/icons/funcList_leaf.bmp"),
+            NppUiResources::BitmapMode::MaskGray192));
         item->setData(Qt::UserRole, e.line);
     }
 }
@@ -83,6 +125,9 @@ void FunctionListPanel::onFilterChanged(const QString& text)
         if (!filter.isEmpty() && !e.display.toLower().contains(filter))
             continue;
         QListWidgetItem* item = new QListWidgetItem(e.display, _list);
+        item->setIcon(NppUiResources::bitmapIcon(
+            QStringLiteral(":/icons/funcList_leaf.bmp"),
+            NppUiResources::BitmapMode::MaskGray192));
         item->setData(Qt::UserRole, e.line);
     }
 }

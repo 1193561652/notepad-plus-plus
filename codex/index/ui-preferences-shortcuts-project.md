@@ -9,7 +9,7 @@
 - `src/MainWindow.cpp::setupAuxiliaryPanels()`：三个 Project Dock 的创建与信号连接。
 - `src/NppCommands.cpp::createMenus()`：Shortcut Mapper 和 Project Panel 菜单入口。
 - `src/localization.cpp::changeDlgLang()`：标签、按钮、表格表头和树顶层条目本地化。
-- `resources/nativeLang/*.xml`：Notepad++ v8.4.6 官方原版语言文件；
+- `installer_common/nativeLang/*.xml`：Notepad++ v8.4.6 官方原版语言文件；
   Qt 控件映射不得写入这些文件。
 
 ## 修改约束

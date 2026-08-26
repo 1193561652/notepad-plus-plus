@@ -20,6 +20,7 @@ public:
     QString workspaceFilePath() const { return _document.filePath(); }
     QStringList allFiles() const { return _document.allFiles(); }
     int panelId() const { return _panelId; }
+    void refreshResources();
 
 signals:
     void fileActivated(const QString& filePath);
@@ -34,6 +35,7 @@ private:
     WorkspaceNode nodeFromItem(QTreeWidgetItem* item) const;
     QTreeWidgetItem* selectedContainer() const;
     void markDirty();
+    void updateItemIcon(QTreeWidgetItem* item);
 
     int _panelId = 0;
     bool _dirty = false;
