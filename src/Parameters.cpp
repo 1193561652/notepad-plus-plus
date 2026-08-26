@@ -1699,6 +1699,16 @@ void NppParameters::feedGUIConfig(const TiXmlElement* el)
 
     if (name == "ToolBar") {
         _nppGUI._toolBarShow = parseBool(attr(L"visible"), true);
+        if (content == "small")
+            _nppGUI._toolBarStatus = TB_SMALL;
+        else if (content == "large")
+            _nppGUI._toolBarStatus = TB_LARGE;
+        else if (content == "small2")
+            _nppGUI._toolBarStatus = TB_SMALL2;
+        else if (content == "large2")
+            _nppGUI._toolBarStatus = TB_LARGE2;
+        else
+            _nppGUI._toolBarStatus = TB_STANDARD;
     }
     else if (name == "StatusBar") {
         _nppGUI._statusBarShow = (content != "hide");
@@ -2338,7 +2348,15 @@ bool NppParameters::writeConfigXml(const QString& filePath)
     {
         TiXmlElement* el = makeCfgEl(guiConfigs, L"ToolBar");
         el->SetAttribute(L"visible", bw(_nppGUI._toolBarShow));
-        el->LinkEndChild(new TiXmlText(L"standard"));
+        const wchar_t* status = L"standard";
+        switch (_nppGUI._toolBarStatus) {
+        case TB_SMALL:  status = L"small"; break;
+        case TB_LARGE:  status = L"large"; break;
+        case TB_SMALL2: status = L"small2"; break;
+        case TB_LARGE2: status = L"large2"; break;
+        case TB_STANDARD: break;
+        }
+        el->LinkEndChild(new TiXmlText(status));
     }
     // StatusBar
     {

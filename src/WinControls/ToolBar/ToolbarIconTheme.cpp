@@ -49,7 +49,8 @@ QString ToolbarIconTheme::iconPath(const QString& iconId, bool disabled) const
     return QFileInfo(path).isFile() ? path : QString();
 }
 
-QIcon ToolbarIconTheme::icon(const QString& iconId, const QIcon& fallback) const
+QIcon ToolbarIconTheme::icon(const QString& iconId, const QIcon& fallback,
+                             const QSize& iconSize) const
 {
     const QString normalPath = iconPath(iconId);
     if (normalPath.isEmpty())
@@ -59,5 +60,8 @@ QIcon ToolbarIconTheme::icon(const QString& iconId, const QIcon& fallback) const
     const QString disabledPath = iconPath(iconId, true);
     if (!disabledPath.isEmpty())
         themed.addFile(disabledPath, QSize(), QIcon::Disabled);
+    else if (!fallback.isNull())
+        themed.addPixmap(fallback.pixmap(iconSize, QIcon::Disabled),
+                         QIcon::Disabled);
     return themed.isNull() ? fallback : themed;
 }

@@ -228,9 +228,14 @@ struct ScintillaViewParams {
 
 // ── 主 GUI 配置（对应原版 NppGUI） ────────────────────────────────────────────
 
+// Keep the numeric order and config.xml meanings aligned with the original
+// ToolBar implementation in Notepad++ 8.4.6.
+enum toolBarStatusType { TB_SMALL, TB_LARGE, TB_SMALL2, TB_LARGE2, TB_STANDARD };
+
 struct NppGUI {
     // 工具栏 / 状态栏 / 菜单栏可见性
     bool _toolBarShow   = true;
+    toolBarStatusType _toolBarStatus = TB_STANDARD;
     bool _statusBarShow = true;
     bool _menuBarShow   = true;
 

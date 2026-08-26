@@ -291,10 +291,27 @@ message(STATUS "Embedding plugin catalog: ${NPP_PLUGIN_CATALOG_FILE}")
 configure_file(resources/pluginCatalog.qrc.in
     "${CMAKE_CURRENT_BINARY_DIR}/pluginCatalog.qrc" @ONLY)
 
+# Notepad++ keeps its built-in UI images as one resource tree.  Generate the
+# Qt manifest from that same tree so new upstream icons cannot be silently
+# omitted from the executable when the baseline resources are synchronized.
+file(GLOB_RECURSE NPP_ORIGINAL_ICON_FILES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/resources/icons/*.bmp"
+    "${CMAKE_SOURCE_DIR}/resources/icons/*.ico"
+    "${CMAKE_SOURCE_DIR}/resources/icons/*.png")
+set(NPP_ORIGINAL_ICONS_QRC "${CMAKE_CURRENT_BINARY_DIR}/originalIcons.qrc")
+file(WRITE "${NPP_ORIGINAL_ICONS_QRC}" "<RCC>\n  <qresource prefix=\"/\">\n")
+foreach(icon_file IN LISTS NPP_ORIGINAL_ICON_FILES)
+    file(RELATIVE_PATH icon_alias "${CMAKE_SOURCE_DIR}/resources" "${icon_file}")
+    file(APPEND "${NPP_ORIGINAL_ICONS_QRC}"
+        "    <file alias=\"${icon_alias}\">${icon_file}</file>\n")
+endforeach()
+file(APPEND "${NPP_ORIGINAL_ICONS_QRC}" "  </qresource>\n</RCC>\n")
+
 # 资源文件
 set(RESOURCES
     resources/resources.qrc
     "${CMAKE_CURRENT_BINARY_DIR}/pluginCatalog.qrc"
+    "${NPP_ORIGINAL_ICONS_QRC}"
 )
 
 add_executable(notepadpp-qt WIN32
@@ -417,6 +434,7 @@ if(BUILD_TESTING)
     add_executable(toolbar-icon-theme-tests
         tests/ToolbarIconThemeTests.cpp
         src/WinControls/ToolBar/ToolbarIconTheme.cpp
+        "${NPP_ORIGINAL_ICONS_QRC}"
     )
     target_compile_definitions(toolbar-icon-theme-tests PRIVATE
         NPP_TEST_ICON_SOURCE="${CMAKE_SOURCE_DIR}/resources/icons/userDefineDlg_off.ico")

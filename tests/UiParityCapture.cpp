@@ -65,6 +65,29 @@ QString safeName(QString value)
     return value.isEmpty() ? QStringLiteral("unnamed") : value;
 }
 
+bool visibleControlsStayInside(QWidget* dialog)
+{
+    if (!dialog)
+        return false;
+    const QRect dialogRect = dialog->rect();
+    for (QWidget* widget : dialog->findChildren<QWidget*>()) {
+        if (!widget->isVisibleTo(dialog)
+            || (!qobject_cast<QAbstractButton*>(widget)
+                && !qobject_cast<QComboBox*>(widget)
+                && !qobject_cast<QLabel*>(widget))) {
+            continue;
+        }
+        const QRect bounds(widget->mapTo(dialog, QPoint(0, 0)),
+                           widget->size());
+        if (!dialogRect.contains(bounds)) {
+            qWarning() << "Visible dialog control is clipped"
+                       << widget->objectName() << bounds << dialogRect;
+            return false;
+        }
+    }
+    return true;
+}
+
 #ifdef Q_OS_WIN
 HWND findCurrentProcessDialog(const wchar_t* expectedTitle, bool* exactMatch)
 {
@@ -3207,6 +3230,8 @@ int main(int argc, char* argv[])
     for (int i = 0; i < tabs->count(); ++i) {
         tabs->setCurrentIndex(i);
         QApplication::processEvents();
+        if (!visibleControlsStayInside(findDialog))
+            return 121;
         const QString name = QStringLiteral("find-tab-%1-%2.png")
             .arg(i, 2, 10, QLatin1Char('0'))
             .arg(safeName(tabs->tabText(i)));
@@ -3215,7 +3240,42 @@ int main(int argc, char* argv[])
     }
     const QString findTitle = findDialog->windowTitle();
     const QSize findSize = findDialog->size();
+    findDialog->resize(findSize.width() + 120, findSize.height() + 80);
+    QApplication::processEvents();
+    if (findDialog->width() < findSize.width() + 100
+        || findDialog->height() != findSize.height()) {
+        return 122;
+    }
+    if (!findDialog->grab().save(
+            output + QStringLiteral("/find-dialog-resized.png"))) {
+        return 123;
+    }
+    findDialog->resize(findSize);
     findDialog->close();
+
+    QLabel* typingMode = mainWindow.findChild<QLabel*>(
+        QStringLiteral("statusTypingMode"));
+    ScintillaEditView* statusView = mainWindow.currentView();
+    if (!typingMode || !statusView)
+        return 124;
+    statusView->SendScintilla(SCI_SETOVERTYPE, false);
+    typingMode->setText(QStringLiteral("INS"));
+    QMouseEvent typingClick(
+        QEvent::MouseButtonRelease, typingMode->rect().center(),
+        Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(typingMode, &typingClick);
+    if (typingMode->text() != QStringLiteral("OVR")
+        || statusView->SendScintilla(SCI_GETOVERTYPE) == 0) {
+        return 125;
+    }
+    QMouseEvent typingRestore(
+        QEvent::MouseButtonRelease, typingMode->rect().center(),
+        Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(typingMode, &typingRestore);
+    if (typingMode->text() != QStringLiteral("INS")
+        || statusView->SendScintilla(SCI_GETOVERTYPE) != 0) {
+        return 126;
+    }
 
     QAction* applicationAboutAction =
         mainWindow.findChild<QAction*>(QStringLiteral("aboutAction"));
@@ -3232,6 +3292,42 @@ int main(int argc, char* argv[])
     }
     applicationAbout->close();
     QApplication::processEvents();
+
+    auto verifyPersistentModelessDialog = [&](const QString& actionName,
+                                               const QString& dialogName) {
+        QAction* action = mainWindow.findChild<QAction*>(actionName);
+        if (!action)
+            return false;
+        action->trigger();
+        QApplication::processEvents();
+        QDialog* first = mainWindow.findChild<QDialog*>(dialogName);
+        if (!first || first->windowModality() != Qt::NonModal
+            || first->isModal() || !first->isVisible()) {
+            return false;
+        }
+        first->close();
+        QApplication::processEvents();
+        action->trigger();
+        QApplication::processEvents();
+        QDialog* reopened = mainWindow.findChild<QDialog*>(dialogName);
+        const bool reused = reopened == first && reopened->isVisible()
+            && reopened->windowModality() == Qt::NonModal
+            && !reopened->isModal();
+        reopened->close();
+        QApplication::processEvents();
+        return reused;
+    };
+    if (!verifyPersistentModelessDialog(
+            QStringLiteral("columnEditorAction"),
+            QStringLiteral("columnEditorDialog"))
+        || !verifyPersistentModelessDialog(
+            QStringLiteral("userDefinedLanguageDialogAction"),
+            QStringLiteral("userDefinedLanguageDialog"))
+        || !verifyPersistentModelessDialog(
+            QStringLiteral("styleConfiguratorAction"),
+            QStringLiteral("styleConfiguratorDialog"))) {
+        return 120;
+    }
 
     QAction* preferencesAction =
         mainWindow.findChild<QAction*>(QStringLiteral("preferencesAction"));
@@ -3252,6 +3348,14 @@ int main(int argc, char* argv[])
         if (!pages || pages->count() != 19) {
             preferences->reject();
             return;
+        }
+        for (int mode = TB_SMALL; mode <= TB_STANDARD; ++mode) {
+            QAbstractButton* button = preferences->findChild<QAbstractButton*>(
+                QStringLiteral("rbToolbarMode%1").arg(mode));
+            if (!button || button->property("toolbarStatus").toInt() != mode) {
+                preferences->reject();
+                return;
+            }
         }
         if (forceChinese
             && (preferences->windowTitle() != QStringLiteral("首选项")
@@ -3311,6 +3415,21 @@ int main(int argc, char* argv[])
         for (int i = 0; preferencesCaptured && i < pages->count(); ++i) {
             pages->setCurrentRow(i);
             QApplication::processEvents();
+            for (QScrollArea* scrollArea :
+                 preferences->findChildren<QScrollArea*>()) {
+                if (scrollArea->isVisibleTo(preferences)
+                    && scrollArea->horizontalScrollBar()->isVisible()) {
+                    qWarning() << "Preference page requires horizontal scrolling"
+                               << i;
+                    preferencesCaptured = false;
+                    break;
+                }
+            }
+            if (!preferencesCaptured
+                || !visibleControlsStayInside(preferences)) {
+                preferencesCaptured = false;
+                break;
+            }
             const QString name =
                 QStringLiteral("preferences-page-%1-%2.png")
                     .arg(i, 2, 10, QLatin1Char('0'))

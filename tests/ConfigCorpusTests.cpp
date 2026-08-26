@@ -132,6 +132,26 @@ bool setDarkMode(const QString& path, bool enabled, QString* error)
     return saveDom(path, document, error);
 }
 
+bool setToolbarStatus(const QString& path, const QString& status,
+                      QString* error)
+{
+    QDomDocument document;
+    if (!loadDom(path, &document, error))
+        return false;
+    const QDomNodeList configs = document.elementsByTagName("GUIConfig");
+    for (int i = 0; i < configs.count(); ++i) {
+        QDomElement element = configs.at(i).toElement();
+        if (element.attribute("name") == "ToolBar") {
+            while (!element.firstChild().isNull())
+                element.removeChild(element.firstChild());
+            element.appendChild(document.createTextNode(status));
+            return saveDom(path, document, error);
+        }
+    }
+    *error = "ToolBar GUIConfig is missing";
+    return false;
+}
+
 bool compareXml(const QString& beforePath, const QString& afterPath,
                 QString* error)
 {
@@ -248,6 +268,11 @@ int main(int argc, char** argv)
                          qPrintable(error));
             return 2;
         }
+        if (!setToolbarStatus(targetPath, QStringLiteral("large2"), &error)) {
+            std::fprintf(stderr, "could not select original ToolBar mode: %s\n",
+                         qPrintable(error));
+            return 2;
+        }
         QFile staleQtState(userPath + "/qtState.ini");
         if (!staleQtState.open(QFile::WriteOnly | QFile::Truncate)
             || staleQtState.write("[Editor]\ndarkMode=false\n") < 0) {
@@ -296,6 +321,11 @@ int main(int argc, char** argv)
         if (!parameters.getNppGUI()._darkModeEnabled) {
             std::fprintf(stderr,
                          "original DarkMode setting was not loaded\n");
+            return 1;
+        }
+        if (parameters.getNppGUI()._toolBarStatus != TB_LARGE2) {
+            std::fprintf(stderr,
+                         "original ToolBar large2 setting was not loaded\n");
             return 1;
         }
         parameters.getNppGUI()._darkModeEnabled = false;

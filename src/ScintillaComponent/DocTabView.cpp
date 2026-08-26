@@ -3,6 +3,7 @@
 
 #include "DocTabView.h"
 #include "ScintillaComponent/ScintillaEditView.h"
+#include "Parameters.h"
 #include <QTabBar>
 #include <QVariant>
 #include <QIcon>
@@ -111,16 +112,30 @@ protected:
 
 // ─── 图标辅助 ────────────────────────────────────────────────────────────────
 
-static const QIcon& savedIcon()
+static QIcon bufferIcon(const Buffer* buffer)
 {
-    static QIcon icon(":/icons/saved.ico");
-    return icon;
-}
+    const NppGUI& gui = NppParameters::getInstance().getNppGUI();
+    const bool alternate = gui._tabIconSetNumber == 1;
+    QString base = QStringLiteral(":/icons/");
+    if (!alternate && gui._darkModeEnabled)
+        base += QStringLiteral("darkMode/tabbar/");
 
-static const QIcon& unsavedIcon()
-{
-    static QIcon icon(":/icons/unsaved.ico");
-    return icon;
+    QString name;
+    if (buffer && buffer->isMonitoring())
+        name = QStringLiteral("monitoring.ico");
+    else if (buffer && buffer->isReadOnly())
+        name = alternate ? QStringLiteral("readonly_alt.ico")
+                         : QStringLiteral("readonly.ico");
+    else if (buffer && buffer->isDirty())
+        name = alternate ? QStringLiteral("unsaved_alt.ico")
+                         : QStringLiteral("unsaved.ico");
+    else
+        name = alternate ? QStringLiteral("saved_alt.ico")
+                         : QStringLiteral("saved.ico");
+    // Upstream's alternate set reuses the normal monitoring image.
+    if (alternate && name == QStringLiteral("monitoring.ico"))
+        base = QStringLiteral(":/icons/");
+    return QIcon(base + name);
 }
 
 // ─── DocTabView ──────────────────────────────────────────────────────────────
@@ -162,7 +177,7 @@ void DocTabView::addBufferView(Buffer* buf, ScintillaEditView* view)
         return;
 
     buf->addView(_editor);
-    QIcon icon = buf->isDirty() ? unsavedIcon() : savedIcon();
+    QIcon icon = bufferIcon(buf);
     int idx = _tabBar->addTab(icon, buf->getTabLabel());
     // 用 quintptr 存储指针以避免 QVariant 对 void* 的限制
     _tabBar->setTabData(idx, QVariant(static_cast<quintptr>(
@@ -177,7 +192,7 @@ void DocTabView::addClone(Buffer* buf, ScintillaEditView* cloneView)
     if (!buf || !buf->document()) return;
     if (indexOfBuffer(buf) != -1) return;
     buf->addView(_editor);
-    QIcon icon = buf->isDirty() ? unsavedIcon() : savedIcon();
+    QIcon icon = bufferIcon(buf);
     int idx = _tabBar->addTab(icon, buf->getTabLabel());
     _tabBar->setTabData(idx, QVariant(static_cast<quintptr>(
         reinterpret_cast<quintptr>(buf))));
@@ -261,8 +276,14 @@ void DocTabView::updateTabTitle(Buffer* buf)
     int idx = indexOfBuffer(buf);
     if (idx != -1) {
         _tabBar->setTabText(idx, buf->getTabLabel());
-        _tabBar->setTabIcon(idx, buf->isDirty() ? unsavedIcon() : savedIcon());
+        _tabBar->setTabIcon(idx, bufferIcon(buf));
     }
+}
+
+void DocTabView::refreshTabIcons()
+{
+    for (int i = 0; i < _tabBar->count(); ++i)
+        _tabBar->setTabIcon(i, bufferIcon(bufferAt(i)));
 }
 
 void DocTabView::sortBuffersByName(bool ascending)

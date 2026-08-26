@@ -29,6 +29,18 @@ int main(int argc, char** argv)
     bool ok = true;
     QTemporaryDir temporary;
     ok &= expect(temporary.isValid(), "temporary directory must be available");
+    ok &= expect(!QIcon(QStringLiteral(":/icons/new_off.ico")).isNull(),
+                 "the original Fluent resource set must be embedded");
+    ok &= expect(!QIcon(QStringLiteral(
+                     ":/icons/filledFluentUI/new_off.ico")).isNull(),
+                 "the original filled Fluent resource set must be embedded");
+    ok &= expect(!QIcon(QStringLiteral(
+                     ":/icons/darkMode/toolbar/FluentUI/new_off.ico")).isNull(),
+                 "the original dark Fluent resource set must be embedded");
+    ok &= expect(!QIcon(QStringLiteral(
+                     ":/icons/darkMode/toolbar/filledFluentUI/new_off.ico"))
+                     .isNull(),
+                 "the original dark filled resource set must be embedded");
 
     QDir root(temporary.path());
     root.mkpath(QStringLiteral("toolbarIcons/custom"));
@@ -50,6 +62,8 @@ int main(int argc, char** argv)
                  "existing fixed-name icon must be found");
     ok &= expect(!theme.icon(QStringLiteral("new")).isNull(),
                  "existing custom icon must be loadable");
+    ok &= expect(theme.hasIcon(QStringLiteral("new")),
+                 "an existing custom override must be reported");
     ok &= expect(theme.iconPath(QStringLiteral("open")).isEmpty(),
                  "missing custom icons must fall back");
 

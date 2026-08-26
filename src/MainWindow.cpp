@@ -47,6 +47,8 @@
 #include <QActionGroup>
 #include <QToolBar>
 #include <QStatusBar>
+#include <QContextMenuEvent>
+#include <QMouseEvent>
 #include <QFile>
 #include <QSaveFile>
 #include <QTextStream>
@@ -1460,11 +1462,14 @@ void MainWindow::applyPreferencesToView(ScintillaEditView* view)
 void MainWindow::applyPreferencesToAllViews()
 {
     applyDarkMode();
+    applyToolbarIcons();
 
     const ScintillaViewParams& svp =
         NppParameters::getInstance().getSVP();
     _mainDocTab->setEditorBorderWidth(svp._borderWidth);
     _subDocTab->setEditorBorderWidth(svp._borderWidth);
+    _mainDocTab->refreshTabIcons();
+    _subDocTab->refreshTabIcons();
 
     applyPreferencesToView(_mainDocTab->editor());
     applyPreferencesToView(_subDocTab->editor());
@@ -1617,9 +1622,29 @@ void MainWindow::createStatusBar()
     _encodingLabel = new QLabel("UTF-8", this);
     _insertLabel   = new QLabel("INS", this);
 
+    _docTypeLabel->setObjectName(QStringLiteral("statusDocType"));
+    _docSizeLabel->setObjectName(QStringLiteral("statusDocSize"));
+    _posLabel->setObjectName(QStringLiteral("statusCursorPosition"));
+    _eolLabel->setObjectName(QStringLiteral("statusEolFormat"));
+    _encodingLabel->setObjectName(QStringLiteral("statusEncoding"));
+    _insertLabel->setObjectName(QStringLiteral("statusTypingMode"));
+
     for (QLabel* l : {_docTypeLabel, _docSizeLabel, _posLabel,
-                      _eolLabel, _encodingLabel, _insertLabel})
+                      _eolLabel, _encodingLabel, _insertLabel}) {
         l->setContentsMargins(4, 0, 4, 0);
+        l->installEventFilter(this);
+    }
+
+    for (QLabel* interactive : {_docTypeLabel, _docSizeLabel, _posLabel,
+                                _eolLabel, _encodingLabel, _insertLabel}) {
+        interactive->setCursor(Qt::PointingHandCursor);
+    }
+    _docTypeLabel->setToolTip(tr("Double-click or right-click to select a language"));
+    _docSizeLabel->setToolTip(tr("Double-click to show document summary"));
+    _posLabel->setToolTip(tr("Double-click to go to a line"));
+    _eolLabel->setToolTip(tr("Double-click or right-click to convert line endings"));
+    _encodingLabel->setToolTip(tr("Double-click or right-click to select encoding"));
+    _insertLabel->setToolTip(tr("Click to switch between insert and overwrite mode"));
 
     _docSizeLabel->setMinimumWidth(200);
     _posLabel->setMinimumWidth(210);
@@ -1642,4 +1667,70 @@ void MainWindow::createStatusBar()
     statusBar()->addPermanentWidget(makeSep());
     statusBar()->addPermanentWidget(_insertLabel);
     statusBar()->setVisible(NppParameters::getInstance().getNppGUI()._statusBarShow);
+}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    QLabel* label = qobject_cast<QLabel*>(watched);
+    const bool isStatusLabel = label
+        && (label == _docTypeLabel || label == _docSizeLabel
+            || label == _posLabel || label == _eolLabel
+            || label == _encodingLabel || label == _insertLabel);
+    if (!isStatusLabel)
+        return QMainWindow::eventFilter(watched, event);
+
+    auto popupStatusMenu = [this, label](const QPoint& localPosition) {
+        QMenu* menu = nullptr;
+        if (label == _docTypeLabel) {
+            menu = _languageMenu;
+        } else if (label == _eolLabel && _editMenu) {
+            menu = _editMenu->findChild<QMenu*>(
+                QStringLiteral("eolEditMenu"));
+        } else if (label == _encodingLabel) {
+            menu = _encodingMenu;
+        }
+        if (menu) {
+            updateActionStates();
+            menu->popup(label->mapToGlobal(localPosition));
+            return true;
+        }
+        return false;
+    };
+
+    if (event->type() == QEvent::MouseButtonRelease) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+        if (label == _insertLabel
+            && mouseEvent->button() == Qt::LeftButton) {
+            if (ScintillaEditView* view = currentActiveView()) {
+                const bool overtype = view->SendScintilla(SCI_GETOVERTYPE) != 0;
+                view->SendScintilla(SCI_SETOVERTYPE, !overtype);
+                _insertLabel->setText(overtype ? QStringLiteral("INS")
+                                               : QStringLiteral("OVR"));
+                view->setFocus(Qt::MouseFocusReason);
+            }
+            return true;
+        }
+    } else if (event->type() == QEvent::MouseButtonDblClick) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+        if (mouseEvent->button() != Qt::LeftButton)
+            return false;
+        if (label == _posLabel) {
+            goToLine();
+            return true;
+        }
+        if (label == _docSizeLabel) {
+            if (QAction* summary = findChild<QAction*>(
+                    QStringLiteral("documentSummaryAction"))) {
+                summary->trigger();
+            }
+            return true;
+        }
+        return popupStatusMenu(mouseEvent->pos());
+    } else if (event->type() == QEvent::ContextMenu) {
+        QContextMenuEvent* contextEvent =
+            static_cast<QContextMenuEvent*>(event);
+        return popupStatusMenu(contextEvent->pos());
+    }
+
+    return QMainWindow::eventFilter(watched, event);
 }

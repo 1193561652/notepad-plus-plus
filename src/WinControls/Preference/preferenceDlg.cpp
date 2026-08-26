@@ -25,13 +25,35 @@
 #include <QSlider>
 #include <QTextEdit>
 #include <QRegExp>
+#include <QApplication>
+#include <QFontMetrics>
+#include <QShowEvent>
+#include <QAbstractButton>
 
 namespace {
 
+qreal preferenceScaleX()
+{
+    // Win32 dialog units derive from the active dialog font.  Using fixed
+    // multipliers made translated text overflow under Qt styles and DPI
+    // settings.  Keep the v8.4.6 resource coordinates, but derive their
+    // pixel size from the platform's actual application font.
+    const QFontMetrics metrics(QApplication::font());
+    return qBound<qreal>(1.65, metrics.averageCharWidth() / 4.0, 1.90);
+}
+
+qreal preferenceScaleY()
+{
+    const QFontMetrics metrics(QApplication::font());
+    return qBound<qreal>(1.80, metrics.height() / 8.0, 2.05);
+}
+
 QRect prefGeometry(int x, int y, int width, int height)
 {
-    return QRect(qRound(x * 1.45), qRound(y * 1.58),
-                 qRound(width * 1.45), qRound(height * 1.58));
+    const qreal scaleX = preferenceScaleX();
+    const qreal scaleY = preferenceScaleY();
+    return QRect(qRound(x * scaleX), qRound(y * scaleY),
+                 qRound(width * scaleX), qRound(height * scaleY));
 }
 
 template <typename T>
@@ -44,8 +66,39 @@ T* placePreferenceControl(T* control, int x, int y, int width, int height)
 QWidget* preferenceCanvas()
 {
     QWidget* page = new QWidget();
-    page->setFixedSize(660, 320);
+    page->setFixedSize(prefGeometry(0, 0, 455, 203).size());
     return page;
+}
+
+void fitAbsoluteTextControl(QWidget* widget)
+{
+    QWidget* parent = widget ? widget->parentWidget() : nullptr;
+    if (!parent || parent->layout())
+        return;
+
+    const bool isLabel = qobject_cast<QLabel*>(widget) != nullptr;
+    const bool isButton = qobject_cast<QAbstractButton*>(widget) != nullptr;
+    if (!isLabel && !isButton)
+        return;
+
+    const int desiredWidth = widget->sizeHint().width() + 4;
+    if (desiredWidth <= widget->width())
+        return;
+
+    QRect geometry = widget->geometry();
+    const int parentWidth = parent->contentsRect().width();
+    if (QLabel* label = qobject_cast<QLabel*>(widget);
+        label && (label->alignment() & Qt::AlignRight)) {
+        const int right = geometry.right();
+        geometry.setLeft(qMax(0, right - desiredWidth + 1));
+    } else {
+        geometry.setRight(qMin(parentWidth - 1,
+                               geometry.left() + desiredWidth - 1));
+    }
+    widget->setGeometry(geometry);
+    if (geometry.width() < desiredWidth)
+        widget->setToolTip(isLabel ? qobject_cast<QLabel*>(widget)->text()
+                                   : qobject_cast<QAbstractButton*>(widget)->text());
 }
 
 } // namespace
@@ -66,7 +119,6 @@ PreferenceDlg::PreferenceDlg(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Preferences"));
-    setFixedSize(830, 372);
     setupUi();
     loadSettings();
 }
@@ -76,13 +128,13 @@ void PreferenceDlg::setupUi()
     // 左侧列表
     _pageList = new QListWidget(this);
     _pageList->setObjectName("pageList");
-    _pageList->setGeometry(10, 10, 120, 330);
+    _pageList->setGeometry(prefGeometry(10, 10, 80, 203));
     _pageList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     _pageList->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     // 右侧堆叠
     _pageStack = new QStackedWidget(this);
-    _pageStack->setGeometry(158, 1, 666, 336);
+    _pageStack->setGeometry(prefGeometry(100, 1, 455, 203));
 
     // 按原版顺序添加页面
     struct { QString name; QWidget* page; } pages[] = {
@@ -136,14 +188,15 @@ void PreferenceDlg::setupUi()
 
     // 分隔线
     QFrame* sep = new QFrame(this);
+    sep->setObjectName(QStringLiteral("preferencePageSeparator"));
     sep->setFrameShape(QFrame::VLine);
     sep->setFrameShadow(QFrame::Sunken);
 
-    sep->setGeometry(148, 8, 2, 332);
+    sep->setGeometry(prefGeometry(95, 8, 1, 205));
 
     QPushButton* closeButton = new QPushButton(tr("Close"), this);
     closeButton->setObjectName("btnPrefsClose");
-    closeButton->setGeometry(380, 343, 70, 23);
+    closeButton->setGeometry(prefGeometry(255, 215, 45, 14));
     connect(closeButton, &QPushButton::clicked, this, [this] {
         onApply();
         accept();
@@ -154,6 +207,52 @@ void PreferenceDlg::setupUi()
         "QGroupBox::title { subcontrol-origin: margin; left: 7px; padding: 0 2px; }"
         "QCheckBox, QRadioButton, QLabel { min-height: 17px; }"
         "QListWidget::item { height: 16px; padding: 0 2px; }"));
+
+    // Match the original 560 x 235 DLU dialog.  The font-aware conversion
+    // keeps the fixed original-style composition without clipping on Linux,
+    // Windows, translated UIs, or non-default scaling.
+    setFixedSize(prefGeometry(0, 0, 560, 235).size());
+}
+
+void PreferenceDlg::showEvent(QShowEvent* event)
+{
+    adjustTranslatedUi();
+    QDialog::showEvent(event);
+}
+
+void PreferenceDlg::adjustTranslatedUi()
+{
+    // NativeLangSpeaker applies the selected XML language after construction.
+    // Grow the category column when a translated title needs more room, and
+    // keep the original separator/page relationship intact.
+    int categoryWidth = _pageList->width();
+    const QFontMetrics listMetrics(_pageList->font());
+    for (int i = 0; i < _pageList->count(); ++i)
+        categoryWidth = qMax(categoryWidth,
+                             listMetrics.horizontalAdvance(
+                                 _pageList->item(i)->text()) + 24);
+    const int extraWidth = categoryWidth - _pageList->width();
+    if (extraWidth > 0) {
+        _pageList->resize(categoryWidth, _pageList->height());
+        _pageStack->move(_pageStack->x() + extraWidth, _pageStack->y());
+        if (QFrame* separator = findChild<QFrame*>(
+                QStringLiteral("preferencePageSeparator")))
+            separator->move(separator->x() + extraWidth, separator->y());
+        if (QPushButton* closeButton = findChild<QPushButton*>(
+                QStringLiteral("btnPrefsClose"))) {
+            closeButton->move(closeButton->x() + extraWidth / 2,
+                              closeButton->y());
+        }
+        setFixedWidth(width() + extraWidth);
+    }
+
+    // Pages based on the original .rc coordinates deliberately have no Qt
+    // layout.  Extend translated labels/check boxes into available space so
+    // their text is not silently cut off, while retaining their original
+    // anchor and grouping.
+    const QList<QWidget*> controls = findChildren<QWidget*>();
+    for (QWidget* control : controls)
+        fitAbsoluteTextControl(control);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -197,15 +296,16 @@ QWidget* PreferenceDlg::makePage_General()
     _hideToolbarCB->setObjectName("chkHideToolbar");
     tbLay->addWidget(_hideToolbarCB);
     const QStringList toolbarModes = {
-        tr("Standard icons: small"), tr("Standard icons: large"),
         tr("Fluent UI icons: small"), tr("Fluent UI icons: large"),
-        tr("Fluent UI icons: small (dark mode)")
+        tr("Filled Fluent UI icons: small"),
+        tr("Filled Fluent UI icons: large"),
+        tr("Standard icons: small")
     };
     for (int i = 0; i < toolbarModes.size(); ++i) {
         QRadioButton* mode = new QRadioButton(toolbarModes.at(i), tbGroup);
         mode->setObjectName(QStringLiteral("rbToolbarMode%1").arg(i));
-        mode->setProperty("toolbarIconSet", i);
-        mode->setChecked(i == 0);
+        mode->setProperty("toolbarStatus", i);
+        mode->setChecked(i == TB_STANDARD);
         tbLay->addWidget(mode);
     }
     tbGroup->setFixedWidth(220);
@@ -214,9 +314,9 @@ QWidget* PreferenceDlg::makePage_General()
     // Tab Bar
     QGroupBox* tabGroup = new QGroupBox(tr("Tab Bar"));
     tabGroup->setObjectName("grpTabBar");
-    QGridLayout* tabLay = new QGridLayout(tabGroup);
+    QVBoxLayout* tabLay = new QVBoxLayout(tabGroup);
     tabLay->setContentsMargins(8, 8, 8, 5);
-    tabLay->setVerticalSpacing(0);
+    tabLay->setSpacing(0);
     _tabHideCB          = new QCheckBox(tr("Hide"));
     _tabHideCB->setObjectName("chkTabHide");
     _tabDragDropCB      = new QCheckBox(tr("Enable drag and drop"));
@@ -242,17 +342,17 @@ QWidget* PreferenceDlg::makePage_General()
     reduceTabBar->setObjectName("chkTabReduce");
     alternateIcons->setObjectName("chkTabAlternateIcons");
     lockTabBar->setObjectName("chkTabLock");
-    tabLay->addWidget(_tabHideCB,          0, 0);
-    tabLay->addWidget(_tabMultiLineCB,     1, 0);
-    tabLay->addWidget(_tabVerticalCB,      2, 0);
-    tabLay->addWidget(reduceTabBar,        3, 0);
-    tabLay->addWidget(alternateIcons,      4, 0);
-    tabLay->addWidget(lockTabBar,          5, 0);
-    tabLay->addWidget(_tabInactiveTabCB,   0, 1);
-    tabLay->addWidget(_tabTopBarCB,        1, 1);
-    tabLay->addWidget(_tabCloseBtnCB,      2, 1);
-    tabLay->addWidget(_tabDblClickCloseCB, 3, 1);
-    tabLay->addWidget(_tabQuitOnEmptyCB,   4, 1);
+    tabLay->addWidget(_tabHideCB);
+    tabLay->addWidget(_tabMultiLineCB);
+    tabLay->addWidget(_tabVerticalCB);
+    tabLay->addWidget(reduceTabBar);
+    tabLay->addWidget(alternateIcons);
+    tabLay->addWidget(lockTabBar);
+    tabLay->addWidget(_tabInactiveTabCB);
+    tabLay->addWidget(_tabTopBarCB);
+    tabLay->addWidget(_tabCloseBtnCB);
+    tabLay->addWidget(_tabDblClickCloseCB);
+    tabLay->addWidget(_tabQuitOnEmptyCB);
     _tabDragDropCB->hide();
     connect(lockTabBar, &QCheckBox::toggled, this,
             [this](bool locked) { _tabDragDropCB->setChecked(!locked); });
@@ -498,6 +598,7 @@ QWidget* PreferenceDlg::makePage_NewDocument()
     _openAnsiAsUtf8CB->setObjectName("chkOpenAnsiAsUtf8");
     QLabel* languageLabel = placePreferenceControl(
         new QLabel(tr("Default language:"), w), 16, 130, 77, 14);
+    languageLabel->setObjectName(QStringLiteral("lblDefaultLanguage"));
     languageLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     QComboBox* defaultLanguage = placePreferenceControl(
         new QComboBox(w), 98, 128, 100, 17);
@@ -687,6 +788,7 @@ QWidget* PreferenceDlg::makePage_AutoCompletion()
     QWidget* w = preferenceCanvas();
     QCheckBox* autoIndent = placePreferenceControl(
         new QCheckBox(tr("Auto-indent"), w), 347, 15, 100, 13);
+    autoIndent->setObjectName(QStringLiteral("chkAutoIndentPreference"));
     connect(autoIndent, &QCheckBox::toggled, _autoIndentCB, &QCheckBox::setChecked);
     connect(_autoIndentCB, &QCheckBox::toggled, autoIndent, &QCheckBox::setChecked);
     QGroupBox* acGroup = placePreferenceControl(
@@ -714,15 +816,22 @@ QWidget* PreferenceDlg::makePage_AutoCompletion()
     _acFromNbCharSB = placePreferenceControl(new QSpinBox(acGroup), 205, 4, 42, 17);
     _acFromNbCharSB->setObjectName("spinAcFromNbChar");
     _acFromNbCharSB->setRange(1, 9);
-    placePreferenceControl(new QLabel(tr("th character"), acGroup), 250, 7, 55, 13);
+    QLabel* characterSuffix = placePreferenceControl(
+        new QLabel(tr("th character"), acGroup), 225, 7, 60, 13);
+    characterSuffix->setObjectName(QStringLiteral("lblAcCharacterSuffix"));
     _acIgnoreNumbersCB = placePreferenceControl(
         new QCheckBox(tr("Ignore numbers"), acGroup), 181, 67, 100, 13);
     _acIgnoreNumbersCB->setObjectName("chkAcIgnoreNumbers");
 
     QGroupBox* insertSelection = placePreferenceControl(
         new QGroupBox(tr("Insert Selection"), acGroup), 180, 31, 96, 38);
-    placePreferenceControl(new QCheckBox(tr("TAB"), insertSelection), 12, 10, 54, 13);
-    placePreferenceControl(new QCheckBox(tr("ENTER"), insertSelection), 12, 23, 55, 13);
+    insertSelection->setObjectName(QStringLiteral("grpInsertSelection"));
+    QCheckBox* insertTab = placePreferenceControl(
+        new QCheckBox(tr("TAB"), insertSelection), 12, 10, 54, 13);
+    insertTab->setObjectName(QStringLiteral("chkInsertTab"));
+    QCheckBox* insertEnter = placePreferenceControl(
+        new QCheckBox(tr("ENTER"), insertSelection), 12, 23, 55, 13);
+    insertEnter->setObjectName(QStringLiteral("chkInsertEnter"));
     _funcParamsCB = placePreferenceControl(
         new QCheckBox(tr("Function parameters hint on input"), acGroup),
         5, 67, 160, 13);
@@ -748,11 +857,17 @@ QWidget* PreferenceDlg::makePage_AutoCompletion()
     _pairTagsCB = placePreferenceControl(
         new QCheckBox(tr("html/xml close tag"), pairGroup), 59, 54, 100, 13);
     _pairTagsCB->setObjectName("chkPairTags");
-    placePreferenceControl(new QLabel(tr("Open"), pairGroup), 220, 7, 30, 13);
-    placePreferenceControl(new QLabel(tr("Close"), pairGroup), 258, 7, 30, 13);
+    QLabel* pairOpen = placePreferenceControl(
+        new QLabel(tr("Open"), pairGroup), 220, 7, 30, 13);
+    pairOpen->setObjectName(QStringLiteral("lblPairOpen"));
+    QLabel* pairClose = placePreferenceControl(
+        new QLabel(tr("Close"), pairGroup), 258, 7, 30, 13);
+    pairClose->setObjectName(QStringLiteral("lblPairClose"));
     for (int i = 0; i < 3; ++i) {
-        placePreferenceControl(new QLabel(tr("Matched pair %1:").arg(i + 1), pairGroup),
-                               160, 20 + i * 20, 70, 13);
+        QLabel* pairLabel = placePreferenceControl(
+            new QLabel(tr("Matched pair %1:").arg(i + 1), pairGroup),
+            160, 20 + i * 20, 70, 13);
+        pairLabel->setObjectName(QStringLiteral("lblMatchedPair%1").arg(i + 1));
         placePreferenceControl(new QLineEdit(pairGroup), 232, 18 + i * 20, 20, 17);
         placePreferenceControl(new QLineEdit(pairGroup), 258, 18 + i * 20, 20, 17);
     }
@@ -1451,9 +1566,9 @@ void PreferenceDlg::loadSettings()
         lock->setChecked(!gui._tabDragAndDrop);
     const QList<QRadioButton*> toolbarModes = findChildren<QRadioButton*>();
     for (QRadioButton* mode : toolbarModes) {
-        if (mode->property("toolbarIconSet").isValid())
-            mode->setChecked(mode->property("toolbarIconSet").toInt()
-                             == gui._tabIconSetNumber);
+        if (mode->property("toolbarStatus").isValid())
+            mode->setChecked(mode->property("toolbarStatus").toInt()
+                             == gui._toolBarStatus);
     }
     onTabHideToggled(gui._tabHide);
 
@@ -1633,13 +1748,18 @@ void PreferenceDlg::saveSettings()
     gui._tabQuitOnEmpty     = _tabQuitOnEmptyCB->isChecked();
     const QList<QRadioButton*> toolbarModes = findChildren<QRadioButton*>();
     for (QRadioButton* mode : toolbarModes) {
-        if (mode->property("toolbarIconSet").isValid() && mode->isChecked())
-            gui._tabIconSetNumber = mode->property("toolbarIconSet").toInt();
+        if (mode->property("toolbarStatus").isValid() && mode->isChecked())
+            gui._toolBarStatus = static_cast<toolBarStatusType>(
+                mode->property("toolbarStatus").toInt());
     }
 
     gui._editorFontName = _fontCombo->currentFont().family();
     gui._editorFontSize = _fontSizeSB->value();
     gui._darkModeEnabled = _darkModeEnableCB->isChecked();
+    // The original switches Standard to the small Fluent set in dark mode:
+    // the colourful bitmap set has no dedicated dark counterpart.
+    if (gui._darkModeEnabled && gui._toolBarStatus == TB_STANDARD)
+        gui._toolBarStatus = TB_SMALL;
 
     // ── Editing ──────────────────────────────────────────────────────────────
     gui._autoIndent               = _autoIndentCB->isChecked();

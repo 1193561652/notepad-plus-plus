@@ -149,7 +149,33 @@ static QStringList preferenceDialogObjectNames(int originalId)
 {
     static const QMap<int, QStringList> ids = {
         {6001, {QStringLiteral("btnPrefsClose")}},
-        {6851, {QStringLiteral("grpAutoInsert")}}
+        {6101, {QStringLiteral("grpToolBar")}},
+        {6102, {QStringLiteral("chkHideToolbar")}},
+        {6103, {QStringLiteral("rbToolbarMode0")}},
+        {6104, {QStringLiteral("rbToolbarMode1")}},
+        {6105, {QStringLiteral("rbToolbarMode4")}},
+        {6129, {QStringLiteral("rbToolbarMode2")}},
+        {6130, {QStringLiteral("rbToolbarMode3")}},
+        {6115, {QStringLiteral("chkAutoIndentPreference")}},
+        {6807, {QStringLiteral("grpAutoCompletion")}},
+        {6808, {QStringLiteral("chkAcEnable")}},
+        {6809, {QStringLiteral("rbAcFunction")}},
+        {6810, {QStringLiteral("rbAcWord")}},
+        {6811, {QStringLiteral("lblAcFromNbChar")}},
+        {6813, {QStringLiteral("lblAcCharacterSuffix")}},
+        {6815, {QStringLiteral("chkFuncParams")}},
+        {6816, {QStringLiteral("rbAcBoth")}},
+        {6824, {QStringLiteral("chkAcIgnoreNumbers")}},
+        {6851, {QStringLiteral("grpAutoInsert")}},
+        {6857, {QStringLiteral("chkPairTags")}},
+        {6858, {QStringLiteral("lblPairOpen")}},
+        {6859, {QStringLiteral("lblPairClose")}},
+        {6860, {QStringLiteral("lblMatchedPair1")}},
+        {6863, {QStringLiteral("lblMatchedPair2")}},
+        {6866, {QStringLiteral("lblMatchedPair3")}},
+        {6869, {QStringLiteral("grpInsertSelection")}},
+        {6870, {QStringLiteral("chkInsertTab")}},
+        {6871, {QStringLiteral("chkInsertEnter")}}
     };
     return ids.value(originalId);
 }

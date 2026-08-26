@@ -2,6 +2,8 @@
 /build*/
 /cmake-build-*/
 /.cache/
+/_CPack_Packages/
+/*.deb
 
 # Compiled output
 *.a

@@ -51,6 +51,7 @@ public:
 
     // 更新标签页标题（脏标记变化时调用）
     void updateTabTitle(Buffer* buf);
+    void refreshTabIcons();
     void setIndividualTabColour(Buffer* buf, int colour);
     void setEditorBorderWidth(int width);
     void sortBuffersByName(bool ascending);

@@ -31,10 +31,26 @@
 #include <QLineEdit>
 #include <QFileDialog>
 #include <QEvent>
+#include <QFontMetrics>
 
 static const int BOOKMARK_MARKER = 1;
 static const int BTN_MIN_WIDTH   = 135;
 static const int LBL_WIDTH       = 108;
+
+static int findInputLabelWidth(const QWidget* widget)
+{
+    const QFontMetrics metrics(widget->font());
+    const QStringList labels = {
+        FindReplaceDlg::tr("Find what:"),
+        FindReplaceDlg::tr("Replace with:"),
+        FindReplaceDlg::tr("Filters:"),
+        FindReplaceDlg::tr("Directory:")
+    };
+    int width = LBL_WIDTH;
+    for (const QString& label : labels)
+        width = qMax(width, metrics.horizontalAdvance(label) + 12);
+    return width;
+}
 
 static bool findFromPosition(ScintillaEditView* view, const QString& text,
                              const FindOption& option, qintptr position)
@@ -49,9 +65,14 @@ static bool findFromPosition(ScintillaEditView* view, const QString& text,
 // ─────────────────────────────────────────────────────────────────────────────
 
 FindReplaceDlg::FindReplaceDlg(QWidget* parent)
-    : QDialog(parent, Qt::Tool | Qt::WindowStaysOnTopHint)
+    : QDialog(parent, Qt::Tool | Qt::CustomizeWindowHint
+                          | Qt::WindowTitleHint
+                          | Qt::WindowSystemMenuHint
+                          | Qt::WindowCloseButtonHint
+                          | Qt::WindowStaysOnTopHint)
 {
     setWindowTitle(tr("Find"));
+    setSizeGripEnabled(true);
     setupUi();
     loadFindHistory();
 }
@@ -119,7 +140,19 @@ void FindReplaceDlg::setupUi()
             this, [this](const QString&){ _statusLabel->clear(); });
 
     onTabChanged(0);
-    setFixedSize(573, 336);
+
+    // The original dialog is 382 x 200 dialog units and grows with the
+    // system dialog font.  A fixed pixel height clipped the option rows on
+    // Linux and with translated/high-DPI fonts.  Let Qt calculate the height
+    // while keeping approximately the original minimum width and aspect.
+    main->activate();
+    const QSize naturalSize = main->sizeHint();
+    setMinimumSize(qMax(573, naturalSize.width()),
+                   qMax(360, naturalSize.height()));
+    // v8.4.6 uses WS_THICKFRAME but constrains min/max track height to the
+    // initial height.  Users can expand the dialog horizontally only.
+    setMaximumHeight(minimumHeight());
+    resize(minimumSize());
 }
 
 // ─── 底部行：搜索模式 + 透明度 ────────────────────────────────────────────────
@@ -214,12 +247,13 @@ QWidget* FindReplaceDlg::makeInputArea()
     vLay->setContentsMargins(0, 0, 0, 0);
     vLay->setSpacing(4);
 
-    auto makeRow = [](QLabel* lbl, QWidget* input) -> QWidget* {
+    const int labelWidth = findInputLabelWidth(this);
+    auto makeRow = [labelWidth](QLabel* lbl, QWidget* input) -> QWidget* {
         auto* row = new QWidget();
         auto* h = new QHBoxLayout(row);
         h->setContentsMargins(0, 0, 0, 0);
         h->setSpacing(4);
-        lbl->setFixedWidth(LBL_WIDTH);
+        lbl->setFixedWidth(labelWidth);
         lbl->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         h->addWidget(lbl);
         h->addWidget(input, 1);

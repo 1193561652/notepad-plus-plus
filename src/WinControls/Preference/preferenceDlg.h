@@ -19,6 +19,8 @@
 #include <QLineEdit>
 #include <QSlider>
 
+class QShowEvent;
+
 class PreferenceDlg : public QDialog
 {
     Q_OBJECT
@@ -38,6 +40,12 @@ private slots:
 
 private:
     void setupUi();
+    void adjustTranslatedUi();
+
+protected:
+    void showEvent(QShowEvent* event) override;
+
+private:
 
     // 页面构建（顺序与原版一致）
     QWidget* makePage_General();        // 1

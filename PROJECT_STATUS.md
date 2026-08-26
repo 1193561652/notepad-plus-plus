@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-08-24
+Last updated: 2026-08-25
 
 This is an independent Qt port of Notepad++ v8.4.6 maintained by Jiang Liwei.
 The application name remains **Notepad++**. See [QT_PORT_NOTICE.md](QT_PORT_NOTICE.md)
@@ -35,6 +35,9 @@ Build commands and tested environments are documented in [README.md](README.md).
 - Original modeless-dialog behavior is restored for the corresponding Qt
   dialogs, and empty-line clicks reliably restore Scintilla caret focus. See
   [dialog and caret record](codex/changes/2026-08-24-modeless-dialogs-and-empty-line-caret.md).
+- The complete v8.4.6 icon tree is embedded, with original toolbar mode,
+  dark/disabled/custom override, and document-tab loading rules. See the
+  [resource loading record](codex/changes/2026-08-25-original-resource-loading.md).
 
 ## Plugin ports
 

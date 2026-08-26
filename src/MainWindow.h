@@ -33,6 +33,7 @@ class PluginAdminModel;
 class EditorMacro;
 class QSplitter;
 class QDockWidget;
+class QDialog;
 class QListWidget;
 class FileBrowserPanel;
 class ProjectPanel;
@@ -90,6 +91,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     void createActions();
@@ -306,6 +308,9 @@ private:
     PreferenceDlg*     _preferenceDlg    = nullptr;
     PluginAdminDialog* _pluginAdminDlg   = nullptr;
     PluginAdminModel*  _pluginAdminModel = nullptr;
+    QDialog*            _columnEditorDlg  = nullptr;
+    QDialog*            _userLanguageDlg  = nullptr;
+    QDialog*            _styleConfigDlg   = nullptr;
 
     // Find All 结果面板
     QDockWidget*       _findResultDock   = nullptr;

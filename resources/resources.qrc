@@ -9,40 +9,5 @@
         <file>contextMenu.xml</file>
         <file>toolbarIcons.xml</file>
         <file>userDefineLang.xml</file>
-        <!-- 程序图标 -->
-        <file>icons/npp.ico</file>
-        <!-- 标签页状态图标 -->
-        <file>icons/saved.ico</file>
-        <file>icons/unsaved.ico</file>
-        <file>icons/readonly.ico</file>
-        <!-- 工具栏彩色BMP图标 -->
-        <file>icons/newFile.bmp</file>
-        <file>icons/openFile.bmp</file>
-        <file>icons/saveFile.bmp</file>
-        <file>icons/saveAll.bmp</file>
-        <file>icons/closeFile.bmp</file>
-        <file>icons/closeAll.bmp</file>
-        <file>icons/cut.bmp</file>
-        <file>icons/copy.bmp</file>
-        <file>icons/paste.bmp</file>
-        <file>icons/undo.bmp</file>
-        <file>icons/redo.bmp</file>
-        <file>icons/find.bmp</file>
-        <file>icons/findReplace.bmp</file>
-        <file>icons/zoomIn.bmp</file>
-        <file>icons/zoomOut.bmp</file>
-        <file>icons/wrap.bmp</file>
-        <file>icons/invisibleChar.bmp</file>
-        <file>icons/indentGuide.bmp</file>
-        <file>icons/userDefineDlg_off.ico</file>
-        <file>icons/startRecord.bmp</file>
-        <file>icons/stopRecord.bmp</file>
-        <file>icons/playRecord.bmp</file>
-        <file>icons/saveRecord.bmp</file>
-        <file>icons/docMap.bmp</file>
-        <file>icons/docList.bmp</file>
-        <file>icons/functionList.bmp</file>
-        <file>icons/fileBrowser.bmp</file>
-        <file>icons/print.bmp</file>
     </qresource>
 </RCC>

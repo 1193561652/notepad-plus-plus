@@ -117,24 +117,155 @@ static bool startDetachedCommand(const QString& command)
 #endif
 }
 
-// The corresponding Notepad++ windows are modeless.  Some of the larger Qt
-// ports still build their controls on the stack, so keep those controls alive
-// with a local event loop while deliberately leaving the main window enabled.
-// This is different from QDialog::exec(), which marks the dialog modal and, on
-// GNOME, may attach it physically to the parent window.
-static int runModelessDialog(QDialog& dialog)
+namespace {
+
+struct UserLanguageDialogState
 {
-    dialog.setWindowModality(Qt::NonModal);
-    dialog.setModal(false);
-    QEventLoop loop;
-    QObject::connect(&dialog, &QDialog::finished,
-                     &loop, &QEventLoop::quit);
-    dialog.show();
-    dialog.raise();
-    dialog.activateWindow();
-    loop.exec();
-    return dialog.result();
-}
+    QVector<UserLangDesc> languages;
+    QComboBox* languageCombo = nullptr;
+    QLineEdit* extensions = nullptr;
+    QCheckBox* caseSensitive = nullptr;
+    QCheckBox* foldComments = nullptr;
+    QVector<QCheckBox*> prefixChecks;
+    QTableWidget* keywordTable = nullptr;
+    QTableWidget* styleTable = nullptr;
+
+    void populate(int index)
+    {
+        if (index < 0 || index >= languages.size()) {
+            extensions->clear();
+            keywordTable->clearContents();
+            styleTable->setRowCount(0);
+            return;
+        }
+        const UserLangDesc& language = languages.at(index);
+        extensions->setText(language.exts.join(QStringLiteral(" ")));
+        caseSensitive->setChecked(language.caseSensitive);
+        foldComments->setChecked(language.foldComments);
+        for (int i = 0; i < prefixChecks.size(); ++i)
+            prefixChecks.at(i)->setChecked(language.prefixKeywords[i]);
+        for (int i = 0; i < 28; ++i) {
+            keywordTable->setItem(
+                i, 1, new QTableWidgetItem(language.keywordLists[i]));
+        }
+        styleTable->setRowCount(language.styles.size());
+        for (int row = 0; row < language.styles.size(); ++row) {
+            const WordsStyle& style = language.styles.at(row);
+            styleTable->setItem(row, 0, new QTableWidgetItem(style.name));
+            styleTable->setItem(row, 1, new QTableWidgetItem(
+                style.hasFg ? style.fgColor.name().mid(1).toUpper()
+                            : QString()));
+            styleTable->setItem(row, 2, new QTableWidgetItem(
+                style.hasBg ? style.bgColor.name().mid(1).toUpper()
+                            : QString()));
+            styleTable->setItem(
+                row, 3, new QTableWidgetItem(style.fontName));
+            styleTable->setItem(row, 4, new QTableWidgetItem(
+                QString::number(style.fontSize)));
+            styleTable->setItem(row, 5, new QTableWidgetItem(
+                QString::number(style.fontStyle)));
+            styleTable->setItem(row, 6, new QTableWidgetItem(
+                QString::number(style.nesting)));
+        }
+    }
+
+    void reload(const QString& selectName)
+    {
+        languages = NppParameters::getInstance().getUserLangs();
+        languageCombo->blockSignals(true);
+        languageCombo->clear();
+        int selected = -1;
+        for (int i = 0; i < languages.size(); ++i) {
+            languageCombo->addItem(languages.at(i).name);
+            if (languages.at(i).name == selectName)
+                selected = i;
+        }
+        languageCombo->blockSignals(false);
+        languageCombo->setCurrentIndex(
+            selected >= 0 ? selected : (languages.isEmpty() ? -1 : 0));
+        populate(languageCombo->currentIndex());
+    }
+};
+
+struct StyleConfiguratorState
+{
+    QVector<LexerStyler> lexers;
+    QVector<WordsStyle> globals;
+    QTableWidget* styles = nullptr;
+    int previousLanguage = 0;
+
+    QVector<WordsStyle>* selectedStyles()
+    {
+        return previousLanguage == 0
+            ? &globals : &lexers[previousLanguage - 1].styles;
+    }
+
+    void saveTable()
+    {
+        QVector<WordsStyle>* values = selectedStyles();
+        const int count = qMin(values->size(), styles->rowCount());
+        for (int row = 0; row < count; ++row) {
+            WordsStyle& style = (*values)[row];
+            auto text = [this, row](int column) {
+                QTableWidgetItem* item = styles->item(row, column);
+                return item ? item->text().trimmed() : QString();
+            };
+            const QColor foreground(QStringLiteral("#") + text(1));
+            const QColor background(QStringLiteral("#") + text(2));
+            style.hasFg = !text(1).isEmpty() && foreground.isValid();
+            style.hasBg = !text(2).isEmpty() && background.isValid();
+            if (style.hasFg)
+                style.fgColor = foreground;
+            if (style.hasBg)
+                style.bgColor = background;
+            style.fontName = text(3);
+            style.fontSize = text(4).toInt();
+            style.fontStyle =
+                (styles->item(row, 5)->checkState() == Qt::Checked ? 1 : 0) |
+                (styles->item(row, 6)->checkState() == Qt::Checked ? 2 : 0) |
+                (styles->item(row, 7)->checkState() == Qt::Checked ? 4 : 0);
+            style.userKeywords = text(8);
+        }
+    }
+
+    void populate(int languageIndex)
+    {
+        previousLanguage = languageIndex;
+        QVector<WordsStyle>* values = selectedStyles();
+        styles->setRowCount(values->size());
+        for (int row = 0; row < values->size(); ++row) {
+            const WordsStyle& style = values->at(row);
+            QTableWidgetItem* name = new QTableWidgetItem(style.name);
+            name->setFlags(name->flags() & ~Qt::ItemIsEditable);
+            styles->setItem(row, 0, name);
+            styles->setItem(row, 1, new QTableWidgetItem(
+                style.hasFg ? style.fgColor.name().mid(1).toUpper()
+                            : QString()));
+            styles->setItem(row, 2, new QTableWidgetItem(
+                style.hasBg ? style.bgColor.name().mid(1).toUpper()
+                            : QString()));
+            styles->setItem(row, 3, new QTableWidgetItem(style.fontName));
+            styles->setItem(row, 4, new QTableWidgetItem(
+                style.fontSize > 0 ? QString::number(style.fontSize)
+                                   : QString()));
+            for (int column = 5; column <= 7; ++column) {
+                QTableWidgetItem* check = new QTableWidgetItem;
+                check->setFlags(Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
+                check->setCheckState(
+                    style.fontStyle & (1 << (column - 5))
+                        ? Qt::Checked : Qt::Unchecked);
+                styles->setItem(row, column, check);
+            }
+            QTableWidgetItem* keywords =
+                new QTableWidgetItem(style.userKeywords);
+            if (style.keywordClass.isEmpty())
+                keywords->setFlags(keywords->flags() & ~Qt::ItemIsEditable);
+            styles->setItem(row, 8, keywords);
+        }
+    }
+};
+
+} // namespace
 
 static void showModelessMessage(QWidget* parent, const QString& objectName,
                                 QMessageBox::Icon icon,
@@ -873,101 +1004,125 @@ void MainWindow::clearSearchMarks()
 
 void MainWindow::columnEditor()
 {
-    ScintillaEditView* view = currentActiveView();
-    if (!view) return;
-
-    QDialog dialog(this);
-    dialog.setWindowTitle(tr("Column Editor"));
-    QFormLayout layout(&dialog);
-    QComboBox mode;
-    mode.setObjectName("columnModeCombo");
-    mode.addItem(tr("Text"));
-    mode.addItem(tr("Number"));
-    QLineEdit textValue;
-    textValue.setObjectName("columnTextValue");
-    QSpinBox initial;
-    initial.setObjectName("columnInitialValue");
-    QSpinBox increment;
-    increment.setObjectName("columnIncrementValue");
-    QSpinBox repeat;
-    repeat.setObjectName("columnRepeatValue");
-    QComboBox format;
-    format.setObjectName("columnFormatCombo");
-    QCheckBox leadingZeros(tr("Leading zeros"));
-    leadingZeros.setObjectName("columnLeadingZeros");
-    initial.setRange(-1000000000, 1000000000);
-    increment.setRange(-1000000, 1000000);
-    increment.setValue(1);
-    repeat.setRange(1, 1000000);
-    repeat.setValue(1);
-    format.addItem(tr("Decimal"), 10);
-    format.addItem(tr("Hexadecimal"), 16);
-    format.addItem(tr("Octal"), 8);
-    format.addItem(tr("Binary"), 2);
-    layout.addRow(tr("Mode:"), &mode);
-    layout.addRow(tr("Text:"), &textValue);
-    layout.addRow(tr("Initial number:"), &initial);
-    layout.addRow(tr("Increase by:"), &increment);
-    layout.addRow(tr("Repeat:"), &repeat);
-    layout.addRow(tr("Format:"), &format);
-    layout.addRow(QString(), &leadingZeros);
-    QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-    layout.addRow(&buttons);
-    connect(&buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-    connect(&buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    auto updateMode = [&](int index) {
-        textValue.setEnabled(index == 0);
-        initial.setEnabled(index == 1);
-        increment.setEnabled(index == 1);
-        repeat.setEnabled(index == 1);
-        format.setEnabled(index == 1);
-        leadingZeros.setEnabled(index == 1);
-    };
-    connect(&mode, QOverload<int>::of(&QComboBox::currentIndexChanged), &dialog, updateMode);
-    updateMode(0);
-    if (runModelessDialog(dialog) != QDialog::Accepted) return;
-
-    int cursorLine = 0, column = 0;
-    view->getCursorPosition(&cursorLine, &column);
-    const QPair<int, int> range = selectedLines(view);
-    const int base = format.currentData().toInt();
-    int numberWidth = 0;
-    if (mode.currentIndex() == 1 && leadingZeros.isChecked()) {
-        for (int line = range.first; line <= range.second; ++line) {
-            const qlonglong value = initial.value()
-                + ((line - range.first) / repeat.value()) * increment.value();
-            numberWidth = qMax(numberWidth, QString::number(value, base).size());
-        }
+    if (!currentActiveView())
+        return;
+    if (_columnEditorDlg) {
+        _columnEditorDlg->show();
+        _columnEditorDlg->raise();
+        _columnEditorDlg->activateWindow();
+        return;
     }
-    view->beginUndoAction();
-    for (int line = range.second; line >= range.first; --line) {
-        QString value;
-        if (mode.currentIndex() == 0) {
-            value = textValue.text();
-        } else {
-            const qlonglong number = initial.value()
-                + ((line - range.first) / repeat.value()) * increment.value();
-            value = QString::number(number, base);
-            if (base == 16)
-                value = value.toUpper();
-            if (leadingZeros.isChecked() && value.size() < numberWidth) {
-                if (value.startsWith('-'))
-                    value = QStringLiteral("-")
-                        + value.mid(1).rightJustified(numberWidth - 1, '0');
-                else
-                    value = value.rightJustified(numberWidth, '0');
+
+    _columnEditorDlg = new QDialog(this);
+    _columnEditorDlg->setObjectName(QStringLiteral("columnEditorDialog"));
+    _columnEditorDlg->setWindowTitle(tr("Column Editor"));
+    _columnEditorDlg->setWindowModality(Qt::NonModal);
+    _columnEditorDlg->setModal(false);
+    QFormLayout* layout = new QFormLayout(_columnEditorDlg);
+    QComboBox* mode = new QComboBox(_columnEditorDlg);
+    mode->setObjectName("columnModeCombo");
+    mode->addItem(tr("Text"));
+    mode->addItem(tr("Number"));
+    QLineEdit* textValue = new QLineEdit(_columnEditorDlg);
+    textValue->setObjectName("columnTextValue");
+    QSpinBox* initial = new QSpinBox(_columnEditorDlg);
+    initial->setObjectName("columnInitialValue");
+    QSpinBox* increment = new QSpinBox(_columnEditorDlg);
+    increment->setObjectName("columnIncrementValue");
+    QSpinBox* repeat = new QSpinBox(_columnEditorDlg);
+    repeat->setObjectName("columnRepeatValue");
+    QComboBox* format = new QComboBox(_columnEditorDlg);
+    format->setObjectName("columnFormatCombo");
+    QCheckBox* leadingZeros = new QCheckBox(tr("Leading zeros"), _columnEditorDlg);
+    leadingZeros->setObjectName("columnLeadingZeros");
+    initial->setRange(-1000000000, 1000000000);
+    increment->setRange(-1000000, 1000000);
+    increment->setValue(1);
+    repeat->setRange(1, 1000000);
+    repeat->setValue(1);
+    format->addItem(tr("Decimal"), 10);
+    format->addItem(tr("Hexadecimal"), 16);
+    format->addItem(tr("Octal"), 8);
+    format->addItem(tr("Binary"), 2);
+    layout->addRow(tr("Mode:"), mode);
+    layout->addRow(tr("Text:"), textValue);
+    layout->addRow(tr("Initial number:"), initial);
+    layout->addRow(tr("Increase by:"), increment);
+    layout->addRow(tr("Repeat:"), repeat);
+    layout->addRow(tr("Format:"), format);
+    layout->addRow(QString(), leadingZeros);
+    QDialogButtonBox* buttons = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, _columnEditorDlg);
+    layout->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted,
+            _columnEditorDlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected,
+            _columnEditorDlg, &QDialog::reject);
+    auto updateMode = [=](int index) {
+        textValue->setEnabled(index == 0);
+        initial->setEnabled(index == 1);
+        increment->setEnabled(index == 1);
+        repeat->setEnabled(index == 1);
+        format->setEnabled(index == 1);
+        leadingZeros->setEnabled(index == 1);
+    };
+    connect(mode, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            _columnEditorDlg, updateMode);
+    updateMode(0);
+    connect(_columnEditorDlg, &QDialog::accepted, this,
+            [=]() {
+        ScintillaEditView* view = currentActiveView();
+        if (!view)
+            return;
+        int cursorLine = 0;
+        int column = 0;
+        view->getCursorPosition(&cursorLine, &column);
+        const QPair<int, int> range = selectedLines(view);
+        const int base = format->currentData().toInt();
+        int numberWidth = 0;
+        if (mode->currentIndex() == 1 && leadingZeros->isChecked()) {
+            for (int line = range.first; line <= range.second; ++line) {
+                const qlonglong value = initial->value()
+                    + ((line - range.first) / repeat->value())
+                        * increment->value();
+                numberWidth = qMax(
+                    numberWidth, QString::number(value, base).size());
             }
         }
-        int position = view->positionFromLineIndex(line, column);
-        if (position < 0) {
-            const int lineEnd = view->positionFromLineIndex(line, qMax(0, view->lineLength(line) - 1));
-            position = lineEnd;
+        view->beginUndoAction();
+        for (int line = range.second; line >= range.first; --line) {
+            QString value;
+            if (mode->currentIndex() == 0) {
+                value = textValue->text();
+            } else {
+                const qlonglong number = initial->value()
+                    + ((line - range.first) / repeat->value())
+                        * increment->value();
+                value = QString::number(number, base);
+                if (base == 16)
+                    value = value.toUpper();
+                if (leadingZeros->isChecked() && value.size() < numberWidth) {
+                    if (value.startsWith('-'))
+                        value = QStringLiteral("-")
+                            + value.mid(1).rightJustified(
+                                numberWidth - 1, '0');
+                    else
+                        value = value.rightJustified(numberWidth, '0');
+                }
+            }
+            int position = view->positionFromLineIndex(line, column);
+            if (position < 0) {
+                position = view->positionFromLineIndex(
+                    line, qMax(0, view->lineLength(line) - 1));
+            }
+            const QByteArray bytes = value.toUtf8();
+            view->SendScintilla(
+                SCI_INSERTTEXT, position,
+                reinterpret_cast<sptr_t>(bytes.constData()));
         }
-        const QByteArray bytes = value.toUtf8();
-        view->SendScintilla(SCI_INSERTTEXT, position,
-            reinterpret_cast<sptr_t>(bytes.constData()));
-    }
-    view->endUndoAction();
+        view->endUndoAction();
+    });
+    _columnEditorDlg->show();
 }
 
 void MainWindow::playMacro()
@@ -1673,50 +1828,91 @@ static QIcon loadBmpIcon(const QString& path)
 
 void MainWindow::applyToolbarIcons()
 {
+    const NppGUI& gui = NppParameters::getInstance().getNppGUI();
     const ToolbarIconTheme theme = ToolbarIconTheme::fromUserDirectory(
         NppParameters::getInstance().getUserPath());
     const struct {
         const char* actionName;
         const char* iconId;
-        const char* fallback;
+        const char* standard;
+        const char* normal;
+        const char* disabled;
     } icons[] = {
-        {"newAction", "new", ":/icons/newFile.bmp"},
-        {"openAction", "open", ":/icons/openFile.bmp"},
-        {"saveAction", "save", ":/icons/saveFile.bmp"},
-        {"saveAllAction", "save-all", ":/icons/saveAll.bmp"},
-        {"closeAction", "close", ":/icons/closeFile.bmp"},
-        {"closeAllAction", "close-all", ":/icons/closeAll.bmp"},
-        {"printAction", "print", ":/icons/print.bmp"},
-        {"cutAction", "cut", ":/icons/cut.bmp"},
-        {"copyAction", "copy", ":/icons/copy.bmp"},
-        {"pasteAction", "paste", ":/icons/paste.bmp"},
-        {"undoAction", "undo", ":/icons/undo.bmp"},
-        {"redoAction", "redo", ":/icons/redo.bmp"},
-        {"findAction", "find", ":/icons/find.bmp"},
-        {"replaceAction", "replace", ":/icons/findReplace.bmp"},
-        {"zoomInAction", "zoom-in", ":/icons/zoomIn.bmp"},
-        {"zoomOutAction", "zoom-out", ":/icons/zoomOut.bmp"},
-        {"wordWrapAction", "word-wrap", ":/icons/wrap.bmp"},
-        {"showAllCharactersAction", "all-chars", ":/icons/invisibleChar.bmp"},
-        {"showIndentAction", "indent-guide", ":/icons/indentGuide.bmp"},
-        {"userDefinedLanguageDialogAction", "udl-dlg", ":/icons/userDefineDlg_off.ico"},
-        {"docMapAction", "doc-map", ":/icons/docMap.bmp"},
-        {"documentListAction", "doc-list", ":/icons/docList.bmp"},
-        {"funcListAction", "function-list", ":/icons/functionList.bmp"},
-        {"fileBrowserAction", "folder-as-workspace", ":/icons/fileBrowser.bmp"},
-        {"startRecordAction", "record", ":/icons/startRecord.bmp"},
-        {"stopRecordAction", "stop-record", ":/icons/stopRecord.bmp"},
-        {"playMacroAction", "playback", ":/icons/playRecord.bmp"},
-        {"saveMacroAction", "save-macro", ":/icons/saveRecord.bmp"}
+        {"newAction", "new", "newFile.bmp", "new_off.ico", nullptr},
+        {"openAction", "open", "openFile.bmp", "open_off.ico", nullptr},
+        {"saveAction", "save", "saveFile.bmp", "save_off.ico", "save_dis.ico"},
+        {"saveAllAction", "save-all", "saveAll.bmp", "saveall_off.ico", "saveall_dis.ico"},
+        {"closeAction", "close", "closeFile.bmp", "supp_off.ico", nullptr},
+        {"closeAllAction", "close-all", "closeAll.bmp", "suppall_off.ico", nullptr},
+        {"printAction", "print", "print.bmp", "imprim_off.ico", nullptr},
+        {"cutAction", "cut", "cut.bmp", "cut_off.ico", "cut_dis.ico"},
+        {"copyAction", "copy", "copy.bmp", "dupli_off.ico", "dupli_dis.ico"},
+        {"pasteAction", "paste", "paste.bmp", "paste_off.ico", "paste_dis.ico"},
+        {"undoAction", "undo", "undo.bmp", "undo_off.ico", "undo_dis.ico"},
+        {"redoAction", "redo", "redo.bmp", "redo_off.ico", "redo_dis.ico"},
+        {"findAction", "find", "find.bmp", "find_off.ico", nullptr},
+        {"replaceAction", "replace", "findReplace.bmp", "findrep_off.ico", nullptr},
+        {"zoomInAction", "zoom-in", "zoomIn.bmp", "zoomIn_off.ico", nullptr},
+        {"zoomOutAction", "zoom-out", "zoomOut.bmp", "zoomOut_off.ico", nullptr},
+        {"wordWrapAction", "word-wrap", "wrap.bmp", "wrap_off.ico", nullptr},
+        {"showAllCharactersAction", "all-chars", "invisibleChar.bmp", "allChars_off.ico", nullptr},
+        {"showIndentAction", "indent-guide", "indentGuide.bmp", "indentGuide_off.ico", nullptr},
+        {"userDefinedLanguageDialogAction", "udl-dlg", "showPannel.bmp", "userDefineDlg_off.ico", nullptr},
+        {"docMapAction", "doc-map", "docMap.bmp", "docMap_off.ico", nullptr},
+        {"documentListAction", "doc-list", "docList.bmp", "docList_off.ico", nullptr},
+        {"funcListAction", "function-list", "functionList.bmp", "funcList_off.ico", nullptr},
+        {"fileBrowserAction", "folder-as-workspace", "fileBrowser.bmp", "fileBrowser_off.ico", nullptr},
+        {"startRecordAction", "record", "startRecord.bmp", "startrecord_off.ico", "startrecord_dis.ico"},
+        {"stopRecordAction", "stop-record", "stopRecord.bmp", "stoprecord_off.ico", "stoprecord_dis.ico"},
+        {"playMacroAction", "playback", "playRecord.bmp", "playrecord_off.ico", "playrecord_dis.ico"},
+        {"saveMacroAction", "save-macro", "saveRecord.bmp", "saverecord_off.ico", "saverecord_dis.ico"}
     };
+
+    toolBarStatusType status = gui._toolBarStatus;
+    if (status == TB_STANDARD) {
+        for (const auto& entry : icons) {
+            if (theme.hasIcon(QString::fromLatin1(entry.iconId))) {
+                status = TB_SMALL;
+                break;
+            }
+        }
+    }
+    const bool large = status == TB_LARGE || status == TB_LARGE2;
+    const QSize iconSize(large ? 32 : 16, large ? 32 : 16);
+    if (_fileToolBar)
+    {
+        _fileToolBar->setIconSize(iconSize);
+        _fileToolBar->setVisible(gui._toolBarShow);
+    }
+
+    QString base = QStringLiteral(":/icons/");
+    if (status != TB_STANDARD) {
+        if (gui._darkModeEnabled)
+            base += status == TB_SMALL2 || status == TB_LARGE2
+                ? QStringLiteral("darkMode/toolbar/filledFluentUI/")
+                : QStringLiteral("darkMode/toolbar/FluentUI/");
+        else if (status == TB_SMALL2 || status == TB_LARGE2)
+            base += QStringLiteral("filledFluentUI/");
+    }
     for (const auto& entry : icons) {
         QAction* action = findChild<QAction*>(
             QString::fromLatin1(entry.actionName));
         if (!action)
             continue;
-        const QIcon fallback = *entry.fallback
-            ? loadBmpIcon(QString::fromLatin1(entry.fallback)) : QIcon();
-        action->setIcon(theme.icon(QString::fromLatin1(entry.iconId), fallback));
+        // Win32 Notepad++ uses these images on the toolbar, not beside the
+        // corresponding menu entries. Keep QAction reuse from changing that.
+        action->setIconVisibleInMenu(false);
+        QIcon fallback;
+        if (status == TB_STANDARD) {
+            fallback = loadBmpIcon(base + QString::fromLatin1(entry.standard));
+        } else {
+            fallback.addFile(base + QString::fromLatin1(entry.normal));
+            fallback.addFile(base + QString::fromLatin1(
+                entry.disabled ? entry.disabled : entry.normal),
+                QSize(), QIcon::Disabled);
+        }
+        action->setIcon(theme.icon(QString::fromLatin1(entry.iconId),
+                                   fallback, iconSize));
     }
 }
 
@@ -3234,56 +3430,77 @@ void MainWindow::createMenus()
         userLangMenu->addSeparator();
         addCommand(userLangMenu, tr("Define your language..."),
                    "userDefinedLanguageDialogAction", [this, userLangMenu]() {
-            QVector<UserLangDesc> editableLanguages =
-                NppParameters::getInstance().getUserLangs();
-            QDialog dialog(this);
-            dialog.setWindowTitle(tr("User Defined Language"));
-            dialog.resize(820, 620);
-            QVBoxLayout layout(&dialog);
-            QComboBox languageCombo;
-            for (const UserLangDesc& language : editableLanguages)
-                languageCombo.addItem(language.name);
-            layout.addWidget(&languageCombo);
-            QWidget managementBar;
-            QHBoxLayout managementLayout(&managementBar);
-            QPushButton newButton(tr("New"));
-            QPushButton renameButton(tr("Rename"));
-            QPushButton deleteButton(tr("Delete"));
-            QPushButton importButton(tr("Import..."));
-            QPushButton exportButton(tr("Export..."));
-            managementLayout.addWidget(&newButton);
-            managementLayout.addWidget(&renameButton);
-            managementLayout.addWidget(&deleteButton);
-            managementLayout.addStretch();
-            managementLayout.addWidget(&importButton);
-            managementLayout.addWidget(&exportButton);
-            layout.addWidget(&managementBar);
-            QTabWidget tabs;
-
-            QWidget generalPage;
-            QFormLayout generalLayout(&generalPage);
-            QLineEdit extensions;
-            QCheckBox caseSensitive(tr("Case sensitive"));
-            QCheckBox foldComments(tr("Allow folding of comments"));
-            QWidget prefixWidget;
-            QGridLayout prefixLayout(&prefixWidget);
-            QCheckBox* prefixChecks[8] = {};
-            for (int i = 0; i < 8; ++i) {
-                prefixChecks[i] = new QCheckBox(
-                    tr("Keyword %1 supports prefixes").arg(i + 1),
-                    &prefixWidget);
-                prefixLayout.addWidget(prefixChecks[i], i / 2, i % 2);
+            if (_userLanguageDlg) {
+                _userLanguageDlg->show();
+                _userLanguageDlg->raise();
+                _userLanguageDlg->activateWindow();
+                return;
             }
-            generalLayout.addRow(tr("Extensions:"), &extensions);
-            generalLayout.addRow(&caseSensitive);
-            generalLayout.addRow(&foldComments);
-            generalLayout.addRow(&prefixWidget);
-            tabs.addTab(&generalPage, tr("General"));
 
-            QTableWidget keywordTable(28, 2);
-            keywordTable.setHorizontalHeaderLabels(
+            _userLanguageDlg = new QDialog(this);
+            QDialog* dialog = _userLanguageDlg;
+            dialog->setObjectName(QStringLiteral("userDefinedLanguageDialog"));
+            dialog->setWindowTitle(tr("User Defined Language"));
+            dialog->setWindowModality(Qt::NonModal);
+            dialog->setModal(false);
+            dialog->resize(820, 620);
+            QSharedPointer<UserLanguageDialogState> state(
+                new UserLanguageDialogState);
+            state->languages = NppParameters::getInstance().getUserLangs();
+
+            QVBoxLayout* layout = new QVBoxLayout(dialog);
+            state->languageCombo = new QComboBox(dialog);
+            for (const UserLangDesc& language : state->languages)
+                state->languageCombo->addItem(language.name);
+            layout->addWidget(state->languageCombo);
+            QWidget* managementBar = new QWidget(dialog);
+            QHBoxLayout* managementLayout =
+                new QHBoxLayout(managementBar);
+            QPushButton* newButton = new QPushButton(tr("New"), managementBar);
+            QPushButton* renameButton =
+                new QPushButton(tr("Rename"), managementBar);
+            QPushButton* deleteButton =
+                new QPushButton(tr("Delete"), managementBar);
+            QPushButton* importButton =
+                new QPushButton(tr("Import..."), managementBar);
+            QPushButton* exportButton =
+                new QPushButton(tr("Export..."), managementBar);
+            managementLayout->addWidget(newButton);
+            managementLayout->addWidget(renameButton);
+            managementLayout->addWidget(deleteButton);
+            managementLayout->addStretch();
+            managementLayout->addWidget(importButton);
+            managementLayout->addWidget(exportButton);
+            layout->addWidget(managementBar);
+            QTabWidget* tabs = new QTabWidget(dialog);
+
+            QWidget* generalPage = new QWidget(tabs);
+            QFormLayout* generalLayout = new QFormLayout(generalPage);
+            state->extensions = new QLineEdit(generalPage);
+            state->caseSensitive =
+                new QCheckBox(tr("Case sensitive"), generalPage);
+            state->foldComments = new QCheckBox(
+                tr("Allow folding of comments"), generalPage);
+            QWidget* prefixWidget = new QWidget(generalPage);
+            QGridLayout* prefixLayout = new QGridLayout(prefixWidget);
+            for (int i = 0; i < 8; ++i) {
+                QCheckBox* prefix = new QCheckBox(
+                    tr("Keyword %1 supports prefixes").arg(i + 1),
+                    prefixWidget);
+                state->prefixChecks.append(prefix);
+                prefixLayout->addWidget(prefix, i / 2, i % 2);
+            }
+            generalLayout->addRow(tr("Extensions:"), state->extensions);
+            generalLayout->addRow(state->caseSensitive);
+            generalLayout->addRow(state->foldComments);
+            generalLayout->addRow(prefixWidget);
+            tabs->addTab(generalPage, tr("General"));
+
+            state->keywordTable = new QTableWidget(28, 2, tabs);
+            state->keywordTable->setHorizontalHeaderLabels(
                 {tr("Keyword list"), tr("Values")});
-            keywordTable.horizontalHeader()->setStretchLastSection(true);
+            state->keywordTable->horizontalHeader()
+                ->setStretchLastSection(true);
             const QStringList keywordNames = {
                 "Comments", "Numbers, prefix1", "Numbers, prefix2",
                 "Numbers, extras1", "Numbers, extras2",
@@ -3301,104 +3518,52 @@ void MainWindow::createMenus()
                 QTableWidgetItem* name =
                     new QTableWidgetItem(keywordNames.at(row));
                 name->setFlags(name->flags() & ~Qt::ItemIsEditable);
-                keywordTable.setItem(row, 0, name);
+                state->keywordTable->setItem(row, 0, name);
             }
-            tabs.addTab(&keywordTable, tr("Keywords"));
+            tabs->addTab(state->keywordTable, tr("Keywords"));
 
-            QTableWidget styleTable;
-            styleTable.setColumnCount(7);
-            styleTable.setHorizontalHeaderLabels({
+            state->styleTable = new QTableWidget(tabs);
+            state->styleTable->setColumnCount(7);
+            state->styleTable->setHorizontalHeaderLabels({
                 tr("Style"), tr("Foreground"), tr("Background"),
                 tr("Font"), tr("Size"), tr("Font style"), tr("Nesting")
             });
-            styleTable.horizontalHeader()->setStretchLastSection(true);
-            tabs.addTab(&styleTable, tr("Styles"));
-            layout.addWidget(&tabs);
+            state->styleTable->horizontalHeader()
+                ->setStretchLastSection(true);
+            tabs->addTab(state->styleTable, tr("Styles"));
+            layout->addWidget(tabs);
 
-            auto populate = [&](int index) {
-                if (index < 0 || index >= editableLanguages.size()) {
-                    extensions.clear();
-                    keywordTable.clearContents();
-                    styleTable.setRowCount(0);
-                    return;
-                }
-                const UserLangDesc& language =
-                    editableLanguages.at(index);
-                extensions.setText(language.exts.join(QStringLiteral(" ")));
-                caseSensitive.setChecked(language.caseSensitive);
-                foldComments.setChecked(language.foldComments);
-                for (int i = 0; i < 8; ++i)
-                    prefixChecks[i]->setChecked(language.prefixKeywords[i]);
-                for (int i = 0; i < 28; ++i)
-                    keywordTable.setItem(
-                        i, 1, new QTableWidgetItem(language.keywordLists[i]));
-                styleTable.setRowCount(language.styles.size());
-                for (int row = 0; row < language.styles.size(); ++row) {
-                    const WordsStyle& style = language.styles.at(row);
-                    styleTable.setItem(row, 0,
-                        new QTableWidgetItem(style.name));
-                    styleTable.setItem(row, 1, new QTableWidgetItem(
-                        style.hasFg ? style.fgColor.name().mid(1).toUpper()
-                                    : QString()));
-                    styleTable.setItem(row, 2, new QTableWidgetItem(
-                        style.hasBg ? style.bgColor.name().mid(1).toUpper()
-                                    : QString()));
-                    styleTable.setItem(row, 3,
-                        new QTableWidgetItem(style.fontName));
-                    styleTable.setItem(row, 4,
-                        new QTableWidgetItem(QString::number(style.fontSize)));
-                    styleTable.setItem(row, 5,
-                        new QTableWidgetItem(QString::number(style.fontStyle)));
-                    styleTable.setItem(row, 6,
-                        new QTableWidgetItem(QString::number(style.nesting)));
-                }
-            };
-            connect(&languageCombo,
+            connect(state->languageCombo,
                     QOverload<int>::of(&QComboBox::currentIndexChanged),
-                    &dialog, populate);
-            auto reloadLanguages = [&](const QString& selectName) {
-                editableLanguages =
-                    NppParameters::getInstance().getUserLangs();
-                languageCombo.blockSignals(true);
-                languageCombo.clear();
-                int selected = -1;
-                for (int i = 0; i < editableLanguages.size(); ++i) {
-                    languageCombo.addItem(editableLanguages.at(i).name);
-                    if (editableLanguages.at(i).name == selectName)
-                        selected = i;
-                }
-                languageCombo.blockSignals(false);
-                languageCombo.setCurrentIndex(
-                    selected >= 0 ? selected
-                                  : (editableLanguages.isEmpty() ? -1 : 0));
-                populate(languageCombo.currentIndex());
-            };
-            connect(&newButton, &QPushButton::clicked, &dialog, [&]() {
+                    dialog, [state](int index) { state->populate(index); });
+            connect(newButton, &QPushButton::clicked, dialog,
+                    [this, dialog, state]() {
                 bool ok = false;
                 const QString name = QInputDialog::getText(
-                    &dialog, tr("New User Defined Language"),
+                    dialog, tr("New User Defined Language"),
                     tr("Name:"), QLineEdit::Normal, QString(), &ok).trimmed();
                 if (!ok || name.isEmpty())
                     return;
                 if (!NppParameters::getInstance()
                          .createUserDefinedLanguage(name)) {
                     QMessageBox::warning(
-                        &dialog, tr("User Defined Language"),
+                        dialog, tr("User Defined Language"),
                         tr("The language could not be created. "
                            "Its name may already exist."));
                     return;
                 }
-                reloadLanguages(name);
+                state->reload(name);
             });
-            connect(&renameButton, &QPushButton::clicked, &dialog, [&]() {
-                const int index = languageCombo.currentIndex();
-                if (index < 0 || index >= editableLanguages.size())
+            connect(renameButton, &QPushButton::clicked, dialog,
+                    [this, dialog, state]() {
+                const int index = state->languageCombo->currentIndex();
+                if (index < 0 || index >= state->languages.size())
                     return;
                 const UserLangDesc oldLanguage =
-                    editableLanguages.at(index);
+                    state->languages.at(index);
                 bool ok = false;
                 const QString name = QInputDialog::getText(
-                    &dialog, tr("Rename User Defined Language"),
+                    dialog, tr("Rename User Defined Language"),
                     tr("Name:"), QLineEdit::Normal,
                     oldLanguage.name, &ok).trimmed();
                 if (!ok || name.isEmpty() || name == oldLanguage.name)
@@ -3407,69 +3572,71 @@ void MainWindow::createMenus()
                         oldLanguage.name, name,
                         oldLanguage.sourceFilePath)) {
                     QMessageBox::warning(
-                        &dialog, tr("User Defined Language"),
+                        dialog, tr("User Defined Language"),
                         tr("The language could not be renamed."));
                     return;
                 }
-                reloadLanguages(name);
+                state->reload(name);
             });
-            connect(&deleteButton, &QPushButton::clicked, &dialog, [&]() {
-                const int index = languageCombo.currentIndex();
-                if (index < 0 || index >= editableLanguages.size())
+            connect(deleteButton, &QPushButton::clicked, dialog,
+                    [this, dialog, state]() {
+                const int index = state->languageCombo->currentIndex();
+                if (index < 0 || index >= state->languages.size())
                     return;
-                const UserLangDesc language =
-                    editableLanguages.at(index);
+                const UserLangDesc language = state->languages.at(index);
                 if (QMessageBox::question(
-                        &dialog, tr("Delete User Defined Language"),
+                        dialog, tr("Delete User Defined Language"),
                         tr("Delete \"%1\"?").arg(language.name)) !=
                     QMessageBox::Yes)
                     return;
                 if (NppParameters::getInstance()
                         .deleteUserDefinedLanguage(
                             language.name, language.sourceFilePath))
-                    reloadLanguages(QString());
+                    state->reload(QString());
             });
-            connect(&importButton, &QPushButton::clicked, &dialog, [&]() {
+            connect(importButton, &QPushButton::clicked, dialog,
+                    [this, dialog, state]() {
                 const QString path = QFileDialog::getOpenFileName(
-                    &dialog, tr("Import User Defined Language"),
+                    dialog, tr("Import User Defined Language"),
                     QString(), tr("XML files (*.xml)"));
                 if (path.isEmpty())
                     return;
                 if (!NppParameters::getInstance()
                          .importUserDefinedLanguages(path)) {
                     QMessageBox::warning(
-                        &dialog, tr("User Defined Language"),
+                        dialog, tr("User Defined Language"),
                         tr("No new language could be imported."));
                 }
-                reloadLanguages(QString());
+                state->reload(QString());
             });
-            connect(&exportButton, &QPushButton::clicked, &dialog, [&]() {
-                const int index = languageCombo.currentIndex();
-                if (index < 0 || index >= editableLanguages.size())
+            connect(exportButton, &QPushButton::clicked, dialog,
+                    [this, dialog, state]() {
+                const int index = state->languageCombo->currentIndex();
+                if (index < 0 || index >= state->languages.size())
                     return;
                 const QString path = QFileDialog::getSaveFileName(
-                    &dialog, tr("Export User Defined Language"),
-                    editableLanguages.at(index).name + QStringLiteral(".xml"),
+                    dialog, tr("Export User Defined Language"),
+                    state->languages.at(index).name + QStringLiteral(".xml"),
                     tr("XML files (*.xml)"));
                 if (!path.isEmpty() &&
                     !NppParameters::getInstance()
                          .exportUserDefinedLanguage(
-                             editableLanguages.at(index).name, path)) {
+                             state->languages.at(index).name, path)) {
                     QMessageBox::warning(
-                        &dialog, tr("User Defined Language"),
+                        dialog, tr("User Defined Language"),
                         tr("The language could not be exported."));
                 }
             });
-            populate(0);
+            state->populate(0);
 
-            QDialogButtonBox buttons(
-                QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-            layout.addWidget(&buttons);
-            connect(&buttons, &QDialogButtonBox::accepted,
-                    &dialog, &QDialog::accept);
-            connect(&buttons, &QDialogButtonBox::rejected,
-                    &dialog, &QDialog::reject);
-            connect(&dialog, &QDialog::finished, this,
+            QDialogButtonBox* buttons = new QDialogButtonBox(
+                QDialogButtonBox::Ok | QDialogButtonBox::Cancel, dialog);
+            layout->addWidget(buttons);
+            connect(buttons, &QDialogButtonBox::accepted,
+                    dialog, &QDialog::accept);
+            connect(buttons, &QDialogButtonBox::rejected,
+                    dialog, &QDialog::reject);
+            connect(dialog, &QDialog::finished, this,
                     [this, userLangMenu](int) {
                 for (QAction* action : userLangMenu->actions()) {
                     if (action->property("udlLanguage").toBool()) {
@@ -3502,37 +3669,42 @@ void MainWindow::createMenus()
                     });
                 }
             });
-            if (runModelessDialog(dialog) != QDialog::Accepted)
+            connect(dialog, &QDialog::accepted, this,
+                    [this, state]() {
+            const int index = state->languageCombo->currentIndex();
+            if (index < 0 || index >= state->languages.size())
                 return;
-
-            const int index = languageCombo.currentIndex();
-            if (index < 0 || index >= editableLanguages.size())
-                return;
-            UserLangDesc language = editableLanguages.at(index);
-            language.exts = extensions.text().toLower().split(
+            UserLangDesc language = state->languages.at(index);
+            language.exts = state->extensions->text().toLower().split(
                 QRegularExpression(QStringLiteral("\\s+")),
                 NppQtCompat::SkipEmptyParts);
-            language.caseSensitive = caseSensitive.isChecked();
-            language.foldComments = foldComments.isChecked();
+            language.caseSensitive = state->caseSensitive->isChecked();
+            language.foldComments = state->foldComments->isChecked();
             for (int i = 0; i < 8; ++i)
-                language.prefixKeywords[i] = prefixChecks[i]->isChecked();
+                language.prefixKeywords[i] =
+                    state->prefixChecks.at(i)->isChecked();
             for (int i = 0; i < 28; ++i)
                 language.keywordLists[i] =
-                    keywordTable.item(i, 1)->text().trimmed();
+                    state->keywordTable->item(i, 1)->text().trimmed();
             for (int row = 0; row < language.styles.size(); ++row) {
                 WordsStyle& style = language.styles[row];
                 const QColor foreground(
-                    QStringLiteral("#") + styleTable.item(row, 1)->text());
+                    QStringLiteral("#")
+                        + state->styleTable->item(row, 1)->text());
                 const QColor background(
-                    QStringLiteral("#") + styleTable.item(row, 2)->text());
+                    QStringLiteral("#")
+                        + state->styleTable->item(row, 2)->text());
                 style.hasFg = foreground.isValid();
                 style.hasBg = background.isValid();
                 if (style.hasFg) style.fgColor = foreground;
                 if (style.hasBg) style.bgColor = background;
-                style.fontName = styleTable.item(row, 3)->text();
-                style.fontSize = styleTable.item(row, 4)->text().toInt();
-                style.fontStyle = styleTable.item(row, 5)->text().toInt();
-                style.nesting = styleTable.item(row, 6)->text().toInt();
+                style.fontName = state->styleTable->item(row, 3)->text();
+                style.fontSize =
+                    state->styleTable->item(row, 4)->text().toInt();
+                style.fontStyle =
+                    state->styleTable->item(row, 5)->text().toInt();
+                style.nesting =
+                    state->styleTable->item(row, 6)->text().toInt();
             }
             if (!NppParameters::getInstance()
                     .writeUserDefinedLanguage(language)) {
@@ -3547,6 +3719,9 @@ void MainWindow::createMenus()
                 if (view->lexerLanguage() != previousLanguage)
                     notifyCurrentLanguageChanged();
             }
+            state->languages = NppParameters::getInstance().getUserLangs();
+            });
+            dialog->show();
         });
     }
 
@@ -3556,151 +3731,110 @@ void MainWindow::createMenus()
     _settingsMenu->addAction(_preferencesAction);
     addCommand(_settingsMenu, tr("Style Configurator..."), "styleConfiguratorAction",
                [this]() {
+        if (_styleConfigDlg) {
+            _styleConfigDlg->show();
+            _styleConfigDlg->raise();
+            _styleConfigDlg->activateWindow();
+            return;
+        }
+
         NppParameters& params = NppParameters::getInstance();
-        QVector<LexerStyler> lexers = params.getLexerStylers();
-        QVector<WordsStyle> globals = params.getGlobalStyles();
-        QDialog dialog(this);
-        dialog.setWindowTitle(tr("Style Configurator"));
-        dialog.resize(920, 620);
-        QVBoxLayout layout(&dialog);
-        QComboBox languageCombo;
-        languageCombo.addItem(tr("Global Styles"));
-        for (const LexerStyler& lexer : lexers)
-            languageCombo.addItem(
+        QSharedPointer<StyleConfiguratorState> state(
+            new StyleConfiguratorState);
+        state->lexers = params.getLexerStylers();
+        state->globals = params.getGlobalStyles();
+        _styleConfigDlg = new QDialog(this);
+        QDialog* dialog = _styleConfigDlg;
+        dialog->setObjectName(QStringLiteral("styleConfiguratorDialog"));
+        dialog->setWindowTitle(tr("Style Configurator"));
+        dialog->setWindowModality(Qt::NonModal);
+        dialog->setModal(false);
+        dialog->resize(920, 620);
+        QVBoxLayout* layout = new QVBoxLayout(dialog);
+        QComboBox* languageCombo = new QComboBox(dialog);
+        languageCombo->addItem(tr("Global Styles"));
+        for (const LexerStyler& lexer : state->lexers)
+            languageCombo->addItem(
                 lexer.desc.isEmpty() ? lexer.name : lexer.desc);
-        layout.addWidget(&languageCombo);
-        QTableWidget styles;
-        styles.setColumnCount(9);
-        styles.setHorizontalHeaderLabels({
+        layout->addWidget(languageCombo);
+        state->styles = new QTableWidget(dialog);
+        state->styles->setColumnCount(9);
+        state->styles->setHorizontalHeaderLabels({
             tr("Style"), tr("Foreground"), tr("Background"), tr("Font"),
             tr("Size"), tr("Bold"), tr("Italic"), tr("Underline"),
             tr("User-defined keywords")
         });
-        styles.horizontalHeader()->setSectionResizeMode(
+        state->styles->horizontalHeader()->setSectionResizeMode(
             0, QHeaderView::Stretch);
-        styles.horizontalHeader()->setSectionResizeMode(
+        state->styles->horizontalHeader()->setSectionResizeMode(
             3, QHeaderView::Stretch);
-        layout.addWidget(&styles);
-        QLabel hint(tr("Double-click a colour cell to choose a colour. "
-                       "Leave it empty to inherit the default."));
-        layout.addWidget(&hint);
+        layout->addWidget(state->styles);
+        QLabel* hint = new QLabel(
+            tr("Double-click a colour cell to choose a colour. "
+               "Leave it empty to inherit the default."), dialog);
+        layout->addWidget(hint);
 
-        int previousLanguage = 0;
-        auto selectedStyles = [&]() -> QVector<WordsStyle>* {
-            return previousLanguage == 0
-                ? &globals : &lexers[previousLanguage - 1].styles;
-        };
-        auto saveTable = [&]() {
-            QVector<WordsStyle>* values = selectedStyles();
-            const int count = qMin(values->size(), styles.rowCount());
-            for (int row = 0; row < count; ++row) {
-                WordsStyle& style = (*values)[row];
-                auto text = [&](int column) {
-                    QTableWidgetItem* item = styles.item(row, column);
-                    return item ? item->text().trimmed() : QString();
-                };
-                const QColor foreground(
-                    QStringLiteral("#") + text(1));
-                const QColor background(
-                    QStringLiteral("#") + text(2));
-                style.hasFg = !text(1).isEmpty() && foreground.isValid();
-                style.hasBg = !text(2).isEmpty() && background.isValid();
-                if (style.hasFg) style.fgColor = foreground;
-                if (style.hasBg) style.bgColor = background;
-                style.fontName = text(3);
-                style.fontSize = text(4).toInt();
-                style.fontStyle =
-                    (styles.item(row, 5)->checkState() == Qt::Checked ? 1 : 0) |
-                    (styles.item(row, 6)->checkState() == Qt::Checked ? 2 : 0) |
-                    (styles.item(row, 7)->checkState() == Qt::Checked ? 4 : 0);
-                style.userKeywords = text(8);
-            }
-        };
-        auto populate = [&](int languageIndex) {
-            previousLanguage = languageIndex;
-            QVector<WordsStyle>* values = selectedStyles();
-            styles.setRowCount(values->size());
-            for (int row = 0; row < values->size(); ++row) {
-                const WordsStyle& style = values->at(row);
-                QTableWidgetItem* name = new QTableWidgetItem(style.name);
-                name->setFlags(name->flags() & ~Qt::ItemIsEditable);
-                styles.setItem(row, 0, name);
-                styles.setItem(row, 1, new QTableWidgetItem(
-                    style.hasFg
-                        ? style.fgColor.name().mid(1).toUpper() : QString()));
-                styles.setItem(row, 2, new QTableWidgetItem(
-                    style.hasBg
-                        ? style.bgColor.name().mid(1).toUpper() : QString()));
-                styles.setItem(row, 3, new QTableWidgetItem(style.fontName));
-                styles.setItem(row, 4, new QTableWidgetItem(
-                    style.fontSize > 0 ? QString::number(style.fontSize)
-                                       : QString()));
-                for (int column = 5; column <= 7; ++column) {
-                    QTableWidgetItem* check = new QTableWidgetItem;
-                    check->setFlags(Qt::ItemIsEnabled |
-                                    Qt::ItemIsUserCheckable);
-                    check->setCheckState(
-                        style.fontStyle & (1 << (column - 5))
-                            ? Qt::Checked : Qt::Unchecked);
-                    styles.setItem(row, column, check);
-                }
-                QTableWidgetItem* keywords =
-                    new QTableWidgetItem(style.userKeywords);
-                if (style.keywordClass.isEmpty())
-                    keywords->setFlags(
-                        keywords->flags() & ~Qt::ItemIsEditable);
-                styles.setItem(row, 8, keywords);
-            }
-        };
-        connect(&languageCombo,
+        connect(languageCombo,
                 QOverload<int>::of(&QComboBox::currentIndexChanged),
-                &dialog, [&](int index) {
-            saveTable();
-            populate(index);
+                dialog, [state](int index) {
+            state->saveTable();
+            state->populate(index);
         });
-        connect(&styles, &QTableWidget::cellDoubleClicked, &dialog,
-                [&](int row, int column) {
+        connect(state->styles, &QTableWidget::cellDoubleClicked, dialog,
+                [dialog, state](int row, int column) {
             if (column != 1 && column != 2)
                 return;
-            const QString current = styles.item(row, column)->text();
+            const QString current =
+                state->styles->item(row, column)->text();
             const QColor color = QColorDialog::getColor(
-                QColor(QStringLiteral("#") + current), &dialog);
+                QColor(QStringLiteral("#") + current), dialog);
             if (color.isValid())
-                styles.item(row, column)->setText(
+                state->styles->item(row, column)->setText(
                     color.name().mid(1).toUpper());
         });
-        populate(0);
-        QDialogButtonBox buttons(
-            QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-        layout.addWidget(&buttons);
-        connect(&buttons, &QDialogButtonBox::accepted,
-                &dialog, &QDialog::accept);
-        connect(&buttons, &QDialogButtonBox::rejected,
-                &dialog, &QDialog::reject);
-        if (runModelessDialog(dialog) != QDialog::Accepted)
-            return;
-        saveTable();
-        params.getLexerStylers() = lexers;
-        params.getGlobalStyles() = globals;
-        if (!params.writeStylers()) {
-            QMessageBox::warning(
-                this, tr("Style Configurator"),
-                tr("Could not save stylers.xml."));
-            params.loadStylers();
-            return;
-        }
-        applyPreferencesToAllViews();
-        for (ScintillaEditView* view :
-             findChildren<ScintillaEditView*>())
-            view->reloadConfiguredStyles();
+        state->populate(0);
+        QDialogButtonBox* buttons = new QDialogButtonBox(
+            QDialogButtonBox::Ok | QDialogButtonBox::Cancel, dialog);
+        layout->addWidget(buttons);
+        connect(buttons, &QDialogButtonBox::accepted,
+                dialog, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected,
+                dialog, &QDialog::reject);
+        connect(dialog, &QDialog::rejected, this,
+                [state, languageCombo]() {
+            state->lexers = NppParameters::getInstance().getLexerStylers();
+            state->globals = NppParameters::getInstance().getGlobalStyles();
+            state->previousLanguage = languageCombo->currentIndex();
+            state->populate(state->previousLanguage);
+        });
+        connect(dialog, &QDialog::accepted, this, [this, state]() {
+            state->saveTable();
+            NppParameters& acceptedParams = NppParameters::getInstance();
+            acceptedParams.getLexerStylers() = state->lexers;
+            acceptedParams.getGlobalStyles() = state->globals;
+            if (!acceptedParams.writeStylers()) {
+                QMessageBox::warning(
+                    this, tr("Style Configurator"),
+                    tr("Could not save stylers.xml."));
+                acceptedParams.loadStylers();
+                state->lexers = acceptedParams.getLexerStylers();
+                state->globals = acceptedParams.getGlobalStyles();
+                return;
+            }
+            applyPreferencesToAllViews();
+            for (ScintillaEditView* view :
+                 findChildren<ScintillaEditView*>())
+                view->reloadConfiguredStyles();
 #ifdef Q_OS_WIN
-        Buffer* buffer = _activeDocTab
-            ? _activeDocTab->currentBuffer() : nullptr;
-        if (_win32PluginManager) {
-            _win32PluginManager->notifyWordStylesUpdated(
-                reinterpret_cast<quintptr>(buffer));
-        }
+            Buffer* buffer = _activeDocTab
+                ? _activeDocTab->currentBuffer() : nullptr;
+            if (_win32PluginManager) {
+                _win32PluginManager->notifyWordStylesUpdated(
+                    reinterpret_cast<quintptr>(buffer));
+            }
 #endif
+        });
+        dialog->show();
     });
     addCommand(_settingsMenu, tr("Shortcut Mapper..."), "shortcutMapperAction",
                [this]() {
@@ -4357,10 +4491,9 @@ void MainWindow::createEncodingMenu()
 
 void MainWindow::createToolBars()
 {
-    applyToolbarIcons();
     _fileToolBar = addToolBar(tr("Standard"));
     _fileToolBar->setObjectName("StandardToolBar");
-    _fileToolBar->setIconSize(QSize(16, 16));
+    applyToolbarIcons();
 
     // 文件操作
     _fileToolBar->addAction(_newAction);
