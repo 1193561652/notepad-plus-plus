@@ -1,5 +1,24 @@
 # 本地缓存：最新分析
 
+## 2026-08-27 ComparePlus 与 HEX-Editor 最终交互回归
+
+- ComparePlus 的差异表、连续导航、导航缩略条、显示过滤、滚动同步、设置、自动重比较、
+  编辑器标记和真实 Git HEAD 比较已由 Qt 控件级测试覆盖。
+- HEX-Editor 的含 NUL 编辑/Apply、查找、模式替换、比较着色、位宽/端序/二进制选项、
+  定位和书签已由 Qt 控件级测试覆盖。
+- 两个插件 Ubuntu Release 构建和各自 2/2 CTest 通过。SVN 客户端及其他平台外观留给
+  对应发布环境验证。
+- 详情见 `codex/changes/2026-08-27-compareplus-hexeditor-interaction-regression.md`。
+
+## 2026-08-27 PythonScript 嵌入式运行时与编辑器 API
+
+- `PythonScript-qt` 已由外部进程/临时文件桥切换为进程内嵌 Python 3。
+- `editor/editor1/editor2` 直接使用宿主 Scintilla 消息；743 个方法、2,306 个原始值和
+  775 个 SCI/SCN 标识由原版 `Scintilla.iface` 生成。
+- 插件进程内 API 回归与生成文件一致性检查共 2/2 通过；`formatRange`、完整 Notepad++
+  命令以及宿主未转发的通知仍是明确边界。
+- 详情见 `codex/changes/2026-08-27-pythonscript-embedded-python-editor-api.md`。
+
 ## 2026-08-24 Ubuntu 打包、本地化和运行时一致性
 
 - 新增 Debian 安装包、桌面启动器和 Ubuntu 收藏夹所需的稳定应用标识；安装包包含

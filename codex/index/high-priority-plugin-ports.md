@@ -20,7 +20,7 @@
 | NppFTP | `NppFTP-qt` | XML profile、远程列表、下载打开、上传当前文档、FTP/SFTP curl 后端 | 2/2 |
 | NppMarkdownPanel | `NppMarkdownPanel-qt` | 预览 dock、CSS、缩放、工具栏、自动 HTML | 1/1 |
 | NPPTextFX2 | `NPPTextFX2-qt` | 31 个常用文本转换、排序、编码、统计命令 | 2/2 |
-| PythonScript | `PythonScript-qt` | 脚本菜单、控制台、外部 Python 运行和基础 editor/notepad bridge | 1/1 |
+| PythonScript | `PythonScript-qt` | 嵌入式 Python 3、脚本菜单/控制台、由 Scintilla.iface 生成的完整 editor 消息 API、基础 notepad API | 2/2 |
 
 ## 尚存的深层差异
 
@@ -31,7 +31,9 @@
 - NppExec：已补齐原版 `npes_saved.txt` 命名脚本仓库、`NPP_EXEC` 和 SCI 指针参数；任意 NPP Win32 窗口消息不进入跨平台 ABI。
 - NppFTP：缺少保存触发上传、密钥认证、完整传输队列/缓存和主密码加密。
 - NPPTextFX2：覆盖常用命令，但不是原版约百项命令及自动编辑钩子的完整集合。
-- PythonScript：目前是外部解释器桥，不是原版嵌入式 Python 与完整 Scintilla/Notepad API。
+- PythonScript：743 个 Scintilla 方法、2,306 个原始值及 775 个 SCI/SCN 标识已接入；
+  `formatRange` 因包含原生绘图句柄明确不提供。宿主 ABI v1 尚未覆盖完整 Notepad++ 命令和全部 Scintilla 通知，
+  因此 `notepad` 对象及回调事件仍小于原版范围。
 
 这些差异应优先通过追加平台无关宿主能力解决；不要把 Qt 对象或平台窗口句柄加入公共 ABI。
 
@@ -50,8 +52,12 @@
   SEL/CON 文件读写、菜单命令和 Scintilla 消息。
 - NppFTP 使用 FIFO 传输队列、哈希隔离缓存、保存后自动上传，以及 SFTP 私钥/口令。
 - NPPTextFX2 增加 Base64、URI、数制、Hex/Text、ASCII 表、日期时间和清空撤销等命令。
-- PythonScript 外部运行时桥增加选区、位置、行、查找、插入/删除及 open/new/save 请求。
+- PythonScript 改为进程内嵌入 Python 3，`editor/editor1/editor2` 直接发送 Scintilla
+  消息；方法和常量由原版 `Scintilla.iface` 生成，并为字符串、颜色、cells、文本范围、
+  styled text、搜索和 string-result 参数提供平台无关适配。
 
-仍不能宣称逐项完全等价：原版 PythonScript 的嵌入式 Python 2 运行时、Markdown 插件的
-Markdig 二进制、NppFTP 主密码加密实现和 TextFX 的 x86-only Viz/Tidy 功能未包含在基线
-源码依赖中。它们应作为独立第三方依赖/安全设计批次处理，而不是在兼容层内模拟。
+仍不能宣称逐项完全等价：PythonScript 的完整 Notepad++ 宿主命令/通知、Markdown
+插件的 Markdig 二进制、NppFTP 主密码加密实现和 TextFX 的 x86-only Viz/Tidy 功能
+未包含在基线源码依赖中。它们应作为独立第三方依赖或宿主 ABI 扩展批次处理，而不是在
+兼容层内模拟。PythonScript 本轮详情见
+`codex/changes/2026-08-27-pythonscript-embedded-python-editor-api.md`。
