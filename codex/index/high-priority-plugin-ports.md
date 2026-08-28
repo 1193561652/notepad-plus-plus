@@ -26,8 +26,9 @@
 
 - DSpellCheck：Hunspell 基础流程已收口；Aspell 和在线词典下载不进入无网络依赖的
   Qt 版范围，本地 `.dic`/`.aff` 导入、删除和多语言选择由词典管理器负责。
-- 两个 Markdown 插件：基础语法和原版 `UseAdvancedExtensions()` 已覆盖；浏览器内
-  Mermaid/nomnoml 和数学公式的脚本绘制仍取决于用户 CSS/JavaScript 运行环境。
+- 两个 Markdown 插件：基础语法和原版 `UseAdvancedExtensions()` 已覆盖；图表围栏与
+  数学公式严格生成原版静态 HTML 标记。原版没有内置或联网加载对应 JavaScript
+  绘制引擎，Qt 版也不额外引入。
 - Explorer：收藏配置尚未复刻 `Favorites.dat`，缺少 Shell 上下文菜单和部分组操作。
 - NppExec：已补齐原版 `npes_saved.txt` 命名脚本仓库、`NPP_EXEC` 和 SCI 指针参数；任意 NPP Win32 窗口消息不进入跨平台 ABI。
 - NppFTP：主密码、队列和缓存基础流程已收口；系统钥匙串和跨设备凭据同步不属于
@@ -62,10 +63,8 @@
   消息；方法和常量由原版 `Scintilla.iface` 生成，并为字符串、颜色、cells、文本范围、
   styled text、搜索和 string-result 参数提供平台无关适配。
 
-仍不能宣称逐项完全等价：PythonScript 的完整 Notepad++ 宿主命令/通知、Markdown
-插件的 Markdig 二进制、NppFTP 主密码加密实现和 TextFX 的 x86-only Viz/Tidy 功能
-未包含在基线源码依赖中。它们应作为独立第三方依赖或宿主 ABI 扩展批次处理，而不是在
-兼容层内模拟。PythonScript 本轮详情见
+仍不能宣称逐项完全等价：各插件明确排除的原生窗口句柄、Win32 钩子、32 位 Viz/Tidy
+等能力不会在跨平台兼容层内模拟。PythonScript 本轮详情见
 `codex/changes/2026-08-27-pythonscript-embedded-python-editor-api.md`。
 本轮 DSpellCheck 与 TextFX 详情见
 `codex/changes/2026-08-28-dspellcheck-textfx-completion.md`。

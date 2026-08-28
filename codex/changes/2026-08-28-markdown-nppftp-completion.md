@@ -7,6 +7,11 @@
   列表、扩展强调、图、页脚、脚注、网格/管道表、数学、媒体、任务、图表围栏、
   自动链接和通用属性。
 - 扩展生成的 HTML 使用占位符跨过基础解析器，避免被二次转义。
+- 按原版 Markdig 输出收口运行时：Mermaid/nomnoml 围栏生成静态 `<div>`，数学公式
+  保留 `\(...\)`/`\[...\]`；原版不内置也不联网加载 Mermaid、nomnoml、MathJax
+  或 KaTeX，因此 Qt 版同样不注入额外 JavaScript。
+- MarkdownViewerPlusPlus 保留内嵌基础 CSS 与用户 `@import` 的原版顺序；
+  NppMarkdownPanel 随插件安装原版 `style.css`，并在外部文件缺失时使用内嵌副本。
 
 ## NppFTP
 
@@ -22,4 +27,5 @@
 ## 验证
 
 - Ubuntu Qt 5 / OpenSSL 3 构建。
-- MarkdownViewerPlusPlus `2/2`、NppMarkdownPanel `1/1`、NppFTP `2/2` CTest。
+- MarkdownViewerPlusPlus `2/2`、NppMarkdownPanel `1/1`、NppFTP `2/2` CTest；
+  Markdown 测试明确覆盖原版静态图表与数学标记。
