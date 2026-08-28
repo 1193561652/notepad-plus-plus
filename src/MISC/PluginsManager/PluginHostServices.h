@@ -41,6 +41,8 @@ public:
     virtual int positionForBuffer(quintptr bufferId, int priorityView) const = 0;
     virtual int openFileCount(int scope) const = 0;
     virtual int currentDocumentIndex(int view) const = 0;
+    virtual quintptr bufferIdAt(int, int) const { return 0; }
+    virtual int currentLanguageType() const { return 0; }
     virtual bool activateDocument(int view, int index) = 0;
     virtual int currentLine() const = 0;
     virtual int bufferEncoding(quintptr bufferId) const = 0;
@@ -92,6 +94,8 @@ public:
     int positionForBuffer(quintptr bufferId, int priorityView) const override;
     int openFileCount(int scope) const override;
     int currentDocumentIndex(int view) const override;
+    quintptr bufferIdAt(int view, int index) const override;
+    int currentLanguageType() const override;
     bool activateDocument(int view, int index) override;
     int currentLine() const override;
     int bufferEncoding(quintptr bufferId) const override;

@@ -125,6 +125,29 @@ private:
     static int NPP_PLUGIN_CALL saveCurrentFile(void* context);
     static int NPP_PLUGIN_CALL executeMenuCommand(
         void* context, int32_t commandId);
+    static int NPP_PLUGIN_CALL saveFileAs(
+        void* context, const char* path, int asCopy);
+    static int NPP_PLUGIN_CALL saveSession(void* context, const char* path);
+    static int NPP_PLUGIN_CALL loadSession(void* context, const char* path);
+    static int32_t NPP_PLUGIN_CALL bufferPosition(
+        void* context, uint64_t bufferId, int32_t priorityView);
+    static int32_t NPP_PLUGIN_CALL openFileCount(void* context, int32_t scope);
+    static int32_t NPP_PLUGIN_CALL currentDocumentIndex(
+        void* context, int32_t view);
+    static int NPP_PLUGIN_CALL activateDocument(
+        void* context, int32_t view, int32_t index);
+    static int32_t NPP_PLUGIN_CALL currentLine(void* context);
+    static int32_t NPP_PLUGIN_CALL bufferEncoding(
+        void* context, uint64_t bufferId);
+    static int NPP_PLUGIN_CALL setBufferEncoding(
+        void* context, uint64_t bufferId, int32_t encoding);
+    static int NPP_PLUGIN_CALL setCurrentLanguage(
+        void* context, int32_t languageType);
+    static void NPP_PLUGIN_CALL setStatusBarText(
+        void* context, int32_t section, const char* text);
+    static uint64_t NPP_PLUGIN_CALL bufferAt(
+        void* context, int32_t view, int32_t index);
+    static int32_t NPP_PLUGIN_CALL currentLanguage(void* context);
     void notify(const LoadedPlugin& plugin,
                 const NppPluginNotification& notification) const;
 

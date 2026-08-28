@@ -523,6 +523,32 @@ int MainWindow::currentDocumentIndexForPlugin(int view) const
     return tab ? tab->currentIndex() : -1;
 }
 
+quintptr MainWindow::bufferIdAtForPlugin(int view, int index) const
+{
+    const DocTabView* tab = view == SUB_VIEW ? _subDocTab : _mainDocTab;
+    return tab && index >= 0 && index < tab->count()
+        ? reinterpret_cast<quintptr>(tab->bufferAt(index)) : 0;
+}
+
+int MainWindow::currentLanguageTypeForPlugin() const
+{
+    const ScintillaEditView* view = currentActiveView();
+    if (!view)
+        return 0;
+    const QString language = view->lexerLanguage().toLower();
+    if (language == QStringLiteral("php")) return 1;
+    if (language == QStringLiteral("c")) return 2;
+    if (language == QStringLiteral("cpp")) return 3;
+    if (language == QStringLiteral("csharp")) return 4;
+    if (language == QStringLiteral("java")) return 6;
+    if (language == QStringLiteral("html")) return 8;
+    if (language == QStringLiteral("xml")) return 9;
+    if (language == QStringLiteral("javascript")) return 19;
+    if (language == QStringLiteral("python")) return 22;
+    if (language == QStringLiteral("json")) return 57;
+    return 0;
+}
+
 bool MainWindow::activateDocumentForPlugin(int view, int index)
 {
     DocTabView* tab = view == SUB_VIEW ? _subDocTab : _mainDocTab;

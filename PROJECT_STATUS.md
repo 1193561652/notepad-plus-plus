@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-08-27
+Last updated: 2026-08-28
 
 This is an independent Qt port of Notepad++ v8.4.6 maintained by Jiang Liwei.
 The application name remains **Notepad++**. See [QT_PORT_NOTICE.md](QT_PORT_NOTICE.md)
@@ -50,8 +50,10 @@ MarkdownViewerPlusPlus, Explorer, NppExec, NppFTP, NppMarkdownPanel,
 NPPTextFX2 and PythonScript. Their repositories, baselines and remaining
 differences are tracked in [plugin repositories](codex/index/plugin-source-repositories.md)
 and [plugin port status](codex/index/high-priority-plugin-ports.md). PythonScript
-now embeds Python 3 and exposes the generated Scintilla editor API; its remaining
-host-API limits are recorded in the plugin status document. ComparePlus and
+now embeds Python 3 and exposes the generated Scintilla editor API plus the
+portable file, Buffer, session, language, encoding and notification APIs; its
+intentionally excluded native-window interfaces are recorded in the plugin status
+document. ComparePlus and
 HEX-Editor have also completed their Ubuntu Qt interaction regressions, including
 real widget/modal-dialog operations and binary-safe document round trips.
 

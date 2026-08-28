@@ -153,6 +153,21 @@ bool PluginManager::loadPlugin(const QString& filePath,
     plugin->hostInfo.get_buffer_file_path = &PluginManager::copyBufferFilePath;
     plugin->hostInfo.save_current_file = &PluginManager::saveCurrentFile;
     plugin->hostInfo.execute_menu_command = &PluginManager::executeMenuCommand;
+    plugin->hostInfo.save_file_as = &PluginManager::saveFileAs;
+    plugin->hostInfo.save_session = &PluginManager::saveSession;
+    plugin->hostInfo.load_session = &PluginManager::loadSession;
+    plugin->hostInfo.get_buffer_position = &PluginManager::bufferPosition;
+    plugin->hostInfo.get_open_file_count = &PluginManager::openFileCount;
+    plugin->hostInfo.get_current_document_index =
+        &PluginManager::currentDocumentIndex;
+    plugin->hostInfo.activate_document = &PluginManager::activateDocument;
+    plugin->hostInfo.get_current_line = &PluginManager::currentLine;
+    plugin->hostInfo.get_buffer_encoding = &PluginManager::bufferEncoding;
+    plugin->hostInfo.set_buffer_encoding = &PluginManager::setBufferEncoding;
+    plugin->hostInfo.set_current_language = &PluginManager::setCurrentLanguage;
+    plugin->hostInfo.set_status_bar_text = &PluginManager::setStatusBarText;
+    plugin->hostInfo.get_buffer_at = &PluginManager::bufferAt;
+    plugin->hostInfo.get_current_language = &PluginManager::currentLanguage;
 
     if (!setInfo(&plugin->hostInfo)) {
         if (errorMessage)
@@ -627,6 +642,103 @@ int NPP_PLUGIN_CALL PluginManager::executeMenuCommand(
 {
     auto* services = static_cast<PluginHostServices*>(context);
     return services && services->executeMenuCommand(commandId);
+}
+
+int NPP_PLUGIN_CALL PluginManager::saveFileAs(
+    void* context, const char* path, int asCopy)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && path
+        && services->saveCurrentFileAs(QString::fromUtf8(path), asCopy != 0);
+}
+
+int NPP_PLUGIN_CALL PluginManager::saveSession(void* context, const char* path)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && path && services->saveCurrentSession(QString::fromUtf8(path));
+}
+
+int NPP_PLUGIN_CALL PluginManager::loadSession(void* context, const char* path)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && path && services->loadSession(QString::fromUtf8(path));
+}
+
+int32_t NPP_PLUGIN_CALL PluginManager::bufferPosition(
+    void* context, uint64_t bufferId, int32_t priorityView)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services ? services->positionForBuffer(
+        static_cast<quintptr>(bufferId), priorityView) : -1;
+}
+
+int32_t NPP_PLUGIN_CALL PluginManager::openFileCount(void* context, int32_t scope)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services ? services->openFileCount(scope) : 0;
+}
+
+int32_t NPP_PLUGIN_CALL PluginManager::currentDocumentIndex(
+    void* context, int32_t view)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services ? services->currentDocumentIndex(view) : -1;
+}
+
+int NPP_PLUGIN_CALL PluginManager::activateDocument(
+    void* context, int32_t view, int32_t index)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && services->activateDocument(view, index);
+}
+
+int32_t NPP_PLUGIN_CALL PluginManager::currentLine(void* context)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services ? services->currentLine() : -1;
+}
+
+int32_t NPP_PLUGIN_CALL PluginManager::bufferEncoding(
+    void* context, uint64_t bufferId)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services ? services->bufferEncoding(static_cast<quintptr>(bufferId)) : -1;
+}
+
+int NPP_PLUGIN_CALL PluginManager::setBufferEncoding(
+    void* context, uint64_t bufferId, int32_t encoding)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && services->setBufferEncoding(
+        static_cast<quintptr>(bufferId), encoding);
+}
+
+int NPP_PLUGIN_CALL PluginManager::setCurrentLanguage(
+    void* context, int32_t languageType)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services && services->setCurrentLanguageType(languageType);
+}
+
+void NPP_PLUGIN_CALL PluginManager::setStatusBarText(
+    void* context, int32_t section, const char* text)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    if (services)
+        services->setStatusBarText(section, QString::fromUtf8(text ? text : ""));
+}
+
+uint64_t NPP_PLUGIN_CALL PluginManager::bufferAt(
+    void* context, int32_t view, int32_t index)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services ? static_cast<uint64_t>(services->bufferIdAt(view, index)) : 0;
+}
+
+int32_t NPP_PLUGIN_CALL PluginManager::currentLanguage(void* context)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    return services ? services->currentLanguageType() : 0;
 }
 
 void PluginManager::notifyPlugins(

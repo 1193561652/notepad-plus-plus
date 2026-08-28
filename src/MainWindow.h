@@ -72,6 +72,8 @@ public:
     int positionForPluginBuffer(quintptr bufferId, int priorityView) const;
     int openFileCountForPlugin(int scope) const;
     int currentDocumentIndexForPlugin(int view) const;
+    quintptr bufferIdAtForPlugin(int view, int index) const;
+    int currentLanguageTypeForPlugin() const;
     bool activateDocumentForPlugin(int view, int index);
     int currentLineForPlugin() const;
     int bufferEncodingForPlugin(quintptr bufferId) const;

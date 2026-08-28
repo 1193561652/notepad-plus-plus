@@ -12,9 +12,11 @@
 
 | 插件 | 新增行为 | 保留边界 |
 | --- | --- | --- |
-| DSpellCheck-qt | 原版完整 Lexer/style 分类、脏行增量重检、URL/邮箱排除、右键建议和调试日志 | 无已知基础行为缺口；Aspell/在线词典属于独立依赖与产品范围 |
+| DSpellCheck-qt | 脏行增量重检、URL/邮箱排除、合并多语言建议、本地词典和用户词典管理 | Aspell/在线下载属于独立依赖与产品范围 |
 | NppExec-qt | LABEL/GOTO、嵌套块 IF、NPE_QUEUE、PROC_INPUT/SIGNAL、`npes_saved.txt` 脚本仓库、NPP_EXEC、SCI 指针消息 | 无已知的无决策基础行为缺口；任意 NPP 原生窗口消息不进入跨平台 ABI |
-| NppFTP-qt | 删除、重命名、建目录、重试、取消和队列状态 | 安全凭据与主密码迁移 |
-| NPPTextFX2-qt | 引号、对齐、重排、缩进和小端字节转换 | Viz、键盘钩子、Tidy |
+| NppFTP-qt | 认证加密主密码、持久缓存、可见队列、逐项重试/取消、远程编辑操作 | 系统钥匙串和跨设备凭据同步不属于原版模型 |
+| NPPTextFX2-qt | 84 项可移植命令，覆盖引号、对齐、重排、缩进、编码、括号和插入工具 | 32 位 Viz、Win32 钩子、Tidy、原始单字节转码 |
 
-详细变更见 `codex/changes/2026-08-13-non-decision-plugin-gap-closure.md`。
+详细变更见 `codex/changes/2026-08-13-non-decision-plugin-gap-closure.md`、
+`codex/changes/2026-08-28-dspellcheck-textfx-completion.md` 和
+`codex/changes/2026-08-28-markdown-nppftp-completion.md`。

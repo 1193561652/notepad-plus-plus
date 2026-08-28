@@ -163,6 +163,16 @@ int MainWindowPluginHostServices::currentDocumentIndex(int view) const
         ? _mainWindow->currentDocumentIndexForPlugin(view) : -1;
 }
 
+quintptr MainWindowPluginHostServices::bufferIdAt(int view, int index) const
+{
+    return _mainWindow ? _mainWindow->bufferIdAtForPlugin(view, index) : 0;
+}
+
+int MainWindowPluginHostServices::currentLanguageType() const
+{
+    return _mainWindow ? _mainWindow->currentLanguageTypeForPlugin() : 0;
+}
+
 bool MainWindowPluginHostServices::activateDocument(int view, int index)
 {
     return _mainWindow

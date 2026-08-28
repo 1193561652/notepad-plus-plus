@@ -118,6 +118,34 @@ typedef int (NPP_PLUGIN_CALL *NppPluginSaveCurrentFile)(
     void* host_context);
 typedef int (NPP_PLUGIN_CALL *NppPluginExecuteMenuCommand)(
     void* host_context, int32_t command_id);
+typedef int (NPP_PLUGIN_CALL *NppPluginSaveFileAs)(
+    void* host_context, const char* path_utf8, int as_copy);
+typedef int (NPP_PLUGIN_CALL *NppPluginSaveSession)(
+    void* host_context, const char* path_utf8);
+typedef int (NPP_PLUGIN_CALL *NppPluginLoadSession)(
+    void* host_context, const char* path_utf8);
+typedef int32_t (NPP_PLUGIN_CALL *NppPluginGetBufferPosition)(
+    void* host_context, uint64_t buffer_id, int32_t priority_view);
+typedef int32_t (NPP_PLUGIN_CALL *NppPluginGetOpenFileCount)(
+    void* host_context, int32_t scope);
+typedef int32_t (NPP_PLUGIN_CALL *NppPluginGetCurrentDocumentIndex)(
+    void* host_context, int32_t view);
+typedef int (NPP_PLUGIN_CALL *NppPluginActivateDocument)(
+    void* host_context, int32_t view, int32_t index);
+typedef int32_t (NPP_PLUGIN_CALL *NppPluginGetCurrentLine)(
+    void* host_context);
+typedef int32_t (NPP_PLUGIN_CALL *NppPluginGetBufferEncoding)(
+    void* host_context, uint64_t buffer_id);
+typedef int (NPP_PLUGIN_CALL *NppPluginSetBufferEncoding)(
+    void* host_context, uint64_t buffer_id, int32_t encoding);
+typedef int (NPP_PLUGIN_CALL *NppPluginSetCurrentLanguage)(
+    void* host_context, int32_t language_type);
+typedef void (NPP_PLUGIN_CALL *NppPluginSetStatusBarText)(
+    void* host_context, int32_t section, const char* text_utf8);
+typedef uint64_t (NPP_PLUGIN_CALL *NppPluginGetBufferAt)(
+    void* host_context, int32_t view, int32_t index);
+typedef int32_t (NPP_PLUGIN_CALL *NppPluginGetCurrentLanguage)(
+    void* host_context);
 
 typedef struct NppPluginHostInfo {
     uint32_t struct_size;
@@ -156,6 +184,21 @@ typedef struct NppPluginHostInfo {
     NppPluginGetBufferFilePath get_buffer_file_path;
     NppPluginSaveCurrentFile save_current_file;
     NppPluginExecuteMenuCommand execute_menu_command;
+    /* ABI v1 extensions. Check struct_size before dereferencing these fields. */
+    NppPluginSaveFileAs save_file_as;
+    NppPluginSaveSession save_session;
+    NppPluginLoadSession load_session;
+    NppPluginGetBufferPosition get_buffer_position;
+    NppPluginGetOpenFileCount get_open_file_count;
+    NppPluginGetCurrentDocumentIndex get_current_document_index;
+    NppPluginActivateDocument activate_document;
+    NppPluginGetCurrentLine get_current_line;
+    NppPluginGetBufferEncoding get_buffer_encoding;
+    NppPluginSetBufferEncoding set_buffer_encoding;
+    NppPluginSetCurrentLanguage set_current_language;
+    NppPluginSetStatusBarText set_status_bar_text;
+    NppPluginGetBufferAt get_buffer_at;
+    NppPluginGetCurrentLanguage get_current_language;
 } NppPluginHostInfo;
 
 typedef struct NppPluginShortcutKey {
