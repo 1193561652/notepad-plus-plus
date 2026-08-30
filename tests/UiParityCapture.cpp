@@ -8,6 +8,7 @@
 #include <QDockWidget>
 #include <QFile>
 #include <QGroupBox>
+#include <QHash>
 #include <QLabel>
 #include <QListWidget>
 #include <QMouseEvent>
@@ -37,6 +38,7 @@
 #include "MISC/UiFont.h"
 #include "MISC/PluginsManager/PluginLoadJournal.h"
 #include "MISC/PluginsManager/PluginEnablementConfig.h"
+#include "MISC/PluginsManager/PluginManager.h"
 #include "Parameters.h"
 #include "WinControls/PluginsAdmin/PluginAdminDialog.h"
 #include "WinControls/PluginsAdmin/PluginAdminModel.h"
@@ -319,7 +321,7 @@ int main(int argc, char* argv[])
                   "[light|dark|noPlugin|pluginRecovery|registrationRollback|"
                   "betterMultiSelection|pluginEnablement|p0Plugins|"
                   "pluginCoexistence] "
-                  "[configurationPlugins] "
+                  "[configurationPlugins|crossPlatformPlugins] "
                   "[native-language]");
         return 2;
     }
@@ -366,6 +368,10 @@ int main(int argc, char* argv[])
         && QString::fromLocal8Bit(argv[2]).compare(
                QStringLiteral("pluginCoexistence"),
                Qt::CaseInsensitive) == 0;
+    const bool crossPlatformPluginsMode = argc >= 3
+        && QString::fromLocal8Bit(argv[2]).compare(
+               QStringLiteral("crossPlatformPlugins"),
+               Qt::CaseInsensitive) == 0;
     const int pluginCoexistencePhase = pluginCoexistenceMode
         ? qEnvironmentVariableIntValue("NPP_QT_TEST_PLUGIN_RESTART_PHASE")
         : 0;
@@ -381,7 +387,8 @@ int main(int argc, char* argv[])
         || pluginRecoveryMode || betterMultiSelectionMode
         || pluginEnablementMode || p0PluginsMode
         || configurationPluginsMode || sessionManagerMode
-        || documentPolicyPluginsMode || pluginCoexistenceMode) {
+        || documentPolicyPluginsMode || pluginCoexistenceMode
+        || crossPlatformPluginsMode) {
         const QString settingsPath =
             output + QStringLiteral("/settings");
         if (pluginCoexistenceMode && pluginCoexistencePhase == 1)
@@ -454,6 +461,32 @@ int main(int argc, char* argv[])
             return 92;
     }
 #endif
+    if (crossPlatformPluginsMode) {
+        PluginEnablementConfig pluginEnablement(
+            PluginEnablementConfig::filePathForConfigDirectory(
+                parameters.getUserPath()));
+        QStringList pluginFolders = {
+            QStringLiteral("ComparePlus-qt"),
+            QStringLiteral("DSpellCheck-qt"),
+            QStringLiteral("MarkdownViewerPlusPlus-qt"),
+            QStringLiteral("Explorer-qt"),
+            QStringLiteral("NppExec-qt"),
+            QStringLiteral("NppFTP-qt"),
+            QStringLiteral("NppMarkdownPanel-qt"),
+            QStringLiteral("NPPTextFX2-qt"),
+            QStringLiteral("PythonScript-qt"),
+            QStringLiteral("HEX-Editor-qt")
+        };
+        const QString pluginFilter = qEnvironmentVariable(
+            "NPP_QT_TEST_CROSS_PLATFORM_PLUGIN_FILTER");
+        if (!pluginFilter.isEmpty())
+            pluginFolders = QStringList{pluginFilter};
+        for (const QString& folder : pluginFolders)
+            pluginEnablement.setEnabled(folder, true);
+        QString enablementError;
+        if (!pluginEnablement.save(&enablementError))
+            return 150;
+    }
     if (p0PluginsMode || pluginCoexistenceMode) {
         const QString pluginConfigDir = QDir(parameters.getUserPath())
             .filePath(QStringLiteral("plugins/Config"));
@@ -672,6 +705,94 @@ int main(int argc, char* argv[])
         if (mainWindow.win32PluginManager())
             return 80;
 #endif
+        return 0;
+    }
+    if (crossPlatformPluginsMode) {
+        PluginManager* plugins = mainWindow.pluginManager();
+        QStringList expectedNames = {
+            QStringLiteral("ComparePlus-qt"),
+            QStringLiteral("DSpellCheck-qt"),
+            QStringLiteral("MarkdownViewerPlusPlus-qt"),
+            QStringLiteral("Explorer-qt"),
+            QStringLiteral("NppExec-qt"),
+            QStringLiteral("NppFTP-qt"),
+            QStringLiteral("NppMarkdownPanel-qt"),
+            QStringLiteral("NPPTextFX2-qt"),
+            QStringLiteral("PythonScript-qt"),
+            QStringLiteral("HEX-Editor-qt")
+        };
+        const QString pluginFilter = qEnvironmentVariable(
+            "NPP_QT_TEST_CROSS_PLATFORM_PLUGIN_FILTER");
+        if (!pluginFilter.isEmpty())
+            expectedNames = QStringList{pluginFilter};
+        const QString removedName = qEnvironmentVariable(
+            "NPP_QT_TEST_REMOVED_CROSS_PLATFORM_PLUGIN");
+        const QString commandPluginName = qEnvironmentVariable(
+            "NPP_QT_TEST_EXECUTE_CROSS_PLATFORM_PLUGIN");
+        QStringList expectedLoaded = expectedNames;
+        if (!removedName.isEmpty())
+            expectedLoaded.removeAll(removedName);
+        const QStringList loadedNames = plugins
+            ? plugins->loadedPluginNames() : QStringList();
+        const QHash<QString, int> safeCommandIndexes = {
+            {QStringLiteral("ComparePlus-qt"), 0},
+            {QStringLiteral("DSpellCheck-qt"), 0},
+            {QStringLiteral("MarkdownViewerPlusPlus-qt"), 2},
+            {QStringLiteral("HEX-Editor-qt"), 2},
+            {QStringLiteral("Explorer-qt"), 4},
+            {QStringLiteral("NppExec-qt"), 12},
+            {QStringLiteral("NppFTP-qt"), 2},
+            {QStringLiteral("NppMarkdownPanel-qt"), 2},
+            {QStringLiteral("NPPTextFX2-qt"), 0},
+            {QStringLiteral("PythonScript-qt"), 3}
+        };
+        QFile report(QDir(output).filePath(
+            QStringLiteral("cross-platform-plugins.txt")));
+        if (!report.open(QIODevice::WriteOnly | QIODevice::Text))
+            return 154;
+        report.write(loadedNames.join(QLatin1Char('\n')).toUtf8());
+        report.write("\n");
+        report.flush();
+        if (!plugins || loadedNames.size() != expectedLoaded.size())
+            return 151;
+        for (const QString& name : expectedLoaded) {
+            const int pluginIndex = loadedNames.indexOf(name);
+            if (pluginIndex < 0
+                || plugins->loadedPluginFunctionCount(pluginIndex) <= 0) {
+                return 151;
+            }
+            QMenu* menu = mainWindow.findChild<QMenu*>(
+                QStringLiteral("crossPlatformPluginMenu_%1")
+                    .arg(pluginIndex));
+            if (!menu || menu->title() != name
+                || menu->actions().size()
+                    != plugins->loadedPluginFunctionCount(pluginIndex)) {
+                return 152;
+            }
+            if (!commandPluginName.isEmpty() && name != commandPluginName)
+                continue;
+            QString commandError;
+            report.write(QStringLiteral("execute=%1\n").arg(name).toUtf8());
+            report.flush();
+            if (name == QStringLiteral("NppFTP-qt")) {
+                QTimer::singleShot(0, [] {
+                    if (QMessageBox* box = qobject_cast<QMessageBox*>(
+                            QApplication::activeModalWidget())) {
+                        box->accept();
+                    }
+                });
+            }
+            if (!plugins->executePluginCommand(
+                    pluginIndex, safeCommandIndexes.value(name, -1),
+                    &commandError)) {
+                return 155;
+            }
+            QApplication::processEvents();
+            report.write(QStringLiteral("executed=%1\n").arg(name).toUtf8());
+            report.flush();
+        }
+        if (!removedName.isEmpty() && loadedNames.contains(removedName))
+            return 153;
         return 0;
     }
 #ifdef Q_OS_WIN
@@ -3388,10 +3509,10 @@ int main(int argc, char* argv[])
                 preferences->findChild<QLabel*>(
                     QStringLiteral("lblSupportedExtensions"));
             if (!categories || categories->count() != 10
-                || categories->item(0)->text() != QStringLiteral("记事本")
-                || categories->item(9)->text() != QStringLiteral("自定义")
+                || categories->item(0)->text() != QStringLiteral("Notepad")
+                || categories->item(9)->text() != QStringLiteral("customize")
                 || !supported
-                || supported->text() != QStringLiteral("支持的扩展名：")) {
+                || supported->text() != QStringLiteral("支持的扩展名:")) {
                 preferences->reject();
                 return;
             }

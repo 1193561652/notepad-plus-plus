@@ -712,6 +712,10 @@ if(BUILD_TESTING)
         Qt5::PrintSupport
         Qt5::Xml
     )
+    if(ENABLE_PLUGIN_SYSTEM)
+        target_compile_definitions(ui-parity-capture PRIVATE
+            ENABLE_PLUGIN_SYSTEM)
+    endif()
     set(NPP_MIMETOOLS_MANAGED_FIXTURE FALSE)
     if(WIN32)
         target_link_libraries(ui-parity-capture

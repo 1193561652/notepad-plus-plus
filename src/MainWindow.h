@@ -84,6 +84,7 @@ public:
     int currentViewIndexForPlugin() const;
     ScintillaEditView* pluginView(int view) const;
     bool showPluginBufferInView(quintptr bufferId, int view);
+    PluginManager* pluginManager() const { return _pluginManager; }
 #ifdef Q_OS_WIN
     Win32PluginManager* win32PluginManager() const
     {

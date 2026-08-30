@@ -45,6 +45,10 @@ bool PluginManager::loadPlugin(const QString& filePath,
         return false;
 
     QLibrary* library = new QLibrary(canonicalPath, this);
+    // Qt plugins can register metatypes and keep process-wide Qt state whose
+    // cleanup runs after MainWindow is destroyed. Keep the module mapped until
+    // process exit so those callbacks never point into an unloaded DLL.
+    library->setLoadHints(QLibrary::PreventUnloadHint);
     if (!library->load()) {
         if (errorMessage)
             *errorMessage = loadError(canonicalPath, library->errorString());

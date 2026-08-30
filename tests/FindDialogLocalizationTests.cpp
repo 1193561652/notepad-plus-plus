@@ -33,7 +33,10 @@ void verifyOfficialLanguage(const QString& path, const QString& filename,
                             const QByteArray& expectedSha256)
 {
     const QByteArray data = readBytes(path);
-    require(QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex()
+    QByteArray canonicalData = data;
+    canonicalData.replace("\r\n", "\n");
+    require(QCryptographicHash::hash(canonicalData,
+                                    QCryptographicHash::Sha256).toHex()
                 == expectedSha256,
             "native language resource differs from Notepad++ v8.4.6");
 
