@@ -2,6 +2,8 @@
 // 移植自: v8.4.6:PowerEditor/src/Parameters.cpp
 
 #include "Parameters.h"
+
+#include "MISC/RuntimePathResolver.h"
 #include "localizationString.h"
 #include "MISC/QtCompat.h"
 #include <QApplication>
@@ -171,6 +173,34 @@ void NppParameters::initDefaultPaths()
     _configPathError = resolution.error;
 }
 
+QString NppParameters::getResourceDirectory(
+    const QString& relativePath) const
+{
+    return RuntimePathResolver::resourceDirectory(_nppPath, relativePath);
+}
+
+QString NppParameters::getResourceFile(const QString& relativePath) const
+{
+    return RuntimePathResolver::resourceFile(_nppPath, relativePath);
+}
+
+QStringList NppParameters::getPluginSearchPaths() const
+{
+    return RuntimePathResolver::pluginRoots(
+        _nppPath, _configPathSource == ConfigPathSource::Portable);
+}
+
+QString NppParameters::getWritablePluginPath() const
+{
+    return RuntimePathResolver::writablePluginRoot(
+        _nppPath, _configPathSource == ConfigPathSource::Portable);
+}
+
+QString NppParameters::getPluginUpdaterPath() const
+{
+    return RuntimePathResolver::pluginUpdaterPath(_nppPath);
+}
+
 bool NppParameters::setUserPathOverride(const QString& path)
 {
     if (path.trimmed().isEmpty())
@@ -293,7 +323,8 @@ QVector<QPair<QString, QString>>
 NppParameters::getAvailableNativeLanguages() const
 {
     QVector<QPair<QString, QString>> result;
-    const QDir localizationDir(_nppPath + QStringLiteral("/localization"));
+    const QDir localizationDir(
+        getResourceDirectory(QStringLiteral("localization")));
     std::size_t count = 0;
     const NativeLanguageDefinition* definitions =
         nativeLanguageDefinitions(count);
@@ -353,8 +384,9 @@ void NppParameters::setNativeLang(const QString& lang)
         return;
     }
 
-    const QString sourcePath =
-        _nppPath + "/localization/" + filename;
+    const QString sourcePath = QDir(
+        getResourceDirectory(QStringLiteral("localization")))
+                                   .filePath(filename);
     if (!QFile::exists(sourcePath))
         return;
 
@@ -380,11 +412,13 @@ void NppParameters::setNativeLang(const QString& lang)
 
 void NppParameters::reloadNativeLang()
 {
-    const QString englishXmlPath =
-        _nppPath + QStringLiteral("/localization/english.xml");
+    const QString localizationDirectory =
+        getResourceDirectory(QStringLiteral("localization"));
+    const QString englishXmlPath = QDir(localizationDirectory)
+                                       .filePath(QStringLiteral("english.xml"));
     if (!_startupLocalizationFile.isEmpty()) {
-        const QString candidate =
-            _nppPath + "/localization/" + _startupLocalizationFile;
+        const QString candidate = QDir(localizationDirectory)
+                                      .filePath(_startupLocalizationFile);
         if (QFile::exists(candidate)) {
             _nativeLangSpeaker.init(candidate, englishXmlPath);
             return;
@@ -395,9 +429,7 @@ void NppParameters::reloadNativeLang()
     // 回退到程序目录中的 nativeLang.xml。英文不需要语言文件。
     QString xmlPath = nativeLangFilePath();
     if (!QFile::exists(xmlPath)) {
-        xmlPath = _nppPath + QStringLiteral("/nativeLang.xml");
-        if (!QFile::exists(xmlPath))
-            xmlPath.clear();
+        xmlPath = getResourceFile(QStringLiteral("nativeLang.xml"));
     }
 
     _nativeLangSpeaker.init(xmlPath, englishXmlPath);

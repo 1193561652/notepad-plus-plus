@@ -1562,7 +1562,7 @@ void ScintillaEditView::setupAutoComplete()
     const QVector<AutoCompletionEntry> configured =
         AutoCompletionParser::loadLanguage(
             _currentLexerName, parameters.getUserPath(),
-            parameters.getNppPath());
+            parameters.getResourceDirectory(QStringLiteral("autoCompletion")));
     QStringList callTips;
     for (const AutoCompletionEntry& entry : configured) {
         const QString apiText = entry.apiText();

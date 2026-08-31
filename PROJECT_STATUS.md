@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-08-28
+Last updated: 2026-08-31
 
 This is an independent Qt port of Notepad++ v8.4.6 maintained by Jiang Liwei.
 The application name remains **Notepad++**. See [QT_PORT_NOTICE.md](QT_PORT_NOTICE.md)
@@ -11,7 +11,7 @@ for attribution and license scope.
 | Platform | Status | Latest verification |
 | --- | --- | --- |
 | Windows | Built and tested; installer pending test | Qt 5.12.12, MinGW 7.3; NSIS installer definition completed but not yet generated or installed on Windows |
-| Ubuntu | Built, tested and packaged | Ubuntu 22.04, Qt 5.15.3, GCC 11.4; Release build and 36/36 tests passed; `.deb` smoke-tested |
+| Ubuntu | Built, tested and packaged | Ubuntu 22.04, Qt 5.15.3, GCC 11.4; Release build and 37/37 tests passed; `.deb` smoke-tested |
 | macOS | Build path only | Not tested yet; testing will have to wait until I can afford a Mac |
 
 Build commands and tested environments are documented in [README.md](README.md).
@@ -29,9 +29,10 @@ Build commands and tested environments are documented in [README.md](README.md).
   See [language loading record](codex/changes/2026-08-24-original-native-language-loading.md).
 - Plugin catalogs are pinned through the JSON-only `nppPluginList` submodule
   and are not updated online. See [catalog record](codex/changes/2026-08-24-plugin-catalog-submodule.md).
-- Ubuntu packaging installs the application under `/opt/notepad-plus-plus`,
-  provides `/usr/bin/notepad++`, installs optional languages and supports
-  desktop-launcher pinning.
+- Ubuntu packaging follows the distribution layout: the application is under
+  `/usr/bin`, shared language/function-list data under `/usr/share`, and the
+  plugin updater under `/usr/libexec`. Runtime path lookup is centralized and
+  still gives program-relative files priority on Windows and in portable mode.
 - Windows packaging now provides a simplified original-style NSIS flow with
   optional language components, shortcuts, Qt runtime deployment and an
   uninstaller. It is awaiting the requested Windows-side test pass. See the

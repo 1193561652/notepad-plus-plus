@@ -4,9 +4,12 @@ Name=Notepad++
 GenericName=Text Editor
 Comment=Edit text and source code
 Exec=notepad++ %F
-Icon=/opt/notepad-plus-plus/npp.ico
+Icon=notepad-plus-plus
 Terminal=false
 Categories=Utility;TextEditor;
 MimeType=text/plain;
 StartupNotify=true
-StartupWMClass=notepadpp-qt
+# The installed executable is /usr/bin/notepad++.  This must match the X11
+# WM_CLASS used by Qt, rather than the internal CMake target name, otherwise
+# GNOME/Ubuntu Dock treats the running window as a separate application.
+StartupWMClass=notepad++

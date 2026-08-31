@@ -1,5 +1,13 @@
 # 本地缓存：最新分析
 
+## 2026-08-31 Ubuntu FHS 安装布局与运行时路径
+
+- Debian 包改为 `/usr/bin`、`/usr/share/notepad-plus-plus-qt`、`/usr/libexec`
+  的发行版惯用布局，不再使用 `/opt` 和启动包装脚本。
+- 新增统一运行时路径层；Windows/便携模式仍优先程序目录，Ubuntu 系统安装使用
+  FHS 共享目录，普通用户插件写入 XDG 数据目录。
+- 详情见 `codex/changes/2026-08-31-ubuntu-fhs-runtime-paths.md`。
+
 ## 2026-08-27 ComparePlus 与 HEX-Editor 最终交互回归
 
 - ComparePlus 的差异表、连续导航、导航缩略条、显示过滤、滚动同步、设置、自动重比较、

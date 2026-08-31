@@ -4084,8 +4084,7 @@ void MainWindow::createMenus()
     addCommand(_pluginsMenu, tr("Open Plugins Folder"),
                "openPluginsFolderAction", []() {
         const QString pluginRoot =
-            QDir(NppParameters::getInstance().getNppPath())
-                .filePath(QStringLiteral("plugins"));
+            NppParameters::getInstance().getWritablePluginPath();
         QDir().mkpath(pluginRoot);
         QDesktopServices::openUrl(QUrl::fromLocalFile(pluginRoot));
     });

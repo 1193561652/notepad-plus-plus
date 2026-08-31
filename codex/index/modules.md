@@ -23,6 +23,10 @@
   `MainWindow` 创建后交给 `DockingManager` 注册。
 - `src/WinControls/Preference/preferenceDlg.*`：偏好设置对话框，与原版路径和大小写对齐。
 - `src/Parameters.*`：配置管理。
+- `src/MISC/ConfigPathResolver.*`：Windows `%APPDATA%`、Unix XDG、便携标记和
+  命令行覆盖的配置目录决策。
+- `src/MISC/RuntimePathResolver.*`：统一程序资源、插件根目录和独立更新器查找；
+  Windows/便携部署保持程序目录相对路径，Unix 系统安装使用 FHS 路径。
 - `src/localization.*`：本地化和 `NativeLangSpeaker` 语言切换。
 - `src/TinyXml/`：XML 配置解析。
 - `src/MISC/PluginsManager/`：插件运行边界、清单、更新计划和独立更新器。

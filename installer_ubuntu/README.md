@@ -1,9 +1,14 @@
 # Ubuntu Debian package
 
-The Debian package keeps the executable, updater, localization files, and
-function-list definitions together under `/opt/notepad-plus-plus`. A small
-`/usr/bin/notepad++` launcher and desktop entry expose the application to the
-desktop and command line.
+The Debian package follows the normal Ubuntu filesystem layout:
+
+- `/usr/bin/notepad++`: application executable;
+- `/usr/libexec/notepad-plus-plus-qt/npp-plugin-updater`: helper executable;
+- `/usr/share/notepad-plus-plus-qt/`: localization and function-list data;
+- `/usr/share/applications/` and `/usr/share/icons/`: desktop integration.
+
+The runtime path resolver still checks the executable directory first, which
+keeps the original Windows and portable Notepad++ resource layout compatible.
 
 Build and test the package from the repository root:
 

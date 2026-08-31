@@ -1074,9 +1074,12 @@ FindReplaceDlg* MainWindow::ensureFindReplaceDialog()
 void MainWindow::setupPluginSystem()
 {
     NppParameters& parameters = NppParameters::getInstance();
-    const QString pluginDir =
-        QDir(parameters.getNppPath())
-            .filePath(QStringLiteral("plugins"));
+    const QStringList pluginDirectories = parameters.getPluginSearchPaths();
+#ifdef Q_OS_WIN
+    const QString pluginDir = pluginDirectories.isEmpty()
+        ? QDir(parameters.getNppPath()).filePath(QStringLiteral("plugins"))
+        : pluginDirectories.constFirst();
+#endif
     PluginEnablementConfig enablement(
         PluginEnablementConfig::filePathForConfigDirectory(
             parameters.getUserPath()));
@@ -1089,8 +1092,22 @@ void MainWindow::setupPluginSystem()
 #ifdef ENABLE_PLUGIN_SYSTEM
     _pluginManager = new PluginManager(_pluginHostServices, this);
     QStringList crossPlatformErrors;
-    _pluginManager->loadPlugins(
-        pluginDir, enabledPluginFolders, &crossPlatformErrors);
+    QStringList crossPlatformEnabledFolders = enabledPluginFolders;
+    for (const QString& directory : pluginDirectories) {
+        _pluginManager->loadPlugins(
+            directory, crossPlatformEnabledFolders, &crossPlatformErrors);
+        const QStringList loadedFolders = _pluginManager->loadedPluginFolders();
+        for (int index = crossPlatformEnabledFolders.size() - 1;
+             index >= 0; --index) {
+            for (const QString& loadedFolder : loadedFolders) {
+                if (loadedFolder.compare(crossPlatformEnabledFolders[index],
+                                         Qt::CaseInsensitive) == 0) {
+                    crossPlatformEnabledFolders.removeAt(index);
+                    break;
+                }
+            }
+        }
+    }
     for (const QString& error : crossPlatformErrors)
         qInfo() << "Cross-platform plugin skipped:" << error;
     populateCrossPlatformPluginMenu();
@@ -1353,8 +1370,8 @@ void MainWindow::showPluginAdmin()
     }
 
     const QString pluginRoot =
-        QDir(NppParameters::getInstance().getNppPath())
-            .filePath(QStringLiteral("plugins"));
+        NppParameters::getInstance().getWritablePluginPath();
+    QDir().mkpath(pluginRoot);
     PluginCatalog catalog = PluginCatalog::embedded();
     if (!catalog.isValid()) {
         QMessageBox::warning(
@@ -1395,9 +1412,7 @@ bool MainWindow::schedulePluginOperations(
 
     PluginUpdatePlan plan;
     plan.applicationPath = QCoreApplication::applicationFilePath();
-    plan.pluginRoot =
-        QDir(NppParameters::getInstance().getNppPath())
-            .filePath(QStringLiteral("plugins"));
+    plan.pluginRoot = NppParameters::getInstance().getWritablePluginPath();
     plan.operations = operations;
 
     const QString planPath =
@@ -1424,14 +1439,10 @@ bool MainWindow::launchPendingPluginUpdater(QString* error)
         return false;
     }
 
-    QString updaterName = QStringLiteral("npp-plugin-updater");
-#if defined(Q_OS_WIN)
-    updaterName += QStringLiteral(".exe");
-#endif
     const QString applicationDirectory =
-        QCoreApplication::applicationDirPath();
+        NppParameters::getInstance().getNppPath();
     const QString updaterPath =
-        QDir(applicationDirectory).filePath(updaterName);
+        NppParameters::getInstance().getPluginUpdaterPath();
     if (!QFileInfo::exists(updaterPath)) {
         if (error) {
             *error = tr("Updater executable was not found: %1")

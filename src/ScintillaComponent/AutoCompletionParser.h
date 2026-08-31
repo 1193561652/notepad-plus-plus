@@ -19,7 +19,7 @@ public:
     static QVector<AutoCompletionEntry> loadLanguage(
         const QString& languageName,
         const QString& userPath,
-        const QString& applicationPath);
+        const QString& sharedAutoCompletionPath);
     static QVector<AutoCompletionEntry> parseFile(const QString& filePath);
 };
 

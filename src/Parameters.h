@@ -443,6 +443,11 @@ public:
 
     QString getNppPath()  const { return _nppPath;  }
     QString getUserPath() const { return _userPath; }
+    QString getResourceDirectory(const QString& relativePath) const;
+    QString getResourceFile(const QString& relativePath) const;
+    QStringList getPluginSearchPaths() const;
+    QString getWritablePluginPath() const;
+    QString getPluginUpdaterPath() const;
     QString getConfigFilePath() const { return configFilePath(); }
     ConfigPathSource configPathSource() const { return _configPathSource; }
     QString configPathError() const { return _configPathError; }
@@ -548,7 +553,10 @@ private:
     Session             _session;
     NativeLangSpeaker   _nativeLangSpeaker;
 
-    QString _nppPath;  // exe 目录
+    // Keep the original NppPath meaning: the executable directory.  Shared
+    // Unix resources and plugins are resolved separately so Windows and
+    // portable layouts remain compatible.
+    QString _nppPath;
     QString _userPath; // 配置目录
     ConfigPathSource _configPathSource = ConfigPathSource::PlatformDefault;
     QString _configPathError;

@@ -5,6 +5,25 @@ project(NotepadPlusPlusQt VERSION 8.4.6
 set(PROJECT_HOMEPAGE_URL "https://github.com/1193561652/notepad-plus-plus/tree/qt-port")
 
 include(CTest)
+include(GNUInstallDirs)
+
+set(NPP_INSTALL_DATA_DIRECTORY
+    "${CMAKE_INSTALL_FULL_DATADIR}/notepad-plus-plus-qt")
+set(NPP_INSTALL_PLUGIN_DIRECTORY
+    "${CMAKE_INSTALL_FULL_LIBDIR}/notepad-plus-plus-qt/plugins")
+set(NPP_INSTALL_LIBEXEC_DIRECTORY
+    "${CMAKE_INSTALL_FULL_LIBEXECDIR}/notepad-plus-plus-qt")
+set(NPP_RELATIVE_DATA_DIRECTORY
+    "../${CMAKE_INSTALL_DATADIR}/notepad-plus-plus-qt")
+set(NPP_RELATIVE_PLUGIN_DIRECTORY
+    "../${CMAKE_INSTALL_LIBDIR}/notepad-plus-plus-qt/plugins")
+set(NPP_RELATIVE_LIBEXEC_DIRECTORY
+    "../${CMAKE_INSTALL_LIBEXECDIR}/notepad-plus-plus-qt")
+configure_file(
+    "${CMAKE_SOURCE_DIR}/src/MISC/RuntimePathConfig.h.in"
+    "${CMAKE_BINARY_DIR}/generated/RuntimePathConfig.h"
+    @ONLY)
+include_directories("${CMAKE_BINARY_DIR}/generated")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -152,6 +171,7 @@ set(SOURCES
     src/MISC/PlatformServices.cpp
     src/MISC/RegExt/FileAssociationModel.cpp
     src/MISC/ConfigPathResolver.cpp
+    src/MISC/RuntimePathResolver.cpp
     src/MISC/ClosedFileHistory.cpp
     src/ScintillaComponent/AutoCompletionParser.cpp
     src/WinControls/FunctionList/functionParser.cpp
@@ -197,6 +217,7 @@ set(HEADERS
     src/MISC/PlatformServices.h
     src/MISC/RegExt/FileAssociationModel.h
     src/MISC/ConfigPathResolver.h
+    src/MISC/RuntimePathResolver.h
     src/MISC/ClosedFileHistory.h
     src/ScintillaComponent/AutoCompletionParser.h
     src/WinControls/FunctionList/functionParser.h
@@ -319,7 +340,7 @@ set(RESOURCES
 add_executable(notepadpp-qt WIN32
     ${SOURCES} ${HEADERS} ${RESOURCES} ${UCHARDET_SOURCES})
 
-if(WIN32)
+if(WIN32 OR (UNIX AND NOT APPLE))
     # Preserve the original executable name for shortcuts, file associations,
     # plugin process checks and the installed application layout.
     set_target_properties(notepadpp-qt PROPERTIES OUTPUT_NAME "notepad++")
@@ -576,6 +597,13 @@ if(BUILD_TESTING)
     target_link_libraries(config-path-resolver-tests Qt5::Core)
     add_test(NAME config-path-resolver-tests COMMAND config-path-resolver-tests)
 
+    add_executable(runtime-path-resolver-tests
+        tests/RuntimePathResolverTests.cpp
+        src/MISC/RuntimePathResolver.cpp
+    )
+    target_link_libraries(runtime-path-resolver-tests Qt5::Core)
+    add_test(NAME runtime-path-resolver-tests COMMAND runtime-path-resolver-tests)
+
     add_executable(closed-file-history-tests
         tests/ClosedFileHistoryTests.cpp
         src/MISC/ClosedFileHistory.cpp
@@ -596,6 +624,7 @@ if(BUILD_TESTING)
         src/Parameters.cpp
         src/NppCommandRegistry.cpp
         src/MISC/ConfigPathResolver.cpp
+        src/MISC/RuntimePathResolver.cpp
         src/localization.cpp
         src/TinyXml/tinyxml.cpp
         src/TinyXml/tinyxmlerror.cpp
@@ -1069,6 +1098,7 @@ if(BUILD_TESTING)
         src/Parameters.cpp
         src/NppCommandRegistry.cpp
         src/MISC/ConfigPathResolver.cpp
+        src/MISC/RuntimePathResolver.cpp
         src/localization.cpp
         src/TinyXml/tinyxml.cpp
         src/TinyXml/tinyxmlerror.cpp
@@ -1126,6 +1156,7 @@ if(BUILD_TESTING)
         src/Parameters.cpp
         src/NppCommandRegistry.cpp
         src/MISC/ConfigPathResolver.cpp
+        src/MISC/RuntimePathResolver.cpp
         src/localization.cpp
         src/TinyXml/tinyxml.cpp
         src/TinyXml/tinyxmlerror.cpp

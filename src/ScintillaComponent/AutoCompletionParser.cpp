@@ -17,7 +17,7 @@ QString AutoCompletionEntry::apiText() const
 QVector<AutoCompletionEntry> AutoCompletionParser::loadLanguage(
     const QString& languageName,
     const QString& userPath,
-    const QString& applicationPath)
+    const QString& sharedAutoCompletionPath)
 {
     QStringList baseNames;
     baseNames << languageName.toLower();
@@ -32,10 +32,11 @@ QVector<AutoCompletionEntry> AutoCompletionParser::loadLanguage(
     if (!alias.isEmpty() && !baseNames.contains(alias))
         baseNames << alias;
 
-    const QStringList roots = {
-        QDir(userPath).filePath(QStringLiteral("autoCompletion")),
-        QDir(applicationPath).filePath(QStringLiteral("autoCompletion"))
+    QStringList roots = {
+        QDir(userPath).filePath(QStringLiteral("autoCompletion"))
     };
+    if (!sharedAutoCompletionPath.trimmed().isEmpty())
+        roots.append(sharedAutoCompletionPath);
     for (const QString& root : roots) {
         for (const QString& baseName : baseNames) {
             const QString filePath =

@@ -122,7 +122,7 @@ int main()
     require(mainSource.contains(QStringLiteral(
                 "setDesktopFileName(QStringLiteral(\"notepad-plus-plus\"))"))
                 && desktopEntry.contains(
-                    QStringLiteral("StartupWMClass=notepadpp-qt")),
+                    QStringLiteral("StartupWMClass=notepad++")),
             "Ubuntu launcher identity must support pinning to favorites");
     return 0;
 }

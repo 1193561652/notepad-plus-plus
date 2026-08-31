@@ -69,8 +69,7 @@ PluginHostEnvironment MainWindowPluginHostServices::environment() const
 
 QString MainWindowPluginHostServices::pluginHomePath() const
 {
-    return QDir(NppParameters::getInstance().getNppPath())
-        .filePath(QStringLiteral("plugins"));
+    return NppParameters::getInstance().getWritablePluginPath();
 }
 
 QString MainWindowPluginHostServices::pluginConfigPath() const

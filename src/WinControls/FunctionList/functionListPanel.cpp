@@ -163,7 +163,7 @@ FunctionListPanel::parseText(const QString& text, const QString& lang) const
     const QList<FunctionListEntry> configured = FunctionListParser::parse(
         text, lang,
         {QDir(parameters.getUserPath()).filePath(QStringLiteral("functionList")),
-         QDir(parameters.getNppPath()).filePath(QStringLiteral("functionList"))});
+         parameters.getResourceDirectory(QStringLiteral("functionList"))});
     for (const FunctionListEntry& entry : configured) {
         result.append(
             {QStringLiteral("%1  (line %2)")

@@ -92,7 +92,7 @@ cmake -S . -B build-ubuntu \
   -DBUILD_TESTING=ON
 cmake --build build-ubuntu -j "$(nproc)"
 ctest --test-dir build-ubuntu --output-on-failure
-./build-ubuntu/notepadpp-qt
+./build-ubuntu/notepad++
 ```
 
 Build the Ubuntu `.deb` package in Release mode:
@@ -106,8 +106,9 @@ ctest --test-dir build-ubuntu-package --output-on-failure
 cpack --config build-ubuntu-package/CPackConfig.cmake -G DEB
 ```
 
-The package installs the self-contained application under
-`/opt/notepad-plus-plus` and provides `/usr/bin/notepad++` plus a desktop entry.
+The package installs the executable under `/usr/bin`, shared resources under
+`/usr/share/notepad-plus-plus-qt`, the updater under
+`/usr/libexec/notepad-plus-plus-qt`, and desktop integration under `/usr/share`.
 
 ### macOS
 
