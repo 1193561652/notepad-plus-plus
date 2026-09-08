@@ -36,7 +36,15 @@
 - 新字段只追加到 `NppPluginHostInfo` 尾部；旧 ABI v1 插件继续按自己的 `struct_size`
   使用原字段，新插件必须先检查宿主结构大小。
 
-## 测试
+## 2026-09 可选扩展
+
+- 可选 `nppGetCommandState(index)` 提供 CHECKABLE/CHECKED 实时位标志，旧插件回退
+  初始化状态。空命令呈现为分隔符，管理器拥有查询，主窗口仅呈现菜单。
+- 通知尾部 `lines_added` 提供原 SCN_MODIFIED 行数变化，ZOOM 事件对应 SCN_ZOOM。
+  读取尾部前检查通知 struct_size，旧前缀布局不变。
+- 详见 `codex/changes/2026-09-06-win32-plugins-qt-adapters.md`。
+
+## 测试入口
 
 - `tests/plugins/CrossPlatformAbiPlugin.cpp`：纯 C ABI 形态的最小真实共享库插件。
 - `tests/CrossPlatformPluginTests.cpp`：环境、版本、二进制文档/选择区/剪贴板、双视图、

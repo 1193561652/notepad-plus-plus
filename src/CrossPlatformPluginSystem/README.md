@@ -30,6 +30,19 @@ item strings until shutdown.
 - `nppMessageProc`: optional plugin-specific synchronous messages; return zero
   for unsupported messages.
 
+## Optional command state and notification tail
+
+`nppGetCommandState(uint32_t command_index)` returns the bit flags
+`NPP_PLUGIN_COMMAND_CHECKABLE` and `NPP_PLUGIN_COMMAND_CHECKED`. The index is
+the position in `nppGetFuncsArray`. The host refreshes state before showing
+the menu and after running a command. Without this export it uses the existing
+initial state. Null command pointers represent separators.
+
+`NPP_PLUGIN_NOTIFICATION_ZOOM` forwards editor zoom changes.
+`NppPluginNotification::lines_added` is an optional signed tail field carrying
+Scintilla's line-count delta. Check `struct_size` against its offset plus field
+size before reading it. The original prefix and ABI version are unchanged.
+
 ## Optional editor context menu exports
 
 Plugins that provide position-dependent editor actions may export both

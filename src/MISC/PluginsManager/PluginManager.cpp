@@ -96,6 +96,8 @@ bool PluginManager::loadPlugin(const QString& filePath,
 
     LoadedPlugin* plugin = new LoadedPlugin;
     plugin->library = library;
+    plugin->getCommandState = reinterpret_cast<NppGetCommandStateFn>(
+        library->resolve("nppGetCommandState"));
     plugin->filePath = canonicalPath;
     plugin->folderName = folderName.isEmpty()
         ? QFileInfo(canonicalPath).completeBaseName() : folderName;
@@ -311,8 +313,28 @@ bool PluginManager::isLoadedPluginFunctionInitiallyChecked(
     if (pluginIndex < 0 || pluginIndex >= _plugins.size())
         return false;
     const LoadedPlugin& plugin = *_plugins[pluginIndex];
+    if (functionIndex < 0 || functionIndex >= plugin.functionCount) return false;
+    return plugin.getCommandState
+        ? (plugin.getCommandState(functionIndex) & NPP_PLUGIN_COMMAND_CHECKED) != 0
+        : plugin.functions[functionIndex].initially_checked != 0;
+}
+
+bool PluginManager::isLoadedPluginFunctionCheckable(int pluginIndex, int functionIndex) const
+{
+    if (pluginIndex < 0 || pluginIndex >= _plugins.size()) return false;
+    const LoadedPlugin& plugin = *_plugins[pluginIndex];
+    if (functionIndex < 0 || functionIndex >= plugin.functionCount) return false;
+    return plugin.getCommandState
+        ? (plugin.getCommandState(functionIndex) & NPP_PLUGIN_COMMAND_CHECKABLE) != 0
+        : plugin.functions[functionIndex].initially_checked != 0;
+}
+
+bool PluginManager::isLoadedPluginFunctionSeparator(int pluginIndex, int functionIndex) const
+{
+    if (pluginIndex < 0 || pluginIndex >= _plugins.size()) return false;
+    const LoadedPlugin& plugin = *_plugins[pluginIndex];
     return functionIndex >= 0 && functionIndex < plugin.functionCount
-        && plugin.functions[functionIndex].initially_checked != 0;
+        && !plugin.functions[functionIndex].command;
 }
 
 QKeySequence PluginManager::loadedPluginFunctionShortcut(
@@ -748,7 +770,7 @@ int32_t NPP_PLUGIN_CALL PluginManager::currentLanguage(void* context)
 void PluginManager::notifyPlugins(
     uint32_t code, quintptr bufferId, int sourceView,
     qint64 position, qint64 length, quint32 modificationType,
-    quint32 updated, const QByteArray& text)
+    quint32 updated, const QByteArray& text, qint64 linesAdded)
 {
     NppPluginNotification notification{};
     notification.struct_size = sizeof(notification);
@@ -760,6 +782,7 @@ void PluginManager::notifyPlugins(
     notification.modification_type = modificationType;
     notification.updated = updated;
     notification.text_utf8 = text.isEmpty() ? nullptr : text.constData();
+    notification.lines_added = linesAdded;
     for (const LoadedPlugin* plugin : _plugins)
         notify(*plugin, notification);
 }

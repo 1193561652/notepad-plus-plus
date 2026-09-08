@@ -147,7 +147,8 @@ NPP_PLUGIN_EXPORT void NPP_PLUGIN_CALL nppBeNotified(
         notificationPayloadValid = notification->buffer_id==42
             && notification->source_view==1 && notification->position==5
             && notification->length==3 && notification->modification_type==7
-            && notification->text_utf8
+            && notification->struct_size >= offsetof(NppPluginNotification, lines_added) + sizeof(notification->lines_added)
+            && notification->lines_added == -2 && notification->text_utf8
             && std::strcmp(notification->text_utf8,"abc")==0;
     }
 }
@@ -167,6 +168,12 @@ NPP_PLUGIN_EXPORT intptr_t NPP_PLUGIN_CALL nppMessageProc(
         case 9: return contextCommand;
         default: return 0;
     }
+}
+
+NPP_PLUGIN_EXPORT uint32_t NPP_PLUGIN_CALL nppGetCommandState(uint32_t index)
+{
+    return index == 0 ? NPP_PLUGIN_COMMAND_CHECKABLE |
+        (commandCount == 0 ? NPP_PLUGIN_COMMAND_CHECKED : 0) : 0;
 }
 
 NPP_PLUGIN_EXPORT const NppPluginContextMenuItem* NPP_PLUGIN_CALL

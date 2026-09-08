@@ -1135,7 +1135,7 @@ void MainWindow::setupPluginSystem()
 #ifdef ENABLE_PLUGIN_SYSTEM
         if (_pluginManager && notification) {
             const quint32 code = static_cast<quint32>(notification->nmhdr.code);
-            if (code == SCN_MODIFIED || code == SCN_UPDATEUI) {
+            if (code == SCN_MODIFIED || code == SCN_UPDATEUI || code == SCN_ZOOM) {
                 const QByteArray text = notification->text && notification->length > 0
                     ? QByteArray(notification->text,
                                  static_cast<int>(notification->length))
@@ -1143,11 +1143,11 @@ void MainWindow::setupPluginSystem()
                 _pluginManager->notifyPlugins(
                     code == SCN_MODIFIED
                         ? NPP_PLUGIN_NOTIFICATION_TEXT_MODIFIED
-                        : NPP_PLUGIN_NOTIFICATION_UPDATE_UI,
+                        : (code == SCN_ZOOM ? NPP_PLUGIN_NOTIFICATION_ZOOM : NPP_PLUGIN_NOTIFICATION_UPDATE_UI),
                     currentBufferIdForPlugin(), MAIN_VIEW,
                     notification->position, notification->length,
                     static_cast<quint32>(notification->modificationType),
-                    static_cast<quint32>(notification->updated), text);
+                    static_cast<quint32>(notification->updated), text, notification->linesAdded);
             }
         }
 #endif
@@ -1161,7 +1161,7 @@ void MainWindow::setupPluginSystem()
 #ifdef ENABLE_PLUGIN_SYSTEM
         if (_pluginManager && notification) {
             const quint32 code = static_cast<quint32>(notification->nmhdr.code);
-            if (code == SCN_MODIFIED || code == SCN_UPDATEUI) {
+            if (code == SCN_MODIFIED || code == SCN_UPDATEUI || code == SCN_ZOOM) {
                 const QByteArray text = notification->text && notification->length > 0
                     ? QByteArray(notification->text,
                                  static_cast<int>(notification->length))
@@ -1169,11 +1169,11 @@ void MainWindow::setupPluginSystem()
                 _pluginManager->notifyPlugins(
                     code == SCN_MODIFIED
                         ? NPP_PLUGIN_NOTIFICATION_TEXT_MODIFIED
-                        : NPP_PLUGIN_NOTIFICATION_UPDATE_UI,
+                        : (code == SCN_ZOOM ? NPP_PLUGIN_NOTIFICATION_ZOOM : NPP_PLUGIN_NOTIFICATION_UPDATE_UI),
                     currentBufferIdForPlugin(), SUB_VIEW,
                     notification->position, notification->length,
                     static_cast<quint32>(notification->modificationType),
-                    static_cast<quint32>(notification->updated), text);
+                    static_cast<quint32>(notification->updated), text, notification->linesAdded);
             }
         }
 #endif
@@ -1246,11 +1246,15 @@ void MainWindow::populateCrossPlatformPluginMenu()
         for (int functionIndex = 0;
              functionIndex < _pluginManager->loadedPluginFunctionCount(
                  pluginIndex); ++functionIndex) {
+            if (_pluginManager->isLoadedPluginFunctionSeparator(pluginIndex, functionIndex)) {
+                pluginMenu->addSeparator();
+                continue;
+            }
             QAction* action = pluginMenu->addAction(
                 _pluginManager->loadedPluginFunctionName(
                     pluginIndex, functionIndex));
             action->setCheckable(
-                _pluginManager->isLoadedPluginFunctionInitiallyChecked(
+                _pluginManager->isLoadedPluginFunctionCheckable(
                     pluginIndex, functionIndex));
             action->setChecked(
                 _pluginManager->isLoadedPluginFunctionInitiallyChecked(
@@ -1258,8 +1262,13 @@ void MainWindow::populateCrossPlatformPluginMenu()
             action->setShortcut(
                 _pluginManager->loadedPluginFunctionShortcut(
                     pluginIndex, functionIndex));
+            const auto syncState = [this, action, pluginIndex, functionIndex]() {
+                action->setCheckable(_pluginManager->isLoadedPluginFunctionCheckable(pluginIndex, functionIndex));
+                action->setChecked(_pluginManager->isLoadedPluginFunctionInitiallyChecked(pluginIndex, functionIndex));
+            };
+            connect(pluginMenu, &QMenu::aboutToShow, action, syncState);
             connect(action, &QAction::triggered, this,
-                    [this, pluginIndex, functionIndex]() {
+                    [this, pluginIndex, functionIndex, syncState]() {
                 QString error;
                 if (!_pluginManager->executePluginCommand(
                         pluginIndex, functionIndex, &error)
@@ -1267,6 +1276,7 @@ void MainWindow::populateCrossPlatformPluginMenu()
                     QMessageBox::warning(
                         this, tr("Plugins"), error);
                 }
+                syncState();
             });
         }
         _pluginsMenu->insertMenu(insertionPoint, pluginMenu);

@@ -1,0 +1,87 @@
+[
+  {
+    "directory": "BetterMultiSelection",
+    "url": "https://github.com/1193561652/BetterMultiSelection.git",
+    "revision": "83b42041e895045cb46fc47e419f6baee0223e5f"
+  },
+  {
+    "directory": "BracketsCheck",
+    "url": "https://github.com/1193561652/BracketsCheck.git",
+    "revision": "56bfef095f42bbdd8c8742c6fd0e40efb93b4eba"
+  },
+  {
+    "directory": "converter",
+    "url": "https://github.com/1193561652/converter.git",
+    "revision": "1d827ac0bd6be28ce7515eb112413b0894336fe9"
+  },
+  {
+    "directory": "editorconfig-notepad-plus-plus",
+    "url": "https://github.com/1193561652/editorconfig-notepad-plus-plus.git",
+    "revision": "1d99a52d45366c213d247fba5081096cd7a9fc04"
+  },
+  {
+    "directory": "ElasticTabstops",
+    "url": "https://github.com/1193561652/ElasticTabstops.git",
+    "revision": "d8e3158c85c58fb2470187a4e25099974ea3467a"
+  },
+  {
+    "directory": "Goto-Line-Col-NPP-Plugin",
+    "url": "https://github.com/1193561652/Goto-Line-Col-NPP-Plugin.git",
+    "revision": "f0c706df6e3f941fcde91f352e76dbae42fd12bd"
+  },
+  {
+    "directory": "JSON-Viewer",
+    "url": "https://github.com/1193561652/JSON-Viewer.git",
+    "revision": "f8ad0d3a889368a1c3235348376fa7d2893b0c4c"
+  },
+  {
+    "directory": "Merge-files-in-one",
+    "url": "https://github.com/1193561652/Merge-files-in-one.git",
+    "revision": "b2e7cba42d1b6c9ae065a0d458bd748450f1dd01"
+  },
+  {
+    "directory": "mimetools",
+    "url": "https://github.com/1193561652/mimetools.git",
+    "revision": "fd7016892bafed77a56ed8717f7b238cdfa49a15"
+  },
+  {
+    "directory": "nppAutoDetectIndent",
+    "url": "https://github.com/1193561652/nppAutoDetectIndent.git",
+    "revision": "bff30e8eba6e24bc093b368c8df53a8120a68ebe"
+  },
+  {
+    "directory": "nppURLPlugin",
+    "url": "https://github.com/1193561652/nppURLPlugin.git",
+    "revision": "ddcc2b834b35ffc33b6d289518d0334797d49bda"
+  },
+  {
+    "directory": "qkNppReverseLines",
+    "url": "https://github.com/1193561652/qkNppReverseLines.git",
+    "revision": "b36eb40effd09d54ed6c32f1ecaf22acd6271db8"
+  },
+  {
+    "directory": "Remove_dup_lines",
+    "url": "https://github.com/1193561652/Remove_dup_lines.git",
+    "revision": "7dec1cf743ef13dacf2d4f3aaabdf33614e18dec"
+  },
+  {
+    "directory": "SecurePad",
+    "url": "https://github.com/1193561652/SecurePad.git",
+    "revision": "b02751d1b0415237f331a2b2a96b9c6d3b4a950d"
+  },
+  {
+    "directory": "selectquotedtext",
+    "url": "https://github.com/1193561652/selectquotedtext.git",
+    "revision": "5eb78feeada2e7bf00a94cac30a8e6bdccb9ce03"
+  },
+  {
+    "directory": "SelectToClipboard",
+    "url": "https://github.com/1193561652/SelectToClipboard.git",
+    "revision": "8da680b8892c0889e20f68dc5b4482a3fc07cf02"
+  },
+  {
+    "directory": "SurroundSelection",
+    "url": "https://github.com/1193561652/SurroundSelection.git",
+    "revision": "327f0b73e03473f65b783bd1643310dde178cc10"
+  }
+]

@@ -62,7 +62,8 @@ typedef enum NppPluginNotificationCode {
     NPP_PLUGIN_NOTIFICATION_LANGUAGE_CHANGED = 12,
     NPP_PLUGIN_NOTIFICATION_TEXT_MODIFIED = 13,
     NPP_PLUGIN_NOTIFICATION_UPDATE_UI = 14,
-    NPP_PLUGIN_NOTIFICATION_DARK_MODE_CHANGED = 15
+    NPP_PLUGIN_NOTIFICATION_DARK_MODE_CHANGED = 15,
+    NPP_PLUGIN_NOTIFICATION_ZOOM = 16
 } NppPluginNotificationCode;
 
 typedef size_t (NPP_PLUGIN_CALL *NppPluginGetCurrentFilePath)(
@@ -232,6 +233,8 @@ typedef struct NppPluginNotification {
     uint32_t modification_type;
     uint32_t updated;
     const char* text_utf8;
+    /* Optional tail. Check struct_size before reading. */
+    int64_t lines_added;
 } NppPluginNotification;
 
 typedef enum NppPluginContextMenuItemFlags {
@@ -267,6 +270,14 @@ typedef const NppPluginContextMenuItem* (NPP_PLUGIN_CALL
                                uint32_t* count);
 typedef void (NPP_PLUGIN_CALL *NppExecuteEditorContextMenuCommandFn)(
     uint32_t command_id);
+
+/* Optional live command state, indexed in nppGetFuncsArray. No ABI layout change. */
+typedef enum NppPluginCommandState {
+    NPP_PLUGIN_COMMAND_CHECKABLE = 1,
+    NPP_PLUGIN_COMMAND_CHECKED = 2
+} NppPluginCommandState;
+typedef uint32_t (NPP_PLUGIN_CALL *NppGetCommandStateFn)(uint32_t command_index);
+NPP_PLUGIN_EXPORT uint32_t NPP_PLUGIN_CALL nppGetCommandState(uint32_t command_index);
 
 NPP_PLUGIN_EXPORT uint32_t NPP_PLUGIN_CALL nppGetPluginAbiVersion(void);
 NPP_PLUGIN_EXPORT const char* NPP_PLUGIN_CALL nppGetName(void);

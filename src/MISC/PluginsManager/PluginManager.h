@@ -37,7 +37,8 @@ public:
     void notifyPlugins(uint32_t code, quintptr bufferId = 0,
                        int sourceView = -1, qint64 position = 0,
                        qint64 length = 0, quint32 modificationType = 0,
-                       quint32 updated = 0, const QByteArray& text = {});
+                       quint32 updated = 0, const QByteArray& text = {},
+                       qint64 linesAdded = 0);
     void unloadAll();
 
     int loadedPluginCount() const { return _plugins.size(); }
@@ -47,6 +48,8 @@ public:
     QString loadedPluginFunctionName(int pluginIndex, int functionIndex) const;
     bool isLoadedPluginFunctionInitiallyChecked(
         int pluginIndex, int functionIndex) const;
+    bool isLoadedPluginFunctionCheckable(int pluginIndex, int functionIndex) const;
+    bool isLoadedPluginFunctionSeparator(int pluginIndex, int functionIndex) const;
     QKeySequence loadedPluginFunctionShortcut(
         int pluginIndex, int functionIndex) const;
     bool executePluginCommand(int pluginIndex, int functionIndex,
@@ -66,6 +69,7 @@ private:
         QString name;
         NppBeNotifiedFn beNotified = nullptr;
         NppMessageProcFn messageProc = nullptr;
+        NppGetCommandStateFn getCommandState = nullptr;
         NppGetEditorContextMenuFn getEditorContextMenu = nullptr;
         NppExecuteEditorContextMenuCommandFn executeEditorContextMenu = nullptr;
         const NppPluginFuncItem* functions = nullptr;

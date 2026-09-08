@@ -152,6 +152,11 @@ int main(int argc, char** argv)
         "function name mismatch");
     require(manager.isLoadedPluginFunctionInitiallyChecked(0, 0),
             "initial checked state was not preserved");
+    require(manager.isLoadedPluginFunctionCheckable(0, 0)
+            && !manager.isLoadedPluginFunctionSeparator(0, 0)
+            && !manager.isLoadedPluginFunctionCheckable(-1, 0)
+            && !manager.isLoadedPluginFunctionSeparator(0, 99),
+            "command state validation failed");
     require(manager.sendPluginMessage(0, 1) == 1,
             "host environment was not received");
     require(manager.sendPluginMessage(0, 2) == 1,
@@ -174,12 +179,15 @@ int main(int argc, char** argv)
     require(manager.sendPluginMessage(0, 3) == 1,
             "READY notification was not sent exactly once");
     require(manager.executePluginCommand(0, 0, &error), qPrintable(error));
+    require(manager.isLoadedPluginFunctionCheckable(0, 0)
+            && !manager.isLoadedPluginFunctionInitiallyChecked(0, 0),
+            "live command state did not refresh after invocation");
     require(manager.sendPluginMessage(0, 4) == 1,
             "plugin command did not run");
     require(manager.sendPluginMessage(0, 7) == 1,
             "extended ABI callbacks failed");
     manager.notifyPlugins(NPP_PLUGIN_NOTIFICATION_TEXT_MODIFIED,
-                          42, 1, 5, 3, 7, 0, QByteArray("abc"));
+                          42, 1, 5, 3, 7, 0, QByteArray("abc"), -2);
     require(manager.sendPluginMessage(0, 8) == 1,
             "extended notification payload failed");
     require(host.openedPath == QStringLiteral("abi-plugin-open.txt"),
