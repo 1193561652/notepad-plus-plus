@@ -88,7 +88,7 @@ template<void (*Function)(void*)> void NPP_PLUGIN_CALL invoke(void* data) noexce
 }
 }
 
-#define NPP_QT_EXPORTS(Name, Setup, Notify) \
+#define NPP_QT_EXPORTS_BASE(Name, Setup, Notify) \
 extern "C" NPP_PLUGIN_EXPORT uint32_t NPP_PLUGIN_CALL nppGetCommandState(uint32_t index) { \
     if (index >= QtPlugin::commands.size()) return 0; \
     return (QtPlugin::checkable[index] ? NPP_PLUGIN_COMMAND_CHECKABLE : 0) | \
@@ -103,5 +103,8 @@ extern "C" NPP_PLUGIN_EXPORT const NppPluginFuncItem* NPP_PLUGIN_CALL nppGetFunc
 extern "C" NPP_PLUGIN_EXPORT void NPP_PLUGIN_CALL nppBeNotified(const NppPluginNotification* n) { \
     if (!n || n->struct_size < offsetof(NppPluginNotification, text_utf8) + sizeof(n->text_utf8) || !QtPlugin::host) return; \
     try { Notify(n); } catch (...) {} \
-    if (n->code == NPP_PLUGIN_NOTIFICATION_SHUTDOWN) QtPlugin::host = nullptr; } \
+    if (n->code == NPP_PLUGIN_NOTIFICATION_SHUTDOWN) QtPlugin::host = nullptr; }
+
+#define NPP_QT_EXPORTS(Name, Setup, Notify) \
+NPP_QT_EXPORTS_BASE(Name, Setup, Notify) \
 extern "C" NPP_PLUGIN_EXPORT intptr_t NPP_PLUGIN_CALL nppMessageProc(uint32_t, uintptr_t, intptr_t) { return 0; }

@@ -172,6 +172,12 @@ int MainWindowPluginHostServices::currentLanguageType() const
     return _mainWindow ? _mainWindow->currentLanguageTypeForPlugin() : 0;
 }
 
+QString MainWindowPluginHostServices::currentLanguageName() const
+{
+    const auto* view = currentView();
+    return view ? view->lexerLanguage() : QString();
+}
+
 bool MainWindowPluginHostServices::activateDocument(int view, int index)
 {
     return _mainWindow

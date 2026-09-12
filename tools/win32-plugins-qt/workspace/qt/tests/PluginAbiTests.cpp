@@ -2,6 +2,9 @@
 #include <Scintilla.h>
 #include <SciLexer.h>
 #include <QApplication>
+#include <QFileInfo>
+#include <QJsonDocument>
+#include <QTableWidget>
 #include <QLibrary>
 #include <QTimer>
 #include <QMessageBox>
@@ -89,7 +92,7 @@ struct Editor {
         case SCI_GETTABINDENTS: return e.tabIndents;
         case SCI_GETUSETABS: return e.useTabs;
         case SCI_GETTABWIDTH: return 4;
-        case SCI_CALLTIPCANCEL: return 0;
+        case SCI_CALLTIPCANCEL: case SCI_GETREADONLY: case SCI_ANNOTATIONCLEARALL: return 0;
         case SCI_GETBACKSPACEUNINDENTS: return e.backspace;
         case SCI_GETINDENT: return e.indent;
         case SCI_SETTABINDENTS: e.tabIndents = w; return 0;
@@ -99,8 +102,8 @@ struct Editor {
         case SCI_GETCURRENTPOS: return e.end;
         case SCI_GETLENGTH: return e.text.size();
         case SCI_GETTEXTLENGTH: return e.text.size();
-        case SCI_GETSELECTIONSTART: return e.start;
-        case SCI_GETSELECTIONEND: return e.end;
+        case SCI_GETSELECTIONNSTART: case SCI_GETSELECTIONSTART: return e.start;
+        case SCI_GETSELECTIONNEND: case SCI_GETSELECTIONEND: return e.end;
         case SCI_GETSELECTIONS: return e.selections;
         case SCI_GETEOLMODE: return e.eol;
         case SCI_TARGETFROMSELECTION: e.targetStart = e.start; e.targetEnd = e.end; return 0;
@@ -114,8 +117,8 @@ struct Editor {
             e.targetEnd = e.targetStart + w; ++e.modifications; return w;
         case SCI_SETSEL:
             e.end = std::max<intptr_t>(0, l); e.start = position < 0 ? e.end : position; return 0;
-        case SCI_SETSELECTIONSTART: e.start = position; return 0;
-        case SCI_SETSELECTIONEND: e.end = position; return 0;
+        case SCI_SETANCHOR: case SCI_SETSELECTIONSTART: e.start = position; return 0;
+        case SCI_SETCURRENTPOS: case SCI_SETSELECTIONEND: e.end = position; return 0;
         case SCI_SELECTALL: e.start = 0; e.end = e.text.size(); return 0;
         case SCI_GETLEXER: return e.lexer;
         case SCI_GETSTYLEAT: return position >= 0 && position < e.text.size() ? e.style : 0;
@@ -146,6 +149,8 @@ int main(int argc, char** argv) {
         auto configBytes = config.path().toUtf8();
         NppPluginHostInfo host{};
         host.struct_size = sizeof(host); host.abi_version = NPP_PLUGIN_ABI_VERSION;
+        auto pluginHome = QFileInfo(QString::fromLocal8Bit(argv[1])).absolutePath().toUtf8();
+        host.plugin_home_path_utf8 = pluginHome.constData();
         host.host_context = &editor; host.send_scintilla = Editor::send; host.get_current_view = Editor::currentView;
         host.get_current_file_path = Editor::filePath; host.get_current_buffer_id = Editor::bufferId;
         host.get_current_language = Editor::language; host.plugin_config_path_utf8 = configBytes.constData();
@@ -160,7 +165,29 @@ int main(int argc, char** argv) {
         auto state = reinterpret_cast<NppGetCommandStateFn>(library.resolve("nppGetCommandState"));
         check(state, "command state export");
         const QByteArray id(argv[2]);
-        if (id == "qkNppReverseLines") {
+        if (id == "XMLTools") {
+            check(count==37,"XMLTools original menu count");
+            editor.set("<x>&</x>");run(28);check(editor.text=="&lt;x&gt;&amp;&lt;/x&gt;","XML escape original logic");
+            editor.start=0;editor.end=editor.text.size();run(29);check(editor.text=="<x>&</x>","XML unescape round trip");
+        } else if (id == "JsonTools") {
+            check(count==31,"JsonTools commands");
+            editor.set("{ \"x\": [1, 2] }");run(2);check(editor.text=="{\"x\":[1,2]}","Original JsonTools compression");
+        } else if (id == "RandomValues") {
+            check(count == 11, "Random values menus");
+            editor.set(""); run(3); check(editor.text.size() == 3 && editor.text[0] >= '1' && editor.text[0] <= '6' && editor.text.endsWith("\r\n"), "Original dice insertion");
+            editor.set(""); run(6); check(editor.text.size() == 3, "Repeat last generator");
+        } else if (id == "SessionMgr") {
+            check(count==7,"SessionMgr commands");
+        } else if (id == "DoxyIt") {
+            check(count==7 && commands[0].shortcut.is_ctrl && commands[0].shortcut.is_alt && commands[0].shortcut.is_shift,"DoxyIt commands");
+        } else if (id == "CodeAlignment") {
+            check(count==9 && commands[0].shortcut.is_ctrl && commands[0].shortcut.is_shift,"CodeAlignment commands");
+        } else if (id == "PluginDemo") {
+            check(count == 20 && commands[4].shortcut.is_alt && commands[4].shortcut.key == 'F', "Demo menu and shortcut");
+            check(state(9) == NPP_PLUGIN_COMMAND_CHECKABLE, "Demo initial close tag state");
+            run(9); event(NPP_PLUGIN_NOTIFICATION_SHUTDOWN); check(init(&host), "Demo reload"); commands=funcs(&count);
+            check(state(9) & NPP_PLUGIN_COMMAND_CHECKED, "Demo persistence");
+        } else if (id == "qkNppReverseLines") {
             check(count == 3, "reverse command count");
             editor.set("one\ntwo\nthree"); run(0); check(editor.text == "three\ntwo\none", "LF reverse");
             editor.set("one\r\ntwo\r\n"); editor.eol = SC_EOL_CRLF; run(0); check(editor.text == "\r\ntwo\r\none", "CRLF trailing blank");

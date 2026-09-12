@@ -42,10 +42,29 @@
 | JSON Viewer | 直接编译原 JsonHandler、RapidJsonHandler 和固定 RapidJSON 分支 | 数值精度、注释/逗号、排序撤销、树计数、路径、字节定位 |
 | Goto Line Col | 原列号计算和 UTF-8 字节分析提为共享头；原 Unicode 数据表、配置与命令行选项语义 | 字节内部定位、Tab/字符列、边界、原字符名称、配置、闪烁恢复、命令行一次性定位 |
 
-## 尚未完成（不可计为已移植）
+## 新增 Qt 实现（2026-09-12）
 
-codealignment、DoxyIt、JsonToolsNppPlugin、
-npp-session-manager、plugindemo、RandomValuesNPP、xmltools。
+| 插件 | 原始逻辑与平台替换 | 已验证内容 |
+| --- | --- | --- |
+| CodeAlignment | 保留原 C# 对齐、作用域、分隔符、链式计算和设置模型；Qt C++ 适配 | ABI、对齐、撤销、设置导入和对话框 |
+| DoxyIt | 直接编译原 C/Python/Null parser、T-Rex、JumpLocations；共享 DocumentationCore | ABI、参数文档、文件宏、换行、Tab/Escape、配置持久化 |
+| Session Manager | 保留 cfg/prp/app 流程、39 个默认设置、session/global XML、原消息 API | ABI、保存/关闭/加载顺序、收藏、书签/滚动位置、关闭定时器 |
+| Plugin Demo | 原演示命令和标签扫描；Qt 停靠窗口、计时器和工具栏 | ABI、文本/路径、缩放、标签自动闭合、会话和设置 |
+| Random Values | 直接编译原 RandomValue/RandomValues/Settings C#；持久化进程保留随机状态 | ABI、骰子/重复、撤销、生成对话框、中文 JSON、重载 |
+| JsonTools | 直接编译原 JSONTools/Utils、RemesPath、schema、CSV、JsonGrepper | ABI、压缩/撤销、中文路径、树查询修改、schema、转义；原测试另见下文 |
+| XML Tools | 直接编译原三个格式化器、转换/注释/Config 和 MSXMLWrapper/MSXMLHelper | ABI、真实编辑器格式化/选区/撤销/标签闭合、中文 XPath；MSXML 语法/XSD/命名空间/XSLT |
+
+所有 24 个有源码插件已接入 Qt 构建；此处指已有实现与下列验证范围，不表示所有菜单路径、平台和原版边界行为均已验证。
+
+### 新增实现的已知边界
+
+- Windows 的 Random Values / JsonTools 使用 .NET Framework 4.8，构建需要带 Roslyn 的 .NET SDK；Qt UI 不引用 WinForms。非 Windows net7.0 回退尚未实测，JsonTools 存在运行时排序/区域性差异。
+- JsonTools 原版 Windows 基线与移植版均有 YAML 用例 21、22、24 失败，原测试保持失败退出；没有标成全套通过。原测试可运行 `JsonTools.Engine.exe --test <源仓库路径>`。
+- CodeAlignment 的 QRegularExpression 不覆盖全部 .NET 特有正则语法。Qt 属性对话框布局与原版不同；JsonTools 正则输出目前显示为新文档。
+- XML Tools 原 MSXML 后端只支持 Windows，需要 MSVC 2022/ATL/Windows SDK。没有用其他 XML 库冒充原逻辑；Linux/macOS 上相关命令仍不可用。
+- XML Tools 原 `PreventXXE`/`AllowHuge` 标志未接入原 MSXML 实现，实际行为由原 msxmloptions 控制；Qt 没有宣称补足该原版缺口。
+- 引擎请求有 30 秒超时，大任务仍需进一步完善异步取消。完整逐菜单人工验收尚未完成。
+- 2026-09-12：构建和 XMLTools 3 项测试通过；整套当时 50 项中 45 项通过，5 项 Windows OLE 剪贴板失败，沙箱外复测相同。增加 MSXML 回归后总数为 51。offscreen 复测 JsonTools、SelectToClipboard（ABI/真实编辑器）、converter 通过；BetterMultiSelection 在该后端仍失败，不能计为 51/51。
 
 ## 原版边界修复
 
@@ -66,7 +85,7 @@ npp-session-manager、plugindemo、RandomValuesNPP、xmltools。
 
 Windows x64、Qt 5.12.12、MinGW 7.3。其他平台尚未实际构建，不能声称已验证。
 ABI 测试使用可控宿主消息适配器和真实动态库、Qt 剪贴板。
-另外链接宿主 npp-scintilla-qt 的真实编辑器测试，覆盖上述 17 个插件的关键行为。
+另外链接宿主 npp-scintilla-qt 的真实编辑器测试，覆盖上述 24 个插件的关键行为。
 Windows 测试使用实际 windows 平台后端：本机 Qt 5.12 offscreen/minimal 在 QMessageBox
 显示时卡住、无法进入定时器回调；换用 windows 后端后括号弹窗测试通过。
 动态库加载使用与宿主一致的 PreventUnloadHint；逻辑 SHUTDOWN/重新初始化单独验证。
@@ -83,3 +102,5 @@ Goto Line Col：保留原 Unicode 数据的字符名称及 U+ 十六进制格式
 原线程等待改为 Qt 单次定时器，仍不重复启动正在执行的光标闪烁；关闭插件时恢复原编辑器。
 命令行由 Qt 提供已分词的启动参数，保留首个 -n/-c、文件匹配、当前行约束和非持久化消费规则。
 原 snprintf 追加到同一缓冲区产生的源/目标重叠改为临时缓冲区，不改变显示内容。
+
+本次宿主 cross-platform-plugin-tests 默认 CTest 后端 30 秒超时；直接指定 `-platform windows` 后退出 0，输出 abi-ready/abi-shutdown。安装包生成与工作区恢复脚本验证通过。

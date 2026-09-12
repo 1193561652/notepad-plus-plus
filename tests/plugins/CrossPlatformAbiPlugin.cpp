@@ -68,6 +68,15 @@ void NPP_PLUGIN_CALL runCommand(void*)
                 && host->execute_menu_command(host->host_context,41007);
         }
         host->set_status_text(host->host_context, "updated status");
+        char language[64]{}, shortName[2] = {'x','x'};
+        const char* expectedLanguage = u8"自定义语言";
+        extendedCallbacksValid = extendedCallbacksValid
+            && host->get_current_language_name
+            && host->get_current_language_name(host->host_context,nullptr,0) == std::strlen(expectedLanguage)
+            && host->get_current_language_name(host->host_context,language,sizeof(language)) == std::strlen(expectedLanguage)
+            && std::strcmp(language,expectedLanguage) == 0
+            && host->get_current_language_name(host->host_context,shortName,sizeof(shortName)) == std::strlen(expectedLanguage)
+            && shortName[1] == '\0';
     }
 }
 

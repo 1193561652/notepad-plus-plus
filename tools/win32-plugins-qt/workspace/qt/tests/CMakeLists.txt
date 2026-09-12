@@ -4,7 +4,7 @@ target_include_directories(plugin-abi-tests PRIVATE
   "${NPP_QT_HOST_SOURCE}/third_party/scintilla/include"
   "${PROJECT_SOURCE_DIR}/selectquotedtext/NPP")
 target_link_libraries(plugin-abi-tests PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
-set(plugin_ids qkNppReverseLines SelectQuotedText mimeTools nppAutoDetectIndent SelectToClipboard BracketsCheck Remove_dup_lines SurroundSelection SecurePad ElasticTabstops Merge_files_in_one urlPlugin BetterMultiSelection nppConverter EditorConfig JSONViewer GotoLineCol)
+set(plugin_ids XMLTools JsonTools RandomValues SessionMgr DoxyIt CodeAlignment PluginDemo qkNppReverseLines SelectQuotedText mimeTools nppAutoDetectIndent SelectToClipboard BracketsCheck Remove_dup_lines SurroundSelection SecurePad ElasticTabstops Merge_files_in_one urlPlugin BetterMultiSelection nppConverter EditorConfig JSONViewer GotoLineCol)
 set(plugin_tests original-core-regression)
 add_executable(original-core-regression CoreRegressionTests.cpp
   ../../SecurePad/blowfish.cpp ../../mimetools/src/b64.cpp ../../mimetools/src/qp.cpp
@@ -47,4 +47,9 @@ if(WIN32)
 else()
   set_tests_properties(${plugin_tests} PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
+
+if(WIN32)
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  add_test(NAME XMLTools-msxml COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/XmlBackendTests.py" "${PROJECT_BINARY_DIR}/plugins/XMLTools-qt/engine/XmlToolsBackend.exe")
 endif()

@@ -174,6 +174,7 @@ bool PluginManager::loadPlugin(const QString& filePath,
     plugin->hostInfo.set_status_bar_text = &PluginManager::setStatusBarText;
     plugin->hostInfo.get_buffer_at = &PluginManager::bufferAt;
     plugin->hostInfo.get_current_language = &PluginManager::currentLanguage;
+    plugin->hostInfo.get_current_language_name = &PluginManager::currentLanguageName;
 
     if (!setInfo(&plugin->hostInfo)) {
         if (errorMessage)
@@ -765,6 +766,19 @@ int32_t NPP_PLUGIN_CALL PluginManager::currentLanguage(void* context)
 {
     auto* services = static_cast<PluginHostServices*>(context);
     return services ? services->currentLanguageType() : 0;
+}
+
+size_t NPP_PLUGIN_CALL PluginManager::currentLanguageName(void* context, char* output, size_t capacity)
+{
+    auto* services = static_cast<PluginHostServices*>(context);
+    const auto name = services ? services->currentLanguageName().toUtf8() : QByteArray();
+    const size_t required = static_cast<size_t>(name.size());
+    if (output && capacity) {
+        const size_t copied = qMin(required, capacity - 1);
+        std::memcpy(output, name.constData(), copied);
+        output[copied] = '\0';
+    }
+    return required;
 }
 
 void PluginManager::notifyPlugins(

@@ -1,6 +1,9 @@
 #include <PluginInterface.h>
 #include <ScintillaEditBase.h>
 #include <QApplication>
+#include <QFileInfo>
+#include <QJsonDocument>
+#include <QTableWidget>
 #include <QLibrary>
 #include <QTemporaryDir>
 #include <QKeyEvent>
@@ -22,6 +25,9 @@
 #include <QTreeWidget>
 #include <QSpinBox>
 #include <QLabel>
+#include <QComboBox>
+#include <QListWidget>
+#include "../../npp-session-manager/qt/SessionMgrApi.h"
 #include "../../editorconfig-notepad-plus-plus/src/menuCmdID.hpp"
 #include <memory>
 #include <cstring>
@@ -32,9 +38,26 @@ struct Host {
     QByteArray pathBytes="test.cpp",created;
     std::vector<int> menuCommands;
     int selectedLanguage = -1;
+    int languageType = 3;
+    QStringList sessionEvents;
+    static int NPP_PLUGIN_CALL saveSession(void* c,const char* path) {
+        auto& h=*static_cast<Host*>(c);h.sessionEvents<<"save:"+QString::fromUtf8(path);
+        QFile file(QString::fromUtf8(path));if(!file.open(QIODevice::WriteOnly))return 0;
+        return file.write("<NotepadPlus><Session activeView=\"0\"><mainView activeIndex=\"0\"><File filename=\"test.cpp\" lang=\"cpp\" firstVisibleLine=\"7\"><Mark line=\"2\"/><Fold line=\"4\"/></File></mainView><subView activeIndex=\"0\"/></Session></NotepadPlus>")>0;
+    }
+    static int NPP_PLUGIN_CALL loadSession(void* c,const char* path) {
+        static_cast<Host*>(c)->sessionEvents<<"load:"+QString::fromUtf8(path);return QFileInfo::exists(QString::fromUtf8(path));
+    }
+    QByteArray languageName = "cpp";
+    static size_t NPP_PLUGIN_CALL languageNameText(void* c,char* out,size_t capacity) {
+        const auto text=static_cast<Host*>(c)->languageName;
+        if(out && capacity>size_t(text.size()))std::memcpy(out,text.constData(),text.size()+1);
+        return text.size();
+    }
     static int NPP_PLUGIN_CALL setLanguage(void* c, int32_t value) { static_cast<Host*>(c)->selectedLanguage=value; return 1; }
     static int NPP_PLUGIN_CALL menu(void* c,int32_t command) {
         auto& h=*static_cast<Host*>(c); h.menuCommands.push_back(command);
+        if(command==41004)h.sessionEvents<<"close";
         if(command==IDM_EDIT_TRIMTRAILING) {
             for(int line=int(h.editor.send(SCI_GETLINECOUNT))-1;line>=0;--line) {
                 auto end=h.editor.send(SCI_GETLINEENDPOSITION,line), start=end;
@@ -55,7 +78,7 @@ struct Host {
         require(view==1,"incorrect active view"); return static_cast<Host*>(c)->editor.send(msg,w,l);
     }
     static int32_t NPP_PLUGIN_CALL view(void*) { return 1; }
-    static int32_t NPP_PLUGIN_CALL language(void*) { return 3; }
+    static int32_t NPP_PLUGIN_CALL language(void* c) { return static_cast<Host*>(c)->languageType; }
     static uint64_t NPP_PLUGIN_CALL buffer(void*) { return 42; }
     static size_t NPP_PLUGIN_CALL path(void* c,char* out,size_t capacity) {
         auto& text=static_cast<Host*>(c)->pathBytes;
@@ -81,10 +104,14 @@ int main(int argc,char** argv) {
         QCoreApplication::processEvents();
         QTemporaryDir temp; require(temp.isValid(),"config directory"); auto config=temp.path().toUtf8();
         NppPluginHostInfo info{}; info.struct_size=sizeof(info); info.abi_version=NPP_PLUGIN_ABI_VERSION;
+        auto pluginHome = QFileInfo(QString::fromLocal8Bit(argv[1])).absolutePath().toUtf8();
+        info.plugin_home_path_utf8 = pluginHome.constData();
         info.host_context=&h; info.send_scintilla=Host::send; info.get_current_view=Host::view;
         info.get_current_file_path=Host::path; info.get_current_buffer_id=Host::buffer;
         info.get_current_language=Host::language; info.plugin_config_path_utf8=config.constData();
+        info.get_current_language_name=Host::languageNameText;
         info.create_document=Host::create;
+        info.save_session=Host::saveSession;info.load_session=Host::loadSession;
         info.execute_menu_command=Host::menu; info.set_current_language=Host::setLanguage;
         QLibrary library(QString::fromLocal8Bit(argv[1])); library.setLoadHints(QLibrary::PreventUnloadHint);
         require(library.load(),qPrintable(library.errorString()));
@@ -99,7 +126,138 @@ int main(int argc,char** argv) {
         std::unique_ptr<QMainWindow> toolbarHost;
         if(id=="urlPlugin") { toolbarHost=std::make_unique<QMainWindow>(); toolbarHost->addToolBar("Test"); }
         event(NPP_PLUGIN_NOTIFICATION_READY);
-        if (id=="GotoLineCol") {
+        if (id=="XMLTools") {
+            require(count==37,"XMLTools original menus");
+            h.set("<root><x>value</x></root>");run(16);require(h.text().contains('\n'),"Original XML pretty printer");h.editor.send(SCI_UNDO);require(h.text()=="<root><x>value</x></root>","XML format undo");
+            h.set("prefix<x>&</x>suffix");h.editor.send(SCI_SETSEL,6,14);run(28);require(h.text()=="prefix&lt;x&gt;&amp;&lt;/x&gt;suffix","XML selected escape");h.editor.send(SCI_UNDO);require(h.text()=="prefix<x>&</x>suffix","XML escape undo");
+            h.set("<x>value</x>");run(31);require(h.text().contains("<!--"),"XML comment");h.editor.send(SCI_SETSEL,0,h.text().size());run(32);require(h.text()=="<x>value</x>","XML comment round trip");
+            h.languageType=9;h.set("<root>");h.editor.send(SCI_GOTOPOS,6);if(!commands[10].initially_checked)run(10);QMetaObject::invokeMethod(&h.editor,"charAdded",Qt::DirectConnection,Q_ARG(int,int('>')));require(h.text()=="<root></root>","XML original automatic closing tag");
+            h.set(QString::fromUtf8("<root><x>值</x></root>").toUtf8());bool xpathOk=false;
+            QTimer::singleShot(0,[&]{auto d=qobject_cast<QDialog*>(QApplication::activeModalWidget());if(!d)return;auto input=d->findChild<QLineEdit*>("xmlXPathExpression");auto runButton=d->findChild<QPushButton*>("xmlXPathEvaluate");auto results=d->findChild<QTreeWidget*>("xmlXPathResults");if(input&&runButton&&results){input->setText("//x");runButton->click();xpathOk=results->topLevelItemCount()==1&&results->topLevelItem(0)->text(2)==QString::fromUtf8("值");}d->reject();});run(24);require(xpathOk,"Original MSXML XPath Unicode");
+        } else if (id=="JsonTools") {
+            require(count==31,"JsonTools menus");
+            h.set("{ \"x\": [1, 2] }");run(2);require(h.text()=="{\"x\":[1,2]}","JsonTools original compression");h.editor.send(SCI_UNDO);require(h.text()=="{ \"x\": [1, 2] }","JsonTools undo");
+            h.set(QString::fromUtf8("{\"中文\": [1,2]}").toUtf8());h.editor.send(SCI_GOTOPOS,h.text().indexOf('2'));run(3);require(QApplication::clipboard()->text().contains(QString::fromUtf8("中文")),"JsonTools UTF8 path");
+            h.set("[1,2,3]");run(7);QCoreApplication::processEvents();
+            QWidget* treeWidget=nullptr;for(auto w:QApplication::allWidgets())if(w->objectName()=="jsonToolsQuery")treeWidget=w;
+            require(treeWidget,"JsonTools Qt tree");auto query=qobject_cast<QLineEdit*>(treeWidget);query->setText("@[1] = 9");auto submit=query->parentWidget()->findChild<QPushButton*>("jsonToolsSubmitQuery");require(submit,"JsonTools query submit");submit->click();require(h.text().contains('9'),"Original RemesPath mutation");h.editor.send(SCI_UNDO);require(h.text()=="[1,2,3]","RemesPath mutation undo");
+            h.set("[1,2]");run(14);require(h.created.contains("schema")&&h.created.contains("array"),"Original schema generation");
+            h.set(QString::fromUtf8("内容 \"quoted\"").toUtf8());run(25);auto quoted=h.text();require(!quoted.isEmpty()&&quoted.startsWith('\"'),"JsonTools quote");h.editor.send(SCI_SETSEL,0,quoted.size());run(26);require(h.text()==QString::fromUtf8("内容 \"quoted\"").toUtf8(),"JsonTools unquote Unicode");
+        } else if (id=="RandomValues") {
+            require(count==11,"Random Values menu count");
+            h.set("replace"); run(3); require(h.text().size()==3 && h.text().endsWith("\r\n"),"Random Values replaces selection");
+            h.editor.send(SCI_UNDO); require(h.text()=="replace","Random Values undo");
+            h.set(""); run(6); require(h.text().size()==3,"Random Values repeat dice");
+            bool edited=false;
+            QTimer::singleShot(0,[&] {
+                auto d=qobject_cast<QDialog*>(QApplication::activeModalWidget()); if(!d || d->objectName()!="randomGenerate") return;
+                d->findChild<QComboBox*>("randomOutputType")->setCurrentIndex(5);
+                d->findChild<QSpinBox*>("randomAmount")->setValue(2);
+                auto table=d->findChild<QTableWidget*>("randomColumns");
+                table->setRowCount(1); table->item(0,0)->setText(QString::fromUtf8("编号")); table->item(0,3)->setText("7..7");
+                edited=true; d->findChild<QDialogButtonBox*>()->button(QDialogButtonBox::Ok)->click();
+            });
+            run(7); require(edited,"Random Values generator dialog");
+            require(!QJsonDocument::fromJson(h.created).isNull() && h.created.contains("7"),"Original JSON generator result");
+            require(h.selectedLanguage==57,"Random Values JSON highlighting");
+            QFile settings(temp.path()+"/Random values.ini"); require(settings.open(QIODevice::ReadOnly),"Random Values settings saved"); auto saved=settings.readAll();
+            require(saved.contains("GenerateAmount=2") && saved.contains("GenerateCol30="),"Original 30-column settings format"); settings.close();
+            event(NPP_PLUGIN_NOTIFICATION_SHUTDOWN); require(init(&info),"Random Values engine restart"); commands=funcs(&count);
+        } else if (id=="SessionMgr") {
+            require(count==7,"SessionMgr base commands");
+            auto message=reinterpret_cast<NppMessageProcFn>(library.resolve("nppMessageProc"));
+            SessionMgrApiDataQt data{};data.message=0x8005;message(2071,0,reinterpret_cast<intptr_t>(&data));
+            require(data.iData==-1 && QString::fromUtf16(reinterpret_cast<const ushort*>(data.wData))=="Default","SessionMgr default and API");
+            const auto directory=temp.path()+"/SessionMgr/sessions/";
+            require(QFileInfo::exists(directory+"Default.npp-session"),"SessionMgr creates default session");
+            int phase=0;QTimer dialogTimer;QObject::connect(&dialogTimer,&QTimer::timeout,[&]{
+                auto widgets=QApplication::topLevelWidgets();
+                for(auto w:widgets)if(w->objectName()=="sessionsDialog"&&phase==0){phase=1;auto button=w->findChild<QPushButton*>("sessionNew");QTimer::singleShot(0,button,&QPushButton::click);return;}
+                for(auto w:widgets)if(w->objectName()=="newSessionDialog"&&phase==1){phase=2;w->findChild<QLineEdit*>("newSessionName")->setText("Work");w->findChild<QDialogButtonBox*>()->button(QDialogButtonBox::Ok)->click();return;}
+                for(auto w:widgets)if(w->objectName()=="sessionsDialog"&&phase==2){phase=3;w->findChild<QPushButton*>("sessionFavorite")->click();w->findChild<QPushButton*>("sessionLoad")->click();return;}
+            });dialogTimer.start(20);run(0);dialogTimer.stop();require(phase==3,"SessionMgr new/load dialog");
+            require(h.sessionEvents==QStringList({"save:"+directory+"Default.npp-session","close","load:"+directory+"Work.npp-session"}),"SessionMgr saves previous before close/load");
+            auto context=reinterpret_cast<NppGetEditorContextMenuFn>(library.resolve("nppGetEditorContextMenu"));uint32_t contextCount=0;auto items=context(nullptr,&contextCount);
+            require(contextCount==1 && QByteArray(items[0].item_name_utf8)=="Work","SessionMgr favorite context menu");
+            run(3);require(h.sessionEvents.last()=="load:"+directory+"Default.npp-session","SessionMgr previous session");
+            QFile global(temp.path()+"/SessionMgr/global.xml");require(global.open(QIODevice::ReadOnly),"SessionMgr global properties file");auto bytes=global.readAll();
+            require(bytes.contains("firstVisibleLine=\"7\"")&&bytes.contains("<Mark line=\"2\"")&&bytes.contains("<Fold line=\"4\""),"SessionMgr global properties preserve marks/folds");
+            data={};data.message=0x8008;data.iData=10;data.wData[0]=0;message(2071,0,reinterpret_cast<intptr_t>(&data));require(data.iData==-1,"SessionMgr API save delay");
+            event(NPP_PLUGIN_NOTIFICATION_FILE_CLOSED);auto before=h.sessionEvents.size();event(NPP_PLUGIN_NOTIFICATION_SHUTDOWN);
+            QEventLoop wait;QTimer::singleShot(1100,&wait,&QEventLoop::quit);wait.exec();require(h.sessionEvents.size()==before,"SessionMgr shutdown cancels pending autosave");
+            data.message=0x8005;message(2071,0,reinterpret_cast<intptr_t>(&data));require(data.iData==-2,"SessionMgr API busy after shutdown");
+            require(init(&info),"SessionMgr reload");commands=funcs(&count);event(NPP_PLUGIN_NOTIFICATION_READY);context(nullptr,&contextCount);require(contextCount==1,"SessionMgr persisted favorites");
+        } else if (id=="DoxyIt") {
+            require(count==7 && commands[3].initially_checked,"DoxyIt commands and active default");
+            h.set("\nint function(const char *ptr, int index)\n");h.editor.send(SCI_GOTOPOS,0);run(0);
+            require(h.text().contains("\\param [in] ptr Description for ptr") && h.text().contains("\\param [in] index Description for index"),"DoxyIt original C parser and placeholder removal");
+            auto selection=[&] {auto start=h.editor.send(SCI_GETSELECTIONSTART),end=h.editor.send(SCI_GETSELECTIONEND);return h.text().mid(start,end-start);};
+            require(selection()=="Brief description","DoxyIt first placeholder selected");
+            QKeyEvent tab(QEvent::KeyPress,Qt::Key_Tab,Qt::NoModifier,"\t");QApplication::sendEvent(&h.editor,&tab);
+            require(selection()=="Description for ptr","DoxyIt Tab navigation");
+            QKeyEvent escape(QEvent::KeyPress,Qt::Key_Escape,Qt::NoModifier);QApplication::sendEvent(&h.editor,&escape);
+            require(h.editor.send(SCI_INDICATORALLONFOR,h.editor.send(SCI_GETSELECTIONSTART))==0,"DoxyIt Escape clears markers");
+            h.editor.send(SCI_UNDO);require(h.text()=="\nint function(const char *ptr, int index)\n","DoxyIt one-step undo");
+            h.languageType=22;h.set("\ndef foo(bar, string=None)\n");h.editor.send(SCI_GOTOPOS,0);event(NPP_PLUGIN_NOTIFICATION_LANGUAGE_CHANGED);run(0);
+            require(h.text().contains("@param [in] bar Description for bar") && h.text().contains("@param [in] string Description for string"),"DoxyIt original Python parser");
+            h.languageType=3;h.set(" *  existing");h.editor.send(SCI_GOTOPOS,h.text().size());
+            QKeyEvent enter(QEvent::KeyPress,Qt::Key_Return,Qt::NoModifier,"\n");QApplication::sendEvent(&h.editor,&enter);event(NPP_PLUGIN_NOTIFICATION_UPDATE_UI);
+            require(h.text()==" *  existing\n *  ","DoxyIt deferred active newline");
+            h.pathBytes=QString::fromUtf8("C:/目录/example.cpp").toUtf8();h.set("");run(1);require(h.text().contains("\\file example.cpp"),"DoxyIt file macro");
+            QTimer settingsTimer;QObject::connect(&settingsTimer,&QTimer::timeout,[&]{for(auto w:QApplication::topLevelWidgets())if(w->objectName()=="doxySettings") {
+                w->findChild<QComboBox*>("doxyLanguage")->setCurrentIndex(1);w->findChild<QLineEdit*>("command_prefix")->setText("@");qobject_cast<QDialog*>(w)->accept();
+            }});settingsTimer.start(20);run(5);settingsTimer.stop();
+            run(3);event(NPP_PLUGIN_NOTIFICATION_SHUTDOWN);require(init(&info),"DoxyIt reload");commands=funcs(&count);require(!commands[3].initially_checked,"DoxyIt toggle persistence");
+            h.set("");run(1);require(h.text().contains("@file example.cpp"),"DoxyIt parser settings persistence");
+        } else if (id=="CodeAlignment") {
+            require(count==9,"CodeAlignment menu");
+            h.editor.send(SCI_SETUSETABS,0);h.editor.send(SCI_SETTABWIDTH,4);
+            h.set("a=1\nlong=2");run(1);require(h.text()=="a    =1\nlong =2","CodeAlignment named x group and add space");
+            h.editor.send(SCI_UNDO);require(h.text()=="a=1\nlong=2","CodeAlignment one undo transaction");
+            h.set("a=1\nlong=2\n\nother=3");h.editor.send(SCI_GOTOPOS,1);run(1);
+            require(h.text()=="a    =1\nlong =2\n\nother=3","CodeAlignment contiguous scope");
+            h.set("\ta=1\nabc=2");run(2);require(h.text()=="\ta=1\nabc=2","CodeAlignment unmatched delimiter");
+            run(1);require(h.text()=="\ta =1\nabc   =2","CodeAlignment expanded tab comparison");
+            h.set(QString::fromUtf8("猫=1\nlong=2").toUtf8());run(1);require(h.text()==QString::fromUtf8("猫    =1\nlong =2").toUtf8(),"CodeAlignment UTF-16 to UTF-8 insertion");
+            h.pathBytes="test.xml";h.set("<root>\n  <a x=\"1\"/>\n  <long x=\"2\"/>\n</root>");h.editor.send(SCI_GOTOPOS,12);run(1);
+            require(h.text()=="<root>\n  <a x    =\"1\"/>\n  <long x =\"2\"/>\n</root>","CodeAlignment XML sibling scope");
+            h.pathBytes="test.cpp";h.set("a:1\nlong:2");
+            QTimer dialogTimer;QObject::connect(&dialogTimer,&QTimer::timeout,[&]{
+                for(auto w:QApplication::topLevelWidgets()) if(w->objectName()=="alignByDialog") {
+                    w->findChild<QComboBox*>("alignmentDelimiter")->setEditText(":");qobject_cast<QDialog*>(w)->accept();
+                }
+            });dialogTimer.start(20);run(0);dialogTimer.stop();require(h.text()=="a   :1\nlong:2","CodeAlignment custom delimiter dialog");
+            event(NPP_PLUGIN_NOTIFICATION_SHUTDOWN);require(init(&info),"CodeAlignment reload");commands=funcs(&count);
+            bool remembered=false;QObject::disconnect(&dialogTimer,nullptr,nullptr,nullptr);
+            QObject::connect(&dialogTimer,&QTimer::timeout,[&]{for(auto w:QApplication::topLevelWidgets())if(w->objectName()=="alignByDialog") {remembered=w->findChild<QComboBox*>("alignmentDelimiter")->currentText()==":";qobject_cast<QDialog*>(w)->reject();}});
+            dialogTimer.start(20);run(0);dialogTimer.stop();require(remembered,"CodeAlignment delimiter history");
+        } else if (id=="PluginDemo") {
+            require(count==20,"Demo full menu");
+            h.pathBytes=QString::fromUtf8("C:/目录/demo.cpp").toUtf8();
+            h.set("old"); run(4); require(h.text()==h.pathBytes,"Demo UTF-8 path");
+            h.set("old"); run(5); require(h.text()=="demo.cpp","Demo file name");
+            h.set("old"); run(6); require(h.text()==QString::fromUtf8("C:/目录").toUtf8(),"Demo directory");
+            run(0); require(h.created=="Hello, Notepad++!","Demo greeting new document");
+            h.languageType=8; run(9);
+            for(auto input:{QByteArray("<tag"),QByteArray("<tag attr='x'"),QByteArray("<br/"),QByteArray("</tag")}) {
+                h.set(input); h.editor.send(SCI_GOTOPOS,input.size());
+                QKeyEvent key(QEvent::KeyPress,Qt::Key_Greater,Qt::NoModifier,">"); QApplication::sendEvent(&h.editor,&key);
+                auto expected=input+">"; if(input=="<tag" || input.startsWith("<tag ")) expected+="</tag>";
+                require(h.text()==expected,"Demo close tag scan");
+                require(h.editor.send(SCI_GETCURRENTPOS)==input.size()+1,"Demo caret before closing tag");
+            }
+            h.languageType=3; h.set("<tag"); h.editor.send(SCI_GOTOPOS,4);
+            QKeyEvent key(QEvent::KeyPress,Qt::Key_Greater,Qt::NoModifier,">"); QApplication::sendEvent(&h.editor,&key);
+            require(h.text()=="<tag>","Demo language gate");
+            h.set("one\ntwo\nthree"); run(16); QWidget* panel=nullptr;
+            for(auto w:QApplication::topLevelWidgets()) if(w->objectName()=="pluginDemoDock") panel=w;
+            require(panel,"Demo dock creation"); panel->findChild<QLineEdit*>("demoLine")->setText("2"); panel->findChild<QPushButton*>("demoGo")->click();
+            require(h.editor.send(SCI_GETCURRENTPOS)==4,"Demo line navigation");
+            h.editor.send(SCI_SETZOOM,3); run(1); QCoreApplication::processEvents();
+            event(NPP_PLUGIN_NOTIFICATION_SHUTDOWN); require(h.editor.send(SCI_GETZOOM)==3,"Demo shutdown restores zoom");
+            require(init(&info),"Demo reload"); commands=funcs(&count);
+            require(commands[9].initially_checked,"Demo toggle persists");
+        } else if (id=="GotoLineCol") {
             if(argc>3) {
                 h.set("first\nabcdef"); h.editor.send(SCI_GOTOPOS,6);
                 event(NPP_PLUGIN_NOTIFICATION_BUFFER_ACTIVATED);

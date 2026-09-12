@@ -1,7 +1,7 @@
 # Qt 插件构建
 
-状态与原始逻辑映射见 [PORTING_STATUS.md](PORTING_STATUS.md)。目前 17 个插件接入构建，
-其余有源码插件仍在移植；7 个仅提供 DLL 的插件按用户要求跳过。
+状态与原始逻辑映射见 [PORTING_STATUS.md](PORTING_STATUS.md)。目前 24 个有源码插件接入构建；
+7 个仅提供 DLL 的插件按用户要求跳过。平台与验证限制见状态记录。
 
 需要 CMake、C++17 编译器、Qt Widgets 和旁边的 `notepad-plus-plus` Qt 宿主源码。
 Qt 6 构建 BetterMultiSelection 时还需要 Core5Compat。插件与宿主必须使用兼容的 Qt 和编译器。
@@ -35,3 +35,9 @@ Windows 测试会短暂显示测试窗口，并使用系统剪贴板。
 产物位于 `build-qt/plugins/<插件名>-qt/`。安装包中对应文件夹可复制到 Qt 宿主的
 `plugins` 目录；这是 Qt 跨平台 ABI 模块，不能加载到原版 Win32 Notepad++。
 当前只实际验证 Windows x64 / Qt 5.12.12 / MinGW 7.3。
+
+新增引擎依赖：Windows 需要 .NET Framework 4.8、带 Roslyn 的 .NET SDK 和 Python 3；
+XMLTools 另需 Visual Studio 2022 C++/ATL 与 Windows SDK。其 MSXML 后端与 MinGW Qt 模块通过
+UTF-8 JSON 行协议隔离，不混用 C++ ABI。SDK 仅用于编译，Windows 托管引擎运行时为 Framework。
+非 Windows 托管引擎当前目标 net7.0，尚未验证；MSXML 功能不支持非 Windows。
+必须随插件复制 engine 子目录，JsonTools 还包含原测试 fixture。

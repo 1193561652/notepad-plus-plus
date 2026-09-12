@@ -100,5 +100,47 @@
     "url": "https://github.com/1193561652/SurroundSelection.git",
     "revision": "327f0b73e03473f65b783bd1643310dde178cc10",
     "branch": "qt-port"
+  },
+  {
+    "directory": "codealignment",
+    "url": "https://github.com/1193561652/codealignment.git",
+    "revision": "f64cf5e02dee38d6f76774e2cd467d8db0429ce2",
+    "branch": "qt-port"
+  },
+  {
+    "directory": "DoxyIt",
+    "url": "https://github.com/1193561652/DoxyIt.git",
+    "revision": "e4f3107d85ed30aa513acd94aea6620dd8a45bd4",
+    "branch": "qt-port"
+  },
+  {
+    "directory": "JsonToolsNppPlugin",
+    "url": "https://github.com/1193561652/JsonToolsNppPlugin.git",
+    "revision": "33dcaff717125058e3dc907b65551aa734dfa1c0",
+    "branch": "qt-port"
+  },
+  {
+    "directory": "npp-session-manager",
+    "url": "https://github.com/1193561652/npp-session-manager.git",
+    "revision": "077fc534f955eb04885862ab848bca4e1e57932d",
+    "branch": "qt-port"
+  },
+  {
+    "directory": "plugindemo",
+    "url": "https://github.com/1193561652/plugindemo.git",
+    "revision": "ab6f46fa759a9701dc80a4a1c24d9eba88c41b5d",
+    "branch": "qt-port"
+  },
+  {
+    "directory": "RandomValuesNPP",
+    "url": "https://github.com/1193561652/RandomValuesNPP.git",
+    "revision": "b693b14c705d3ad63f13ca2173744380c95f1f04",
+    "branch": "qt-port"
+  },
+  {
+    "directory": "xmltools",
+    "url": "https://github.com/1193561652/xmltools.git",
+    "revision": "7ff3ebdfa12f8b81ec2cab184b6e244e10341571",
+    "branch": "qt-port"
   }
 ]

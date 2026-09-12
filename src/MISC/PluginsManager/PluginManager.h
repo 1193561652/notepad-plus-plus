@@ -152,6 +152,7 @@ private:
     static uint64_t NPP_PLUGIN_CALL bufferAt(
         void* context, int32_t view, int32_t index);
     static int32_t NPP_PLUGIN_CALL currentLanguage(void* context);
+    static size_t NPP_PLUGIN_CALL currentLanguageName(void* context, char* output, size_t capacity);
     void notify(const LoadedPlugin& plugin,
                 const NppPluginNotification& notification) const;
 

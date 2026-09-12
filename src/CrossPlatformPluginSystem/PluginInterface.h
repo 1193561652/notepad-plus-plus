@@ -200,6 +200,8 @@ typedef struct NppPluginHostInfo {
     NppPluginSetStatusBarText set_status_bar_text;
     NppPluginGetBufferAt get_buffer_at;
     NppPluginGetCurrentLanguage get_current_language;
+    /* Current lexer/UDL name in UTF-8, same buffer sizing contract as file path. */
+    NppPluginGetCurrentFilePath get_current_language_name;
 } NppPluginHostInfo;
 
 typedef struct NppPluginShortcutKey {

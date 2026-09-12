@@ -37,6 +37,8 @@ public:
         { return QStringLiteral("/config"); }
     QString currentFilePath() const override
         { return QStringLiteral("current.txt"); }
+    QString currentLanguageName() const override
+        { return QString::fromUtf8("自定义语言"); }
     bool openFile(const QString& path) override
         { openedPath = path; return true; }
     bool isDarkModeEnabled() const override { return false; }
