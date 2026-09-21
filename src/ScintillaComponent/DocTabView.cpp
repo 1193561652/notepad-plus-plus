@@ -272,6 +272,7 @@ void DocTabView::addBufferView(Buffer* buf, ScintillaEditView* view)
         reinterpret_cast<quintptr>(buf))));
     _tabBar->setCurrentIndex(idx);
     attachBuffer(idx);
+    refreshTabBarGeometry();
 }
 
 void DocTabView::addClone(Buffer* buf, ScintillaEditView* cloneView)
@@ -286,6 +287,7 @@ void DocTabView::addClone(Buffer* buf, ScintillaEditView* cloneView)
         reinterpret_cast<quintptr>(buf))));
     _tabBar->setCurrentIndex(idx);
     attachBuffer(idx);
+    refreshTabBarGeometry();
 }
 
 void DocTabView::setIndividualTabColour(Buffer* buf, int colour)
@@ -324,6 +326,7 @@ void DocTabView::removeTab(int index)
     buffer->removeView(_editor);
     _viewStates.remove(buffer);
     _tabBar->removeTab(index);
+    refreshTabBarGeometry();
     if (_tabBar->count() == 0) {
         _attachedBuffer = nullptr;
         _editor->createStandardDocument();
@@ -373,6 +376,21 @@ void DocTabView::refreshTabIcons()
     static_cast<NppTabBar*>(_tabBar)->refreshAppearance();
     for (int i = 0; i < _tabBar->count(); ++i)
         _tabBar->setTabIcon(i, bufferIcon(bufferAt(i)));
+    refreshTabBarGeometry();
+}
+
+void DocTabView::refreshTabBarGeometry()
+{
+    // The original DocTabView sends WM_SIZE to its parent after changing the
+    // tab collection.  QTabBar's height hint likewise changes when the first
+    // tab is added, but Qt 5 can retain the empty bar's zero-height allocation
+    // when this happens before the top-level window is shown.  Preserve the
+    // style/DPI-derived height as the dynamic minimum, then recompute layout.
+    _tabBar->setMinimumHeight(
+        _tabBar->count() > 0 ? _tabBar->sizeHint().height() : 0);
+    _tabBar->updateGeometry();
+    layout()->invalidate();
+    layout()->activate();
 }
 
 void DocTabView::sortBuffersByName(bool ascending)

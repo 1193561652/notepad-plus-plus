@@ -686,6 +686,8 @@ int main(int argc, char* argv[])
         return 23;
     if (!restoredCoexistenceSession
         && (mainTabs->tabBar()->count() != 1
+        || mainTabs->tabBar()->isHidden()
+        || mainTabs->tabBar()->height() <= 0
         || mainTabs->tabBar()->tabRect(0).width() >=
             mainTabs->tabBar()->width() / 2)) {
         return 42;

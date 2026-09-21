@@ -183,11 +183,6 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
         move(startupOptions.windowX, startupOptions.windowY);
     if (startupOptions.alwaysOnTop)
         setWindowFlag(Qt::WindowStaysOnTopHint, true);
-    if (startupOptions.noTabBar) {
-        _mainDocTab->tabBar()->hide();
-        _subDocTab->tabBar()->hide();
-    }
-
     // 根据配置恢复会话或新建空白文档
     bool restored = false;
     if (!startupOptions.noSession && !startupOptions.openSession &&
@@ -198,6 +193,14 @@ MainWindow::MainWindow(const CommandLineOptions& startupOptions, QWidget *parent
     if (!restored && !startupOptions.hasFiles() &&
         startupOptions.quoteType < 0)
         doNewBuffer(_mainDocTab);
+
+    // Apply tab visibility only after session/new-buffer creation.  A QTabBar
+    // with no items may have a collapsed size hint; explicitly showing it
+    // after the tabs exist prevents it from remaining collapsed.
+    const bool showTabBar =
+        !startupOptions.noTabBar && !gui._tabHide;
+    _mainDocTab->tabBar()->setVisible(showTabBar);
+    _subDocTab->tabBar()->setVisible(showTabBar);
 
     updateRecentFilesMenu();
     initActionStates();

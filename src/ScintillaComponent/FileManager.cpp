@@ -218,20 +218,24 @@ bool FileManager::loadBufferContent(
         return false;
     }
 
-    if (buf->isLargeFile() && !view->createLargeDocument()) {
+    // Match the original FileManager::_pscratchTilla loading path: build the
+    // complete document in an unattached Scintilla view, then publish it to
+    // the visible editor only after every block has loaded successfully.
+    ScintillaEditView scratchView;
+    if (buf->isLargeFile() && !scratchView.createLargeDocument()) {
         if (errorMessage)
             *errorMessage =
                 "Scintilla could not create a large-text document.";
         return false;
     }
-    view->setLargeFileMode(buf->isLargeFile());
-    view->beginBulkLoad(buf->sourceFileSize());
+    scratchView.setLargeFileMode(buf->isLargeFile());
+    scratchView.beginBulkLoad(buf->sourceFileSize());
 
     const int bomSize = bomSizeFor(format.encoding, sample);
     if (!file.seek(bomSize)) {
         if (errorMessage)
             *errorMessage = file.errorString();
-        view->endBulkLoad();
+        scratchView.endBulkLoad();
         return false;
     }
 
@@ -247,7 +251,7 @@ bool FileManager::loadBufferContent(
         if (block.isEmpty() && file.error() != QFile::NoError) {
             if (errorMessage)
                 *errorMessage = file.errorString();
-            view->endBulkLoad();
+            scratchView.endBulkLoad();
             return false;
         }
         QByteArray input = pendingInput;
@@ -260,25 +264,25 @@ bool FileManager::loadBufferContent(
         const QString text = decoder->toUnicode(
             input.constData(), input.size());
         if (decoder->hasFailure() ||
-            !view->appendUtf8Chunk(text.toUtf8())) {
+            !scratchView.appendUtf8Chunk(text.toUtf8())) {
             if (errorMessage)
                 *errorMessage =
                     "The file could not be decoded or allocated.";
-            view->endBulkLoad();
+            scratchView.endBulkLoad();
             return false;
         }
     }
     const QString finalText = decoder->toUnicode(
         pendingInput.constData(), pendingInput.size());
     if (!finalText.isEmpty() &&
-        !view->appendUtf8Chunk(finalText.toUtf8())) {
+        !scratchView.appendUtf8Chunk(finalText.toUtf8())) {
         if (errorMessage)
             *errorMessage = "Scintilla could not allocate the final text block.";
-        view->endBulkLoad();
+        scratchView.endBulkLoad();
         return false;
     }
     decoder->toUnicode("", 0);
-    const bool scintillaOk = view->endBulkLoad();
+    const bool scintillaOk = scratchView.endBulkLoad();
     if (decoder->hasFailure() || decoder->needsMoreData() ||
         !scintillaOk) {
         if (errorMessage)
@@ -286,6 +290,9 @@ bool FileManager::loadBufferContent(
                 "The file ended with an incomplete character or Scintilla error.";
         return false;
     }
+
+    view->setDocument(scratchView.document());
+    view->setLargeFileMode(buf->isLargeFile());
 
     buf->setEncoding(format.encoding);
     buf->setHasBom(format.hasBom);

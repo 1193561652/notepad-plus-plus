@@ -25,6 +25,7 @@
 | 32 位拒绝、64 位确认 | `MainWindow::confirmHugeFileOpen()` |
 | 大文本 Scintilla 文档 | `ScintillaEditView::createLargeDocument()` |
 | 128 KiB 流式加载 | `FileManager::loadBufferContent()` |
+| 不可见 scratch 视图加载 | `FileManager::loadBufferContent()` |
 | 流式保存和 gap 分段 | `FileManager::saveBufferCopy()` |
 | UTF-16 跨块代理项保护 | `takeIncompleteUtf16Tail()` |
 | 指针宽度消息接口 | `ScintillaEditView::execute()` / `sptr_t` |
@@ -44,6 +45,8 @@
 - 不增加大文件提示、状态栏标记或可配置阈值。
 - reload 可在普通文档和大文档之间切换；clone 继续共享同一文档。
 - 打开和保存不经过 `readAll -> QString -> setText` 或 `view->text()` 全文副本。
+- 分块内容先写入 `FileManager` 的不可见 scratch Scintilla，完整成功后才把文档
+  交给可见编辑器；加载失败不会替换当前文档。
 
 URL Hotspot、XML 标签匹配、字符自动配对和保存时备份均已实现；这些路径必须
 继续先检查 `Buffer::isLargeFile()`，保持 v8.4.6 的降级行为。
@@ -68,6 +71,7 @@ URL Hotspot、XML 标签匹配、字符自动配对和保存时备份均已实�
 - UTF-16 高代理项恰好落在块尾。
 - 编辑造成 Scintilla gap 后的流式保存。
 - 大文件文档内查找和替换。
+- scratch 分块加载不修改可见视图，失败时保留原文档。
 
 2026-07-26 验证结果：主程序构建成功，CTest `17/17` 通过。
 32 位拒绝分支由条件编译和公式测试覆盖，尚未在 32 位构建上实机执行；真实

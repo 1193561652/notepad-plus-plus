@@ -66,6 +66,12 @@ bool verifyStreamingCase(
     buffer->setLargeFile(true);
     buffer->setSourceFileSize(bytes.size());
     ScintillaEditView view;
+    view.setText(QStringLiteral("visible document before scratch load"));
+    int visibleModificationCount = 0;
+    QObject::connect(&view, &ScintillaEditView::textChanged,
+                     [&visibleModificationCount]() {
+                         ++visibleModificationCount;
+                     });
     buffer->setView(&view);
 
     TextDecodingOptions options;
@@ -82,6 +88,8 @@ bool verifyStreamingCase(
         (documentOptions & SC_DOCUMENTOPTION_STYLES_NONE) != 0 &&
         (documentOptions & SC_DOCUMENTOPTION_TEXT_LARGE) != 0,
         "Large Scintilla document options were not applied");
+    ok &= check(visibleModificationCount == 0,
+                "Streaming blocks were written through the visible editor");
     ok &= check(view.isLargeFileMode() &&
                 view.wrapMode() == WrapNone &&
                 !view.hasLexer() &&
@@ -353,6 +361,33 @@ int main(int argc, char** argv)
             temporary.filePath(QStringLiteral("split-legacy.txt")),
             legacyCodec->fromUnicode(legacyText),
             QStringLiteral("windows-1252"), legacyText, false);
+    }
+
+    {
+        const QString invalidPath =
+            temporary.filePath(QStringLiteral("invalid-utf8.txt"));
+        ok &= check(writeBytes(invalidPath, QByteArray("\xC3", 1)),
+                    "Could not create invalid UTF-8 input");
+        Buffer* buffer = MainFileManager.loadBuffer(invalidPath);
+        ok &= check(buffer != nullptr,
+                    "Could not register invalid UTF-8 test buffer");
+        if (buffer) {
+            ScintillaEditView view;
+            view.setText(QStringLiteral("keep this document"));
+            const qintptr originalDocument = view.document();
+            buffer->setView(&view);
+            TextDecodingOptions options;
+            options.filePath = invalidPath;
+            QString error;
+            ok &= check(!MainFileManager.loadBufferContent(
+                            buffer, &view, options,
+                            QStringLiteral("UTF-8"), &error),
+                        "Invalid UTF-8 unexpectedly loaded");
+            ok &= check(view.document() == originalDocument &&
+                        view.text() == QStringLiteral("keep this document"),
+                        "Failed scratch load replaced the visible document");
+            MainFileManager.closeBuffer(buffer);
+        }
     }
 
     const QString backupSource =

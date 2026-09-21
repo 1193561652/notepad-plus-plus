@@ -424,7 +424,6 @@ bool MainWindow::doOpenFile(const QString& filePath, DocTabView* targetTab,
 #endif
 
     ScintillaEditView* view = targetTab->editor();
-    view->createStandardDocument();
     buf->setView(view);
 
     QString loadError;
@@ -807,15 +806,11 @@ void MainWindow::reloadFromDisk()
     const qint64 fileSize = QFileInfo(path).size();
     if (!confirmHugeFileOpen(this, fileSize))
         return;
-    const bool wasLarge = buf->isLargeFile();
     const bool isLarge = Buffer::isLargeFileSize(fileSize);
     buf->setSourceFileSize(fileSize);
     buf->setLargeFile(isLarge);
     if (isLarge)
         buf->clearBackupFile();
-    if (wasLarge && !isLarge)
-        view->createStandardDocument();
-
     QString loadError;
     if (!MainFileManager.loadBufferContent(
             buf, view, decodingOptionsForPath(path), QString(), &loadError)) {

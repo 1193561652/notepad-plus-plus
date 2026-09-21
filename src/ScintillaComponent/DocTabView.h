@@ -79,6 +79,7 @@ private:
 
     void saveCurrentViewState();
     void attachBuffer(int index);
+    void refreshTabBarGeometry();
 
     QTabBar* _tabBar = nullptr;
     ScintillaEditView* _editor = nullptr;

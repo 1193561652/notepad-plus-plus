@@ -1578,6 +1578,10 @@ void MainWindow::applyPreferencesToAllViews()
     updateStatusBar();
 
     const NppGUI& gui = NppParameters::getInstance().getNppGUI();
+    const bool showTabBar =
+        !_startupOptions.noTabBar && !gui._tabHide;
+    _mainDocTab->tabBar()->setVisible(showTabBar);
+    _subDocTab->tabBar()->setVisible(showTabBar);
     if (_backupTimer) {
         _backupTimer->setInterval(qMax(1000, gui._snapshotBackupTiming));
         if (gui._isSnapshotMode && !_backupTimer->isActive())
