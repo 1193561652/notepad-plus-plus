@@ -149,6 +149,8 @@ protected:
 	void scrollContentsBy(int, int) override {}
 
 private:
+	void TraceIme(const char *stage, QEvent *event = nullptr,
+		const Scintilla::NotificationData *notification = nullptr) const;
 	Scintilla::Internal::ScintillaQt *sqt;
 
 	QElapsedTimer time;

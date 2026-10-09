@@ -1132,6 +1132,14 @@ if(BUILD_TESTING)
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endif()
 
+    add_executable(ime-composition-tests tests/ImeCompositionTests.cpp)
+    target_link_libraries(ime-composition-tests npp-scintilla-qt Qt5::Widgets)
+    add_test(NAME ime-composition-tests COMMAND ime-composition-tests)
+    if(UNIX AND NOT APPLE)
+        set_tests_properties(ime-composition-tests PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endif()
+
     add_executable(boost-regex-tests
         tests/BoostRegexTests.cpp
         src/ScintillaComponent/ScintillaTextSearch.cpp

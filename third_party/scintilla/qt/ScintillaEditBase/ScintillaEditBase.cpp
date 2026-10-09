@@ -12,7 +12,9 @@
 #include "ScintillaQt.h"
 #include "PlatQt.h"
 
+#include <algorithm>
 #include <QApplication>
+#include <QInputMethod>
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 #include <QInputContext>
 #endif
@@ -20,6 +22,12 @@
 #include <QVarLengthArray>
 #include <QScrollBar>
 #include <QTextFormat>
+#include <QDateTime>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QDebug>
 
 constexpr int IndicatorInput = static_cast<int>(Scintilla::IndicatorNumbers::Ime);
 constexpr int IndicatorTarget = IndicatorInput + 1;
@@ -39,6 +47,103 @@ constexpr int IndicatorUnknown = IndicatorInput + 3;
 
 using namespace Scintilla;
 using namespace Scintilla::Internal;
+
+// Opt-in diagnostics only: preserve the IME and focus event handling unchanged.
+static const QString &ImeTracePath()
+{
+	static const QString path = qEnvironmentVariable("NPP_IME_TRACE");
+	return path;
+}
+
+void ScintillaEditBase::TraceIme(const char *stage, QEvent *event,
+	const NotificationData *notification) const
+{
+	if (ImeTracePath().isEmpty())
+		return;
+	static QFile file(ImeTracePath());
+	static bool attemptedOpen = false;
+	if (!attemptedOpen) {
+		attemptedOpen = true;
+		if (!file.open(QIODevice::WriteOnly | QIODevice::Append))
+			qWarning() << "Cannot open IME trace:" << file.fileName() << file.errorString();
+	}
+	if (!file.isOpen())
+		return;
+	static quint64 sequence = 0;
+	static QElapsedTimer timer;
+	if (!timer.isValid())
+		timer.start();
+	const auto pointerId = [](const void *pointer) {
+		return QString::number(reinterpret_cast<quintptr>(pointer), 16);
+	};
+	const Sci::Position length = sqt->pdoc->Length();
+	const int sampleLength = static_cast<int>(std::min<Sci::Position>(length, 256));
+	QByteArray sample(sampleLength, '\0');
+	if (sampleLength)
+		sqt->pdoc->GetCharRange(sample.data(), 0, sampleLength);
+	QJsonObject record;
+	record["seq"] = static_cast<double>(++sequence);
+	record["time"] = QDateTime::currentDateTime().toString(Qt::ISODateWithMs);
+	record["elapsedUs"] = static_cast<double>(timer.nsecsElapsed() / 1000);
+	record["pid"] = static_cast<double>(QCoreApplication::applicationPid());
+	record["stage"] = QString::fromLatin1(stage);
+	record["widget"] = pointerId(this);
+	record["document"] = pointerId(sqt->pdoc);
+	record["focusObject"] = pointerId(QGuiApplication::focusObject());
+	record["hasFocus"] = hasFocus();
+	record["appState"] = static_cast<int>(QGuiApplication::applicationState());
+	record["platform"] = QGuiApplication::platformName();
+	record["inputModule"] = qEnvironmentVariable("QT_IM_MODULE");
+	record["qtVersion"] = QString::fromLatin1(qVersion());
+	record["length"] = static_cast<double>(length);
+	record["caret"] = static_cast<double>(sqt->CurrentPosition());
+	record["anchor"] = static_cast<double>(send(SCI_GETANCHOR));
+	record["modified"] = send(SCI_GETMODIFY) != 0;
+	record["tentativeActive"] = sqt->pdoc->TentativeActive();
+	record["preeditPos"] = static_cast<double>(preeditPos);
+	record["textPrefix"] = QString::fromUtf8(sample);
+	record["textPrefixHex"] = QString::fromLatin1(sample.toHex());
+	record["textTruncated"] = length > sampleLength;
+	if (event) {
+		record["eventType"] = static_cast<int>(event->type());
+		record["accepted"] = event->isAccepted();
+		record["spontaneous"] = event->spontaneous();
+		if (event->type() == QEvent::InputMethod) {
+			const auto *ime = static_cast<QInputMethodEvent *>(event);
+			record["preedit"] = ime->preeditString();
+			record["commit"] = ime->commitString();
+			record["replacementStart"] = ime->replacementStart();
+			record["replacementLength"] = ime->replacementLength();
+			QJsonArray attributes;
+			for (const auto &attribute : ime->attributes()) {
+				QJsonObject item;
+				item["type"] = static_cast<int>(attribute.type);
+				item["start"] = attribute.start;
+				item["length"] = attribute.length;
+				attributes.append(item);
+			}
+			record["attributes"] = attributes;
+		} else if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease) {
+			const auto *key = static_cast<QKeyEvent *>(event);
+			record["key"] = key->key();
+			record["keyText"] = key->text();
+			record["modifiers"] = static_cast<int>(key->modifiers());
+			record["autoRepeat"] = key->isAutoRepeat();
+			record["nativeScanCode"] = static_cast<double>(key->nativeScanCode());
+		} else if (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut) {
+			record["focusReason"] = static_cast<int>(static_cast<QFocusEvent *>(event)->reason());
+		}
+	}
+	if (notification) {
+		record["notification"] = static_cast<int>(notification->nmhdr.code);
+		record["modificationType"] = static_cast<int>(notification->modificationType);
+		record["changePosition"] = static_cast<double>(notification->position);
+		record["changeLength"] = static_cast<double>(notification->length);
+	}
+	file.write(QJsonDocument(record).toJson(QJsonDocument::Compact));
+	file.write("\n");
+	file.flush();
+}
 
 ScintillaEditBase::ScintillaEditBase(QWidget *parent)
 : QAbstractScrollArea(parent), sqt(new ScintillaQt(this)), preeditPos(-1), wheelDelta(0)
@@ -90,6 +195,11 @@ ScintillaEditBase::ScintillaEditBase(QWidget *parent)
 
 	connect(sqt, SIGNAL(aboutToCopy(QMimeData*)),
 		this, SIGNAL(aboutToCopy(QMimeData*)));
+	if (!ImeTracePath().isEmpty()) {
+		connect(qApp, &QGuiApplication::applicationStateChanged, this,
+			[this](Qt::ApplicationState) { TraceIme("applicationStateChanged"); });
+		TraceIme("created");
+	}
 }
 
 ScintillaEditBase::~ScintillaEditBase() = default;
@@ -123,6 +233,13 @@ void ScintillaEditBase::scrollVertical(int value)
 bool ScintillaEditBase::event(QEvent *event)
 {
 	bool result = false;
+	const bool trace = !ImeTracePath().isEmpty() &&
+		(event->type() == QEvent::InputMethod || event->type() == QEvent::KeyPress ||
+		 event->type() == QEvent::KeyRelease || event->type() == QEvent::FocusIn ||
+		 event->type() == QEvent::FocusOut || event->type() == QEvent::WindowActivate ||
+		 event->type() == QEvent::WindowDeactivate);
+	if (trace)
+		TraceIme("event.before", event);
 
 	if (event->type() == QEvent::KeyPress) {
 		// Circumvent the tab focus convention.
@@ -138,6 +255,8 @@ bool ScintillaEditBase::event(QEvent *event)
 		result = QAbstractScrollArea::event(event);
 	}
 
+	if (trace)
+		TraceIme("event.after", event);
 	return result;
 }
 
@@ -627,6 +746,21 @@ void ScintillaEditBase::inputMethodEvent(QInputMethodEvent *event)
 		sqt->EnsureCaretVisible();
 		updateMicroFocus();
 	}
+	if (event->preeditString().isEmpty()) {
+		preeditPos = -1;
+		// An empty event can cancel the visible composition without clearing
+		// Qt's input-context cache (IBus HidePreeditText on Qt 5). Window
+		// deactivation commits that cache BEFORE focusOutEvent is delivered.
+		// Finish the cancellation here, after TentativeUndo, while this editor
+		// still owns the input context. Do not reset for commits/replacements.
+		if (!initialCompose && event->commitString().isEmpty() &&
+			event->replacementStart() == 0 && event->replacementLength() == 0 &&
+			QGuiApplication::focusObject() == this) {
+			TraceIme("composition.cancel.reset.before", event);
+			QGuiApplication::inputMethod()->reset();
+			TraceIme("composition.cancel.reset.after", event);
+		}
+	}
 	sqt->ShowCaretAtCurrentPosition();
 }
 
@@ -698,6 +832,10 @@ QVariant ScintillaEditBase::inputMethodQuery(Qt::InputMethodQuery query) const
 
 void ScintillaEditBase::notifyParent(NotificationData scn)
 {
+	if (scn.nmhdr.code == Notification::Modified ||
+		scn.nmhdr.code == Notification::SavePointReached ||
+		scn.nmhdr.code == Notification::SavePointLeft)
+		TraceIme("notification", nullptr, &scn);
 	emit notify(&scn);
 	switch (scn.nmhdr.code) {
 		case Notification::StyleNeeded:
