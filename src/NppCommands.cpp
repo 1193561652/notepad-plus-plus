@@ -533,9 +533,13 @@ void MainWindow::toggleWordWrap()
             if (_wordWrapAction) _wordWrapAction->setChecked(false);
             return;
         }
-        bool wrap = v->wrapMode() == WrapWord;
-        v->setWrapMode(wrap ? WrapNone : WrapWord);
-        if (_wordWrapAction) _wordWrapAction->setChecked(!wrap);
+        const bool wrap = v->wrapMode() == WrapNone;
+        // Match IDM_VIEW_WRAP: keep both views and the persisted preference
+        // in sync. applyWordWrap preserves each view's large-file restriction.
+        NppParameters::getInstance().getSVP()._doWrap = wrap;
+        _mainDocTab->editor()->applyWordWrap(wrap);
+        _subDocTab->editor()->applyWordWrap(wrap);
+        if (_wordWrapAction) _wordWrapAction->setChecked(wrap);
     }
 }
 

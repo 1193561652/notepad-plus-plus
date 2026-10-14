@@ -46,6 +46,7 @@
 #include "ScintillaComponent/DocTabView.h"
 #include "ScintillaComponent/FindReplaceDlg.h"
 #include "ScintillaComponent/ScintillaEditView.h"
+#include "WordWrapRestartTest.h"
 #ifdef Q_OS_WIN
 #include "Win32PluginSystem/Win32PluginManager.h"
 #include "Win32PluginSystem/Win32NativeDockHost.h"
@@ -315,6 +316,12 @@ int main(int argc, char* argv[])
     app.setOrganizationName(QStringLiteral("Notepad++"));
     app.setOrganizationDomain(QStringLiteral("notepad-plus-plus.org"));
     app.setFont(notepadPlusPlusUiFont());
+
+    if (argc >= 2 && QString::fromLocal8Bit(argv[1]) == "--word-wrap-restart")
+        return runWordWrapRestartTest();
+    if (argc == 4 && QString::fromLocal8Bit(argv[1]) == "--word-wrap-phase")
+        return runWordWrapRestartPhase(QString::fromLocal8Bit(argv[2]),
+                                       QString::fromLocal8Bit(argv[3]).toInt());
 
     if (argc < 2 || argc > 4) {
         qCritical("Usage: ui-parity-capture <output-directory> "

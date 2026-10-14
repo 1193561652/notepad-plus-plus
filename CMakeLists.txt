@@ -894,6 +894,11 @@ if(BUILD_TESTING)
             set(NPP_MIMETOOLS_MANAGED_FIXTURE TRUE)
         endif()
     endif()
+    add_test(NAME word-wrap-restart COMMAND ui-parity-capture --word-wrap-restart)
+    if(UNIX AND NOT APPLE)
+        set_tests_properties(word-wrap-restart PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endif()
     add_test(NAME ui-localization-runtime-100
         COMMAND ui-parity-capture
             "${CMAKE_BINARY_DIR}/ui-localization-runtime-100"
