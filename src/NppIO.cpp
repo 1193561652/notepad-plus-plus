@@ -1062,8 +1062,15 @@ void MainWindow::onBackupTimer()
         const int originalIndex = tab->currentIndex();
         for (int i = 0; i < tab->count(); ++i) {
             Buffer* buf = tab->bufferAt(i);
-            if (!buf || !buf->isDirty() ||
-                buf->isLargeFile()) continue;
+            if (!buf || buf->isLargeFile()) continue;
+            // Match FileManager::backupCurrentBuffer in v8.4.6: a clean
+            // buffer must no longer reference an earlier dirty snapshot.
+            // IME cancellation (or undo to the save point) can make it clean
+            // after a timer has already backed up tentative text.
+            if (!buf->isDirty()) {
+                buf->clearBackupFile();
+                continue;
+            }
             if (visited.contains(buf)) continue;
             visited.insert(buf);
             ScintillaEditView* view = activateBufferView(buf, tab);

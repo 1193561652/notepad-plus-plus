@@ -895,8 +895,9 @@ if(BUILD_TESTING)
         endif()
     endif()
     add_test(NAME word-wrap-restart COMMAND ui-parity-capture --word-wrap-restart)
+    add_test(NAME ime-session-restart COMMAND ui-parity-capture --ime-session-restart)
     if(UNIX AND NOT APPLE)
-        set_tests_properties(word-wrap-restart PROPERTIES
+        set_tests_properties(word-wrap-restart ime-session-restart PROPERTIES
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endif()
     add_test(NAME ui-localization-runtime-100

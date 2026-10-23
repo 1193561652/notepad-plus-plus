@@ -47,6 +47,7 @@
 #include "ScintillaComponent/FindReplaceDlg.h"
 #include "ScintillaComponent/ScintillaEditView.h"
 #include "WordWrapRestartTest.h"
+#include "ImeSessionRestartTest.h"
 #ifdef Q_OS_WIN
 #include "Win32PluginSystem/Win32PluginManager.h"
 #include "Win32PluginSystem/Win32NativeDockHost.h"
@@ -316,6 +317,12 @@ int main(int argc, char* argv[])
     app.setOrganizationName(QStringLiteral("Notepad++"));
     app.setOrganizationDomain(QStringLiteral("notepad-plus-plus.org"));
     app.setFont(notepadPlusPlusUiFont());
+
+    if (argc >= 2 && QString::fromLocal8Bit(argv[1]) == "--ime-session-restart")
+        return runImeSessionRestartTest();
+    if (argc == 4 && QString::fromLocal8Bit(argv[1]) == "--ime-session-phase")
+        return runImeSessionPhase(QString::fromLocal8Bit(argv[2]),
+                                  QString::fromLocal8Bit(argv[3]).toInt());
 
     if (argc >= 2 && QString::fromLocal8Bit(argv[1]) == "--word-wrap-restart")
         return runWordWrapRestartTest();
